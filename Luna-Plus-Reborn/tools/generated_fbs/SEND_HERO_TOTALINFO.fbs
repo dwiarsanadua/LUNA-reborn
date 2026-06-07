@@ -1,0 +1,22 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table SEND_HERO_TOTALINFO {
+    BaseObjectInfo: uint8;
+    ChrTotalInfo: uint8;
+    HeroTotalInfo: uint8;
+    SendMoveInfo: uint8;
+    UniqueIDinAgent: uint32;
+    SkillNum: uint16;
+    ItemTotalInfo: uint8;
+    OptionNum: uint16;
+    PetNum: uint16;
+    ServerTime: uint8;
+    StorageSize: uint32;
+    AddableInfo: uint8;
+    GetMsgLength: uint16;
+    sizeof: uint8;
+}

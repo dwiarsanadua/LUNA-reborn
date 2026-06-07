@@ -1,0 +1,16 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_FRIEND_READ_NOTE_WITH_PACKAGE {
+    FromName: int8;
+    NoteID: uint32;
+    ItemIdx: uint16;
+    PackageItem: uint32;
+    PackageMoney: uint32;
+    Note: int8;
+    GetMsgLength: uint16;
+    static_cast: uint8;
+}

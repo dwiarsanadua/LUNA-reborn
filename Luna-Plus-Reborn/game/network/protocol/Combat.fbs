@@ -1,0 +1,21 @@
+include "Types.fbs";
+include "PacketType.fbs";
+
+namespace luna.protocol;
+
+table AttackRequest {
+    target_id: uint32;
+    skill_id: uint16;
+    position: Vec3;
+}
+
+table AttackResult {
+    attacker_id: uint32;
+    target_id: uint32;
+    damage: int32;
+    damage_type: DamageType;
+    is_critical: bool;
+    is_miss: bool;
+    target_hp_remaining: int32;
+    effects: [DamageEffect];
+}

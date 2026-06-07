@@ -1,0 +1,16 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table STATE_INFO {
+    State_Start_Motion: int32;
+    State_Ing_Motion: int32;
+    State_End_Motion: int32;
+    State_End_MotionTime: uint32;
+    State_End_Time: uint32;
+    State_Start_Time: uint32;
+    bEndState: bool;
+    MotionSpeedRate: float;
+}

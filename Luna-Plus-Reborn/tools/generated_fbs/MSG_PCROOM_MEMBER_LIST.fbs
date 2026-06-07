@@ -1,0 +1,14 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_PCROOM_MEMBER_LIST {
+    count: uint8;
+    PartyStage: uint16;
+    StageMemberMin: uint16;
+    PCRoomMemList: uint8;
+    GetMsgLength: uint16;
+    static_cast: uint8;
+}

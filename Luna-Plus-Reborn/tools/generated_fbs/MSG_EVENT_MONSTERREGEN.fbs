@@ -1,0 +1,16 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_EVENT_MONSTERREGEN {
+    MonsterKind: uint16;
+    cbMobCount: uint8;
+    wMap: uint16;
+    cbChannel: uint8;
+    Pos: Vec3;
+    wRadius: uint16;
+    ItemID: uint32;
+    dwDropRatio: uint32;
+}

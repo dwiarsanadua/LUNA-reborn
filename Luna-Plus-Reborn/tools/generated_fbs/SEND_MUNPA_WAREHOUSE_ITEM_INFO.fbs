@@ -1,0 +1,16 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table SEND_MUNPA_WAREHOUSE_ITEM_INFO {
+    info: uint8;
+    wOptionCount: uint16;
+    wRareOptionCount: uint16;
+    wPetInfoCount: uint16;
+    bTabNum: uint8;
+    AddableInfo: uint8;
+    GetSize: uint16;
+    static_cast: uint8;
+}

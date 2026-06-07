@@ -1,0 +1,13 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_STALLMSG {
+    SellerID: uint32;
+    BuyerID: uint32;
+    ItemIdx: uint32;
+    count: uint16;
+    money: uint32;
+}

@@ -1,0 +1,11 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table SEND_GUILD_INVITE {
+    MasterIdx: uint32;
+    MasterName: int8;
+    GuildName: int8;
+}

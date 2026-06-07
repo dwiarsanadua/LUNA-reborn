@@ -1,0 +1,15 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_SIEGERECALL_LOADOBJINFO {
+    ThemeIdx: uint8;
+    MapIdx: uint16;
+    RecallMapIdx: uint16;
+    StepIdx: uint8;
+    AddObjIdx: uint8;
+    ComKind: uint8;
+    ComIndex: uint8;
+}

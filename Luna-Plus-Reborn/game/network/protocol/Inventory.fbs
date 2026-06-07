@@ -1,0 +1,22 @@
+include "Types.fbs";
+include "PacketType.fbs";
+
+namespace luna.protocol;
+
+table InventorySlot {
+    slot_index: uint8;
+    item_id: uint32;
+    count: uint16;
+    enchant: uint8;
+}
+
+table InventoryData {
+    gold: uint32;
+    slots: [InventorySlot];
+}
+
+table InventoryUpdate {
+    slot_index: uint8;
+    item_id: uint32;
+    count: uint16;
+}

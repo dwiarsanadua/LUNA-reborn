@@ -1,0 +1,12 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_PCROOM_BUFF_INFO {
+    dwBuffIndex: uint32;
+    wStage: uint16;
+    wDay: uint16;
+    bIsChanged: uint8;
+}

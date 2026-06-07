@@ -1,0 +1,11 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_SIEGERECALL_CHECK_OBJ_DIE {
+    byCheckKind: uint8;
+    check_mapNum: uint8;
+    check_ObjIdx: uint8;
+}

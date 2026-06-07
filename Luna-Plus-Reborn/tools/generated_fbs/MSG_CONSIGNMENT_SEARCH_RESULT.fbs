@@ -1,0 +1,14 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_CONSIGNMENT_SEARCH_RESULT {
+    dwCount: uint32;
+    dwStartPage: uint32;
+    dwEndPage: uint32;
+    ItemList: uint8;
+    ItemInfo: uint8;
+    OptionInfo: uint8;
+}

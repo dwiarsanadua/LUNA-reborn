@@ -1,0 +1,29 @@
+# LUNA Plus — Client Configuration
+client:
+  title: "LUNA Online Plus"
+  width: 1024
+  height: 768
+  fullscreen: false
+  vsync: true
+
+server:
+  agent_host: "127.0.0.1"
+  agent_port: 10001
+  distribute_host: "127.0.0.1"
+  distribute_port: 10003
+
+database:
+  type: sqlite
+  sqlite:
+    member_db: "data/luna_member.db"
+    game_db: "data/luna_game.db"
+    log_db: "data/luna_log.db"
+
+logging:
+  level: debug
+  file: "logs/client.log"
+  console: true
+
+assets:
+  data_path: "assets/"
+  manifest: "assets/manifest.json"

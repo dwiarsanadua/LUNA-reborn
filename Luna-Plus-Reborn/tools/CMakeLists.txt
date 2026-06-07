@@ -1,0 +1,7 @@
+add_subdirectory(chx_to_gltf)
+add_subdirectory(map_converter)
+add_subdirectory(test_combat)
+add_subdirectory(test_login)
+add_subdirectory(test_fbs)
+add_subdirectory(test_stress)
+add_subdirectory(update_manifest)

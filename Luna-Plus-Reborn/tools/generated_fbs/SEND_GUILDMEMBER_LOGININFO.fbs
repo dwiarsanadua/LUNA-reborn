@@ -1,0 +1,11 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table SEND_GUILDMEMBER_LOGININFO {
+    MemberIdx: uint32;
+    bLogIn: bool;
+    mMapType: uint8;
+}

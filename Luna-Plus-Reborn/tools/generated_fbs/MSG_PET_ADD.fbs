@@ -1,0 +1,17 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_PET_ADD {
+    MasterIdx: uint32;
+    BaseObjectInfo: uint8;
+    MoveInfo: uint8;
+    PetObjectInfo: uint8;
+    ItemInfo: uint8;
+    IsLogin: bool;
+    IsSummoned: bool;
+    AddableInfo: uint8;
+    GetMsgLength: uint16;
+}

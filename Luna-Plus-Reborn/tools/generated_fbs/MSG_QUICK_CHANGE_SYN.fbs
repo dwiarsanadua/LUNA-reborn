@@ -1,0 +1,12 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_QUICK_CHANGE_SYN {
+    tabNum1: uint8;
+    pos1: uint8;
+    tabNum2: uint8;
+    pos2: uint8;
+}

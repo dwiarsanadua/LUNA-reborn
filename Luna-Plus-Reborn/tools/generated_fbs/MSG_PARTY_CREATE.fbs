@@ -1,0 +1,18 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_PARTY_CREATE {
+    PartyOpt: uint8;
+    JobGrade: uint8;
+    Race: uint8;
+    DiceGrade: uint8;
+    MapType: uint8;
+    PartyIDX: uint32;
+    MasterID: uint32;
+    MasterLv: uint32;
+    Job: uint8;
+    Name: int8;
+}

@@ -1,0 +1,11 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table SKILL_TREE_INFO {
+    ClassIndex: uint16;
+    Count: uint16;
+    SkillIndex: uint32;
+}

@@ -1,0 +1,41 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table ACTIVE_SKILL_INFO {
+    OperatorEffect: int32;
+    TargetEffect: int32;
+    SkillEffect: int32;
+    AnimationTime: uint32;
+    CastingTime: uint32;
+    DelayType: uint16;
+    DelayTime: uint32;
+    CoolTime: uint32;
+    Target: uint16;
+    Range: uint16;
+    Area: uint8;
+    AreaTarget: uint8;
+    AreaData: uint16;
+    Unit: uint8;
+    UnitDataType: uint16;
+    UnitData: uint32;
+    Success: uint16;
+    Cancel: uint16;
+    TrainPoint: uint16;
+    TrainMoney: uint32;
+    Buff: uint32;
+    BuffRate: uint16;
+    RequiredBuff: uint32;
+    IsMove: bool;
+    RequiredPlayerLevel: uint16;
+    mConsumeItem: uint8;
+    ConsumePoint: uint8;
+    Type: uint8;
+    mValue: uint32;
+    mIsBattle: bool;
+    mIsPeace: bool;
+    mIsMove: bool;
+    mIsStop: bool;
+}

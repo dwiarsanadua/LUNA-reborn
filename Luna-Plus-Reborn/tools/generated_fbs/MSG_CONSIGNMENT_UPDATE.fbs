@@ -1,0 +1,13 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_CONSIGNMENT_UPDATE {
+    dwConsignmentIndex: uint32;
+    wUpdateKind: uint16;
+    dwBuyItemIndex: uint32;
+    dwBuyTotalPrice: uint32;
+    wBuyDurability: uint16;
+}

@@ -1,0 +1,5 @@
+if(APPLE)
+    set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/dist/LunaPlus.app/Contents/MacOS")
+else()
+    set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/dist")
+endif()

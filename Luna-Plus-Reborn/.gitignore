@@ -1,0 +1,34 @@
+# Build directories
+build/
+bin/
+lib/
+out/
+.ninja_deps
+.ninja_log
+CMakeCache.txt
+CMakeFiles/
+
+# IDEs
+.vscode/
+.idea/
+.vs/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Project-specific ignores
+# Assets are typically too large for standard Git repos. 
+# Use Git LFS or separate download.
+assets/
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+
+# Python cache
+__pycache__/
+*.pyc

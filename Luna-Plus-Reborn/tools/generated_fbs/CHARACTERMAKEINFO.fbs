@@ -1,0 +1,17 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table CHARACTERMAKEINFO {
+    Name: int8;
+    UserID: uint32;
+    RaceType: uint8;
+    SexType: uint8;
+    HairType: uint8;
+    FaceType: uint8;
+    JobType: uint8;
+    StandingArrayNum: uint8;
+    bDuplCheck: bool;
+}

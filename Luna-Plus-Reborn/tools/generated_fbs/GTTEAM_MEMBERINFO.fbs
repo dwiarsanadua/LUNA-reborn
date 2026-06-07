@@ -1,0 +1,12 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table GTTEAM_MEMBERINFO {
+    TeamGuildIdx: uint32;
+    TeamLevel: uint32;
+    TeamMember: uint16;
+    TeamDieMember: uint16;
+}

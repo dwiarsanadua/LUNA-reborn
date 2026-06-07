@@ -1,0 +1,23 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_GUILD_DATA {
+    mIndex: uint32;
+    mLevel: uint32;
+    mLocation: uint8;
+    mUnionIndex: uint32;
+    mScore: uint32;
+    mWarehouseSize: uint32;
+    mWarehouseRank: uint32;
+    mName: int8;
+    mIntro: int8;
+    mMark: int8;
+    mNotice: int8;
+    mMemberSize: uint32;
+    mMember: uint8;
+    GetSize: uint32;
+    sizeof: uint8;
+}

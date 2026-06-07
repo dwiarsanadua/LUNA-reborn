@@ -1,0 +1,16 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table CONDUCT_INFO {
+    ConductName: int8;
+    ConductIdx: uint16;
+    ConductTootipIdx: uint16;
+    ConductKind: uint16;
+    ConductPos: uint16;
+    HighImage: int32;
+    MotionIdx: int32;
+    bInvalidOnVehicle: bool;
+}

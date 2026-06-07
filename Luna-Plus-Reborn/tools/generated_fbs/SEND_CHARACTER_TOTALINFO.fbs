@@ -1,0 +1,20 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table SEND_CHARACTER_TOTALINFO {
+    BaseObjectInfo: uint8;
+    TotalInfo: uint8;
+    MoveInfo: uint8;
+    Vehicle: uint8;
+    mVehicleIndex: uint32;
+    mSeatIndex: uint32;
+    stHouseRideInfo: uint8;
+    dwFurnitureObjectIndex: uint32;
+    wSlot: uint16;
+    bLogin: uint8;
+    AddableInfo: uint8;
+    GetMsgLength: uint16;
+}

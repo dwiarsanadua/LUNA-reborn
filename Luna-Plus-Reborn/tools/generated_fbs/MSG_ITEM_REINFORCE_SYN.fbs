@@ -1,0 +1,17 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_ITEM_REINFORCE_SYN {
+    mSourceItemIndex: uint32;
+    mSourceItemPosition: uint16;
+    mSourceItemDbIndex: uint32;
+    mSize: uint16;
+    mProtectionItem: uint8;
+    mSupportItem: uint8;
+    mItem: uint8;
+    GetSize: uint32;
+    sizeof: uint8;
+}

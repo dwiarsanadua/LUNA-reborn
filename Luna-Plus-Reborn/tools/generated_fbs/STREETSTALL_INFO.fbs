@@ -1,0 +1,17 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table STREETSTALL_INFO {
+    StallOwnerID: uint32;
+    Title: int8;
+    Item: uint8;
+    StallKind: uint16;
+    count: uint16;
+    PetItemCount: uint16;
+    AddableInfo: uint8;
+    GetSize: uint16;
+    sizeof: uint8;
+}

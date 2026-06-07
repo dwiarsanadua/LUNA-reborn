@@ -1,0 +1,15 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table QUESTNPCINFO {
+    dwObjIdx: uint32;
+    wMapNum: uint8;
+    wNpcKind: uint16;
+    sName: int8;
+    wNpcIdx: uint16;
+    vPos: Vec3;
+    fDir: float;
+}

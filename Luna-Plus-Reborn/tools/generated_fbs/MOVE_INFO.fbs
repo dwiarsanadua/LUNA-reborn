@@ -1,0 +1,21 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MOVE_INFO {
+    m_bLastMoving: bool;
+    m_bEffectMoving: bool;
+    m_dwMoveCalculateTime: uint32;
+    m_bMoveCalculateTime: bool;
+    Move_LastCalcTime: uint32;
+    Move_StartTime: uint32;
+    Move_StartPosition: Vec3;
+    Move_Direction: Vec3;
+    Move_EstimateMoveTime: float;
+    bApplyGravity: bool;
+    dwValidGravityTime: uint32;
+    fGravityAcceleration: float;
+    fGravitySpeed: float;
+}

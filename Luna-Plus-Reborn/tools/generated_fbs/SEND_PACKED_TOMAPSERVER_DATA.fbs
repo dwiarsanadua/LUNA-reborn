@@ -1,0 +1,13 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table SEND_PACKED_TOMAPSERVER_DATA {
+    ToMapNum: uint8;
+    wRealDataSize: uint16;
+    Data: int8;
+    GetMsgLength: uint16;
+    sizeof: uint8;
+}

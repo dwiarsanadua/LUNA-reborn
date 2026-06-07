@@ -1,0 +1,26 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table HERO_TOTALINFO {
+    Str: uint32;
+    Dex: uint32;
+    Vit: uint32;
+    Int: uint32;
+    Wis: uint32;
+    Mana: uint32;
+    MaxMana: uint32;
+    ExpPoint: uint8;
+    LevelUpPoint: uint16;
+    Money: uint32;
+    PartyID: uint32;
+    Playtime: uint32;
+    LastPKModeEndTime: uint32;
+    MaxLevel: uint16;
+    MunpaCanEntryDate: int8;
+    FamilyCanEntryDate: int8;
+    SkillPoint: uint32;
+    bUsingTwoBlade: bool;
+}

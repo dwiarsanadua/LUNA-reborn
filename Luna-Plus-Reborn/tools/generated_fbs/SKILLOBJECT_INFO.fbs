@@ -1,0 +1,22 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table SKILLOBJECT_INFO {
+    SkillObjectIdx: uint32;
+    SkillIdx: uint32;
+    Pos: Vec3;
+    StartTime: uint32;
+    Direction: Vec3;
+    SkillLevel: uint8;
+    Operator: uint32;
+    MainTarget: uint8;
+    BattleID: uint32;
+    Option: uint16;
+    Rate: float;
+    RemainTime: uint32;
+    Count: int32;
+    IsNew: uint8;
+}

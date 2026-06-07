@@ -1,0 +1,3 @@
+add_subdirectory(AgentServer)
+add_subdirectory(DistributeServer)
+add_subdirectory(MapServer)

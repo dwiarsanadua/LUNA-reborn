@@ -1,0 +1,14 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_HOUSE_CREATESRV {
+    dwPlayerID: uint32;
+    dwPlayerMapNum: uint32;
+    dwConnectionIndex: uint32;
+    szHouseName: int8;
+    GetMsgLength: uint16;
+    static_cast: uint8;
+}

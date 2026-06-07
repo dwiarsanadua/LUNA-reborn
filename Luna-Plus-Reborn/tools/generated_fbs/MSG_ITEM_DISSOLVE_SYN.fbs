@@ -1,0 +1,21 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_ITEM_DISSOLVE_SYN {
+    mSourceSize: uint8;
+    mSize: uint8;
+    Item: uint8;
+    Type: uint8;
+    mIndex: uint32;
+    mDbIndex: uint32;
+    mPosition: uint16;
+    mQuantity: uint8;
+    Add: bool;
+    FALSE: uint8;
+    TRUE: uint8;
+    GetSize: uint8;
+    sizeof: uint8;
+}

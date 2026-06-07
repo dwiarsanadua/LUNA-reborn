@@ -1,0 +1,15 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_ITEM_MIX_ACK {
+    mSourceItemPosition: uint16;
+    mSourceItemDbIndex: uint32;
+    mMixSize: uint32;
+    mResultIndex: uint32;
+    mUpdateResult: uint8;
+    GetSize: uint8;
+    sizeof: uint8;
+}

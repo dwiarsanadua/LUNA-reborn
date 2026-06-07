@@ -1,0 +1,16 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_DUNGEON_INFO {
+    dwIndex: uint32;
+    dwPartyIndex: uint32;
+    dwChannelID: uint32;
+    dwPoint: uint32;
+    dwJoinPlayerNum: uint32;
+    difficulty: uint8;
+    warpState: uint8;
+    SwitchNpcState: uint8;
+}

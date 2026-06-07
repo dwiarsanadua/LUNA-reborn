@@ -1,0 +1,12 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_FISHING_MISSION_CODE {
+    dwItem1: uint32;
+    dwItem2: uint32;
+    dwItem3: uint32;
+    dwProcessTime: uint32;
+}

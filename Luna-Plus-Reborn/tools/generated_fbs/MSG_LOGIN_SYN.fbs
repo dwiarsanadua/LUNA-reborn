@@ -1,0 +1,17 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_LOGIN_SYN {
+    AuthKey: uint32;
+    _id: int8;
+    pw: int8;
+    _id: int8;
+    pw: int8;
+    Version: int8;
+    strSecurityPW: int8;
+    Check: uint8;
+    mLoginKey: int8;
+}

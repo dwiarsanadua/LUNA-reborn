@@ -1,0 +1,12 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_RECALL_NACK {
+    Type: uint8;
+    mKey: uint32;
+    mRecallPlayerName: uint8;
+    mTargetPlayerName: uint8;
+}

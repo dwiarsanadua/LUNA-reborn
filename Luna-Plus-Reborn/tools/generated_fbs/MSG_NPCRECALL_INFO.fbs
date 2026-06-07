@@ -1,0 +1,16 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_NPCRECALL_INFO {
+    dwCreatedIdx: uint32;
+    byRecallCodition: uint8;
+    dwNpcIdx: uint32;
+    wNpcKind: uint16;
+    RecallMapNum: uint8;
+    fXpos: float;
+    fZpos: float;
+    byActive: uint8;
+}

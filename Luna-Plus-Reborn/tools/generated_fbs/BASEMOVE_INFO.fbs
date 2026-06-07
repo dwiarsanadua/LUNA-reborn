@@ -1,0 +1,24 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table BASEMOVE_INFO {
+    CurPosition: Vec3;
+    CurTargetPositionIdx: uint8;
+    MaxTargetPositionIdx: uint8;
+    TargetPositions: Vec3;
+    bMoving: uint8;
+    MoveMode: uint8;
+    AddedMoveSpeed: float;
+    KyungGongIdx: uint16;
+    SetFrom: uint8;
+    GetCurTargetPosIdx: uint8;
+    GetMaxTargetPosIdx: uint8;
+    SetCurTargetPosIdx: uint8;
+    SetMaxTargetPosIdx: uint8;
+    InitTargetPosition: uint8;
+    SetTargetPosition: uint8;
+    SetTargetPosition: uint8;
+}

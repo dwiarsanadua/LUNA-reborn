@@ -1,0 +1,12 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MAPOBJECT_INFO {
+    Life: uint32;
+    MaxLife: uint32;
+    PhyDefence: uint32;
+    Radius: float;
+}

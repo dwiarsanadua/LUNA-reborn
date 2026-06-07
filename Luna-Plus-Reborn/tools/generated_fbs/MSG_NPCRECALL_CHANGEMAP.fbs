@@ -1,0 +1,14 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_NPCRECALL_CHANGEMAP {
+    dwNpcIdx: uint32;
+    CurMapNum: uint8;
+    ChangeMapNum: uint8;
+    ChannelNum: uint8;
+    fChangeMapXPos: float;
+    fChangeMapZPos: float;
+}

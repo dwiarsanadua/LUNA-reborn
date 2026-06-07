@@ -1,0 +1,26 @@
+include "Types.fbs";
+include "PacketType.fbs";
+
+namespace luna.protocol;
+
+table MoveRequest {
+    direction: Vec3;
+    target_position: Vec3;
+    move_mode: MoveMode;
+}
+
+table MoveResponse {
+    entity_id: uint32;
+    position: Vec3;
+    velocity: Vec3;
+    timestamp: uint64;
+}
+
+table EntityMove {
+    entity_id: uint32;
+    position: Vec3;
+    target: Vec3;
+    speed: float;
+    animation: string;
+    timestamp: uint64;
+}

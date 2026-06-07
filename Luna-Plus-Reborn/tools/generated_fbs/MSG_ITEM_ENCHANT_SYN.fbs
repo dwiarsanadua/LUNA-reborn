@@ -1,0 +1,13 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_ITEM_ENCHANT_SYN {
+    ItemPos: uint16;
+    wItemIdx: uint32;
+    MaterialItemPos: uint16;
+    wMaterialItemIdx: uint32;
+    mProtectionItem: uint8;
+}

@@ -1,0 +1,16 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_HOUSE_EXTEND {
+    wExtendLevel: uint16;
+    wUnInstallNum: uint16;
+    wInstallNum: uint16;
+    dwDecoPoint: uint32;
+    UnInstall: uint8;
+    Install: uint8;
+    GetMsgLength: uint16;
+    sizeof: uint8;
+}

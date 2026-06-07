@@ -1,0 +1,33 @@
+# LUNA Plus — AgentServer Configuration
+server:
+  name: "LunaPlus AgentServer 01"
+  type: agent
+  port: 10001
+  max_connections: 500
+  worker_threads: 4
+  bind_address: "0.0.0.0"
+
+database:
+  type: sqlite    # sqlite | postgresql
+  sqlite:
+    member_db: "data/luna_member.db"
+    game_db: "data/luna_game.db"
+    log_db: "data/luna_log.db"
+  # postgres:
+  #   host: localhost
+  #   port: 5432
+  #   user: game
+  #   password: luna
+  #   member_db: LUNA_MEMBERDB
+  #   game_db: LUNA_GAMEDB
+  #   log_db: LUNA_LOGDB
+
+logging:
+  level: debug
+  file: "logs/agent.log"
+  console: true
+
+network:
+  tcp_nodelay: true
+  send_buffer_size: 65536
+  recv_buffer_size: 65536

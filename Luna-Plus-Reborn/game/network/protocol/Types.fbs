@@ -1,0 +1,58 @@
+namespace luna.protocol;
+
+struct Vec3 {
+    x: float;
+    y: float;
+    z: float;
+}
+
+enum MoveMode : byte {
+    Walk = 0, Run = 1, Sit = 2, Prone = 3,
+}
+
+enum DamageType : byte {
+    Normal = 0, Skill = 1, Dot = 2, Magic = 3, True = 4,
+}
+
+enum ChatChannel : byte {
+    All = 0, Whisper = 1, Party = 2, Guild = 3,
+    Shout = 4, World = 5, System = 6, Trade = 7,
+}
+
+enum EntityType : byte {
+    Player = 0, Monster = 1, NPC = 2, Pet = 3,
+    Vehicle = 4, DroppedItem = 5, Summon = 6,
+}
+
+enum DespawnReason : byte {
+    Death = 0, Despawn = 1, Logout = 2, DespawnTimer = 3,
+}
+
+enum LoginResult : byte {
+    Success = 0, InvalidCredentials = 1, AlreadyLoggedIn = 2,
+    Banned = 3, Maintenance = 4, VersionMismatch = 5,
+}
+
+enum ServerStatus : byte {
+    Online = 0, Busy = 1, Maintenance = 2, Offline = 3,
+}
+
+enum StatType : byte {
+    HP = 0, MP = 1, SP = 2, STR = 3, DEX = 4,
+    INT = 5, MoveSpeed = 6, AttackSpeed = 7,
+}
+
+table ServerInfo {
+    id: uint16;
+    name: string;
+    load_percent: uint8;
+    status: ServerStatus;
+    is_premium: bool;
+}
+
+table DamageEffect {
+    effect_id: uint16;
+    duration: float;
+    value: int32;
+    stat_type: StatType;
+}

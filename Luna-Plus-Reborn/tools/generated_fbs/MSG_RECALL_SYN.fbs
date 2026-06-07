@@ -1,0 +1,19 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_RECALL_SYN {
+    Player: uint8;
+    mIndex: uint32;
+    mName: int8;
+    mMapType: uint8;
+    mRecallPlayer: uint8;
+    mTargetPlayer: uint8;
+    mChannelIndex: uint32;
+    mRandomPositionRange: uint32;
+    mLimitMiliSecond: uint32;
+    mKey: uint32;
+    mSkillIndex: uint32;
+}

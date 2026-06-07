@@ -1,0 +1,24 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table SKILL_INFO {
+    Index: uint32;
+    Name: uint8;
+    Tooltip: uint32;
+    Image: int32;
+    Kind: uint8;
+    Level: uint16;
+    Party: bool;
+    Money: uint32;
+    Value: uint8;
+    mPercent: float;
+    mPlus: float;
+    mLife: uint8;
+    mMana: uint8;
+    mWeaponType: uint8;
+    mWeaponAnimationType: uint8;
+    mArmorType: uint8;
+}

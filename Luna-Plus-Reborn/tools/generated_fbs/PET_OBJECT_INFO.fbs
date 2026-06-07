@@ -1,0 +1,26 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table PET_OBJECT_INFO {
+    ID: uint32;
+    ItemDBIdx: uint32;
+    MasterIdx: uint32;
+    MasterName: int8;
+    Kind: uint32;
+    Level: uint8;
+    Grade: uint8;
+    SkillSlot: uint8;
+    Exp: uint16;
+    Friendly: uint8;
+    HP: uint32;
+    MAXHP: uint32;
+    MP: uint32;
+    MAXMP: uint32;
+    AI: uint8;
+    State: uint8;
+    Type: uint8;
+    FriendlyCheckTime: uint32;
+}

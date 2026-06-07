@@ -1,0 +1,14 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MONSTER_TOTALINFO {
+    Life: uint32;
+    MonsterKind: uint16;
+    Group: uint32;
+    MapNum: uint8;
+    OwnedObjectIndex: uint32;
+    mScriptName: uint8;
+}

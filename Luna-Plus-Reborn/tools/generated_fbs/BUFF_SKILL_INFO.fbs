@@ -1,0 +1,31 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table BUFF_SKILL_INFO {
+    DelayTime: uint32;
+    SkillEffect: int32;
+    Status: uint8;
+    DataType: uint8;
+    StatusData: float;
+    Condition: uint8;
+    Type: uint8;
+    Operation: uint8;
+    mValue: float;
+    Count: int32;
+    mRuleBattle: uint8;
+    mRulePeace: uint8;
+    mRuleMove: uint8;
+    mRuleStop: uint8;
+    mRuleRest: uint8;
+    Die: bool;
+    NoUpdate: bool;
+    CountType: uint8;
+    IsEndTime: bool;
+    mEventSkillIndex: uint32;
+    IsCash: bool;
+    Item: uint32;
+    ItemCount: uint16;
+}

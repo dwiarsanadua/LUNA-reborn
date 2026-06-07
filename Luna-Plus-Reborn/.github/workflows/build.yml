@@ -1,0 +1,179 @@
+name: LUNA Reborn CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CMAKE_BUILD_TYPE: Release
+  BGFX_DIR: external/bgfx
+
+jobs:
+  # ──────────────────────────────────────────────
+  # macOS Build (Apple Silicon)
+  # ──────────────────────────────────────────────
+  build-macos:
+    name: 🍎 macOS (arm64)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: LUNA-Plus-Reborn
+
+      - name: Install Homebrew Dependencies
+        run: |
+          brew install cmake ninja glfw glm assimp freetype libuv sqlite3 spdlog yaml-cpp fmt miniaudio
+
+      - name: Cache bgfx build
+        id: cache-bgfx
+        uses: actions/cache@v4
+        with:
+          path: external/bgfx/.build
+          key: bgfx-metal-${{ runner.os }}-${{ hashFiles('external/bgfx/scripts/cmake/') }}
+
+      - name: Build bgfx
+        if: steps.cache-bgfx.outputs.cache-hit != 'true'
+        working-directory: LUNA-Plus-Reborn
+        run: |
+          if [ -d "$BGFX_DIR" ]; then
+            mkdir -p external/bgfx/.build
+            cd external/bgfx
+            cmake -B .build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_OSX_ARCHITECTURES=arm64 \
+              -DBGFX_BUILD_EXAMPLES=OFF -DBGFX_BUILD_TOOLS=OFF
+            ninja -C .build bgfx
+          fi
+
+      - name: Configure CMake
+        working-directory: LUNA-Plus-Reborn
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_CXX_COMPILER=clang++
+
+      - name: Build All Targets
+        working-directory: LUNA-Plus-Reborn
+        run: ninja -C build
+
+      - name: Run Unit Tests
+        working-directory: LUNA-Plus-Reborn
+        run: |
+          ./build/tools/test_combat/test_combat
+          ./build/tools/test_fbs/test_fbs 2>&1 | head -5
+
+      - name: Validate Game Data
+        working-directory: LUNA-Plus-Reborn
+        run: |
+          sqlite3 assets/data/game_data.db "SELECT COUNT(*) FROM game_monsterlist;" | grep -q "1252"
+          echo "✅ Game data valid: 1,252 monsters"
+
+      - name: Validate Model Conversion
+        working-directory: LUNA-Plus-Reborn
+        run: |
+          COUNT=$(ls assets_converted/mod_objs/*.glb 2>/dev/null | wc -l)
+          echo "✅ $COUNT GLB models available"
+          [ "$COUNT" -gt 100 ] || exit 1
+
+      - name: Package DMG
+        working-directory: LUNA-Plus-Reborn
+        run: |
+          mkdir -p dist
+          cp build/client/LunaPlusClient dist/
+          cp -r assets dist/assets 2>/dev/null || true
+          cp -r assets_converted dist/assets_converted 2>/dev/null || true
+          echo "LUNA Plus Reborn v1.0.0" > dist/RELEASE.txt
+          hdiutil create -volname "LUNA Plus Reborn" \
+            -srcfolder dist -ov -format UDZO \
+            "LUNA_Plus_Reborn_macOS.dmg" 2>/dev/null || echo "⚠️ DMG creation skipped"
+
+      - name: Upload macOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: luna-reborn-macos
+          path: |
+            LUNA-Plus-Reborn/build/client/LunaPlusClient
+            LUNA-Plus-Reborn/build/server/*/*Server
+            LUNA-Plus-Reborn/build/tools/*/test_*
+            LUNA-Plus-Reborn/build/tools/*/chx_to_gltf
+            LUNA-Plus-Reborn/build/tools/*/map_converter
+            LUNA-Plus-Reborn/LUNA_Plus_Reborn_macOS.dmg
+
+  # ──────────────────────────────────────────────
+  # Windows Build (x64)
+  # ──────────────────────────────────────────────
+  build-windows:
+    name: 🪟 Windows (x64)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: LUNA-Plus-Reborn
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install vcpkg Dependencies
+        run: |
+          vcpkg install glfw3 glm assimp freetype libuv sqlite3 spdlog yaml-cpp fmt --triplet x64-windows
+        shell: pwsh
+
+      - name: Cache bgfx build
+        id: cache-bgfx
+        uses: actions/cache@v4
+        with:
+          path: external/bgfx/.build
+          key: bgfx-d3d11-${{ runner.os }}-${{ hashFiles('external/bgfx/scripts/cmake/') }}
+
+      - name: Build bgfx
+        if: steps.cache-bgfx.outputs.cache-hit != 'true'
+        working-directory: LUNA-Plus-Reborn
+        run: |
+          if (Test-Path $env:BGFX_DIR) {
+            New-Item -ItemType Directory -Force -Path external/bgfx/.build
+            cd external/bgfx
+            cmake -B .build -G Ninja -DCMAKE_BUILD_TYPE=Release `
+              -DBGFX_BUILD_EXAMPLES=OFF -DBGFX_BUILD_TOOLS=OFF
+            ninja -C .build bgfx
+          }
+        shell: pwsh
+
+      - name: Configure CMake
+        working-directory: LUNA-Plus-Reborn
+        run: |
+          cmake -B build -G Ninja `
+            -DCMAKE_BUILD_TYPE=$env:CMAKE_BUILD_TYPE `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake"
+
+      - name: Build All Targets
+        working-directory: LUNA-Plus-Reborn
+        run: ninja -C build
+
+      - name: Run Unit Tests
+        working-directory: LUNA-Plus-Reborn
+        run: |
+          .\build\tools\test_combat\test_combat.exe
+          .\build\tools\test_fbs\test_fbs.exe
+
+      - name: Package Installer
+        working-directory: LUNA-Plus-Reborn
+        run: |
+          New-Item -ItemType Directory -Force -Path dist
+          Copy-Item build/client/LunaPlusClient.exe dist/
+          Compress-Archive -Path dist/* -DestinationPath LUNA_Plus_Reborn_Windows.zip
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: luna-reborn-windows
+          path: |
+            LUNA-Plus-Reborn/build/client/LunaPlusClient.exe
+            LUNA-Plus-Reborn/build/server/*/*Server.exe
+            LUNA-Plus-Reborn/build/tools/*/test_*.exe
+            LUNA-Plus-Reborn/LUNA_Plus_Reborn_Windows.zip

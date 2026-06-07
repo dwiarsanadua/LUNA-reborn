@@ -1,0 +1,12 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table SEND_CHEAT_ITEM_OPTION {
+    bPosition: uint16;
+    wItemIdx: uint32;
+    wOptionKind: uint16;
+    OptionInfo: uint8;
+}

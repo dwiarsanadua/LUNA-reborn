@@ -1,0 +1,13 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_BATTLE_INFO {
+    BattleKind: uint8;
+    info: int8;
+    msglen: uint16;
+    GetMsgLength: int32;
+    sizeof: uint8;
+}

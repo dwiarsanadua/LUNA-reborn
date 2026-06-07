@@ -1,0 +1,48 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table CHARACTER_TOTALINFO {
+    Life: uint32;
+    MaxLife: uint32;
+    Race: uint8;
+    Gender: uint8;
+    FaceType: uint8;
+    HairType: uint8;
+    WearedItemIdx: uint32;
+    HideFlag: uint32;
+    WeaponEnchant: uint8;
+    JobGrade: uint8;
+    Job: uint8;
+    Level: uint16;
+    CurMapNum: uint8;
+    LoginMapNum: uint8;
+    bPeace: bool;
+    MapChangePoint_Index: uint16;
+    LoginPoint_Index: uint16;
+    MunpaID: uint32;
+    PositionInMunpa: uint8;
+    FamilyID: uint32;
+    nFamilyEmblemChangedFreq: uint32;
+    MarkName: uint8;
+    FamilyMarkName: uint8;
+    bVisible: bool;
+    bPKMode: uint8;
+    BadFame: uint8;
+    Height: float;
+    Width: float;
+    NickName: int8;
+    GuildName: int8;
+    FamilyNickName: int8;
+    FamilyName: int8;
+    dwGuildUnionIdx: uint32;
+    sGuildUnionName: int8;
+    dwGuildUnionMarkIdx: uint32;
+    HideLevel: uint16;
+    DetectLevel: uint16;
+    wInventoryExpansion: uint16;
+    bUsingWaterSeed: bool;
+    DateMatching: uint8;
+}

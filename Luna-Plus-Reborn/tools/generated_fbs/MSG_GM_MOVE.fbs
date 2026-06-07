@@ -1,0 +1,13 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_GM_MOVE {
+    Name: int8;
+    dwData1: uint32;
+    dwData2: uint32;
+    dwGMIndex: uint32;
+    strGMID: int8;
+}

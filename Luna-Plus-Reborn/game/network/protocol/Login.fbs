@@ -1,0 +1,25 @@
+include "Types.fbs";
+include "PacketType.fbs";
+
+namespace luna.protocol;
+
+table LoginRequest {
+    username: string (required);
+    password_hash: [uint8] (required);
+    client_version: string;
+    mac_address: string;
+}
+
+table LoginResponse {
+    result: LoginResult;
+    session_token: string;
+    server_list: [ServerInfo];
+}
+
+table ServerListRequest {
+    session_token: string;
+}
+
+table ServerListResponse {
+    servers: [ServerInfo];
+}

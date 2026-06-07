@@ -1,0 +1,14 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table MSG_FISHING_GETFISH_SYN {
+    dwPlaceIdx: uint32;
+    dwPoleItemIdx: uint32;
+    wPerpectCnt: uint16;
+    wGreatCnt: uint16;
+    wGoodCnt: uint16;
+    wMissCnt: uint16;
+}

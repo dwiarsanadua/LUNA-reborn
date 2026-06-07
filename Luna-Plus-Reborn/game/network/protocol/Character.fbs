@@ -1,0 +1,50 @@
+include "Types.fbs";
+include "PacketType.fbs";
+
+namespace luna.protocol;
+
+table CharacterInfo {
+    character_id: uint32;
+    name: string;
+    level: uint16;
+    class: uint16;
+    gender: uint8;
+    map_id: uint16;
+    position: Vec3;
+}
+
+table CharacterListRequest {
+    session_token: string;
+}
+
+table CharacterListResponse {
+    characters: [CharacterInfo];
+    max_slots: uint8;
+}
+
+table CreateCharacterRequest {
+    session_token: string;
+    name: string;
+    class: uint16;
+    gender: uint8;
+    body_type: uint8;
+    face_id: uint8;
+    hair_id: uint8;
+}
+
+table CreateCharacterResponse {
+    result: byte;
+    character: CharacterInfo;
+}
+
+table EnterWorldRequest {
+    session_token: string;
+    character_id: uint32;
+}
+
+table EnterWorldResponse {
+    result: byte;
+    map_id: uint16;
+    position: Vec3;
+    session_key: uint32;
+}

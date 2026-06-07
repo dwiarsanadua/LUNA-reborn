@@ -1,0 +1,25 @@
+# LUNA Plus — DistributeServer Configuration
+server:
+  name: "LunaPlus DistributeServer 01"
+  type: distribute
+  port: 10003
+  max_connections: 500
+  worker_threads: 4
+  bind_address: "0.0.0.0"
+
+database:
+  type: sqlite
+  sqlite:
+    member_db: "data/luna_member.db"
+    game_db: "data/luna_game.db"
+    log_db: "data/luna_log.db"
+
+logging:
+  level: debug
+  file: "logs/distribute.log"
+  console: true
+
+network:
+  tcp_nodelay: true
+  send_buffer_size: 65536
+  recv_buffer_size: 65536

@@ -1,0 +1,17 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table SEND_REGISTEDGUILDINFO {
+    MaxTeam: uint8;
+    Count: uint8;
+    CurTournament: uint16;
+    CurRound: uint16;
+    CurState: uint16;
+    PlayerID: uint32;
+    RemainTime: uint32;
+    GInfo: uint8;
+    GetSize: uint32;
+}

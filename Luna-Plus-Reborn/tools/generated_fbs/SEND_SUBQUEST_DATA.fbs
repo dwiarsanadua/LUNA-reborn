@@ -1,0 +1,11 @@
+// Auto-generated struct mapping
+namespace luna.protocol;
+
+struct Vec3 { x:float; y:float; z:float; }
+struct Vec2 { x:float; y:float; }
+
+table SEND_SUBQUEST_DATA {
+    GetSize: int32;
+    wCount: uint16;
+    QuestList: uint8;
+}
