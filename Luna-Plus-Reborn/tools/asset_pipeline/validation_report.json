@@ -1,0 +1,97 @@
+{
+  "timestamp": "2026-06-08T06:56:24.489870",
+  "assets_dir": "/Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/assets",
+  "assets_converted_dir": "/Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/assets_converted",
+  "directory_structure": {
+    "status": "ok",
+    "issues": []
+  },
+  "counts": {
+    "textures": {
+      "total": 353,
+      "by_type": {
+        ".png": 353
+      }
+    },
+    "models": {
+      "total": 7556,
+      "by_type": {
+        ".obj": 7556
+      }
+    },
+    "animations": {
+      "total": 0,
+      "by_type": {}
+    },
+    "audio": {
+      "total": 978,
+      "by_type": {
+        ".wav": 930,
+        ".mp3": 48
+      }
+    },
+    "maps": {
+      "total": 0,
+      "by_type": {}
+    },
+    "shaders": {
+      "total": 26,
+      "by_type": {
+        ".sc": 17,
+        ".bin": 9
+      }
+    },
+    "fonts": {
+      "total": 1,
+      "by_type": {
+        ".ttf": 1
+      }
+    },
+    "data": {
+      "total": 4,
+      "by_type": {
+        ".db": 4
+      }
+    },
+    "characters": {
+      "total": 1457,
+      "by_type": {
+        ".json": 1457
+      }
+    },
+    "interface": {
+      "total": 0,
+      "by_type": {}
+    },
+    "scripts": {
+      "total": 0,
+      "by_type": {}
+    },
+    "converted": {
+      "total": 9127,
+      "by_type": {
+        ".hgt": 61,
+        ".json": 53,
+        ".obj": 31,
+        ".png": 8173,
+        ".glb": 809
+      }
+    }
+  },
+  "shaders": {
+    "bin_files": 9,
+    "sc_files": 17,
+    "bin_list": [
+      "fs_unlit.bin",
+      "vs_default.bin",
+      "fs_terrain.bin",
+      "fs_lit.bin",
+      "fs_ui.bin",
+      "fs_default.bin",
+      "vs_terrain.bin",
+      "vs_unlit.bin",
+      "vs_skinned.bin"
+    ]
+  },
+  "issues": []
+}
