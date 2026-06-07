@@ -1,3 +1,6 @@
 add_subdirectory(gx_render)
+add_subdirectory(gx_geom)
+add_subdirectory(physics)
+add_subdirectory(resource)
 add_subdirectory(network)
 add_subdirectory(scripting)
