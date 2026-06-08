@@ -77,7 +77,7 @@ bool MapServer::Initialize(int map_id, uint16_t port) {
         return false;
     }
 
-    network_->SetReceiveCallback([this](const uint8_t* data, size_t size) {
+    network_->SetReceiveCallback([](const uint8_t* data, size_t size) {
         spdlog::debug("MapServer: packet received size={}", size);
     });
 

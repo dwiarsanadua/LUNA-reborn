@@ -2,6 +2,8 @@
 #include <cstdio>
 
 void MailDialog::Open(GameState* state, WindowManager* wm) {
+    (void)body_input_;
+    (void)selected_;
     window_ = wm->Open("Mail", 100, 50, 580, 460);
     window_->SetClosable(true);
     window_->SetMovable(true);

@@ -16,6 +16,7 @@ target_link_libraries(AgentServer PRIVATE
     spdlog::spdlog
     fmt::fmt
     flatbuffers::flatbuffers
+    EnTT::EnTT
 )
 
 target_compile_definitions(AgentServer PRIVATE

@@ -12,7 +12,7 @@
 
 namespace {
 
-std::string trim(const std::string& s) {
+[[maybe_unused]] std::string trim(const std::string& s) {
     auto start = s.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
     auto end = s.find_last_not_of(" \t\r\n");
@@ -190,7 +190,7 @@ uint32_t jsonUint(const JsonVal& obj, const std::string& key, uint32_t def = 0) 
     return v < 0 ? 0 : static_cast<uint32_t>(v);
 }
 
-std::vector<uint32_t> jsonUintArray(const JsonVal& obj, const std::string& key) {
+[[maybe_unused]] std::vector<uint32_t> jsonUintArray(const JsonVal& obj, const std::string& key) {
     std::vector<uint32_t> result;
     for (auto& [k, v] : obj.obj_val) {
         if (k == key && v.type == JsonVal::ARRAY) {

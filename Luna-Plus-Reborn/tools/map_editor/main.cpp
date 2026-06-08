@@ -10,7 +10,9 @@
 #include <algorithm>
 #include <cmath>
 
+#define GLFW_EXPOSE_NATIVE_COCOA
 #include <GLFW/glfw3.h>
+#include <GLFW/glfw3native.h>
 #include <bgfx/bgfx.h>
 #include <bgfx/platform.h>
 #include <glm/glm.hpp>
@@ -528,9 +530,17 @@ static bool InitBgfx(GLFWwindow* window) {
     glfwGetWindowSize(window, &w, &h);
 
     bgfx::PlatformData pd{};
+#ifdef _WIN32
     pd.nwh = glfwGetWin32Window(window);
+#elif defined(__APPLE__)
+    pd.nwh = glfwGetCocoaWindow(window);
+#endif
 
-    bgfx::init(bgfx::RendererType::Count, BGFX_PCI_ID_NONE, 0, &pd);
+    bgfx::Init init;
+    init.type = bgfx::RendererType::Count;
+    init.vendorId = BGFX_PCI_ID_NONE;
+    init.platformData = pd;
+    bgfx::init(init);
     bgfx::reset((uint32_t)w, (uint32_t)h, BGFX_RESET_VSYNC | BGFX_RESET_MSAA_X4);
     bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0x443355FF, 1.0f, 0);
     bgfx::setViewRect(0, 0, 0, (uint16_t)w, (uint16_t)h);

@@ -1,7 +1,7 @@
 #include "ComboBox.hpp"
 
 ComboBox::ComboBox(float x, float y, float w, float h)
-    : Widget(x, y, w, h) {}
+    : Widget(x, y, w, h) { (void)dropdown_h_; }
 
 void ComboBox::AddItem(const std::string& item) {
     items_.push_back(item);

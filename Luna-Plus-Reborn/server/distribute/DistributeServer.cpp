@@ -16,7 +16,7 @@ bool DistributeServer::Initialize(uint16_t port) {
         return false;
     }
 
-    network_->SetReceiveCallback([this](const uint8_t* data, size_t size) {
+    network_->SetReceiveCallback([](const uint8_t* data, size_t size) {
         if (size < 4) return;
         uint16_t type = (data[0] << 8) | data[1];
         spdlog::debug("DistributeServer: packet type=0x{:04X}", type);

@@ -1,7 +1,7 @@
 #include "KeyBindDialog.hpp"
 #include <cstdio>
 
-static std::vector<std::pair<std::string, std::string>> GetDefaultBindings() {
+[[maybe_unused]] static std::vector<std::pair<std::string, std::string>> GetDefaultBindings() {
     return {
         {"I", "Inventory"}, {"K", "Skills"}, {"J", "Quests"}, {"C", "Character Info"},
         {"P", "Party"}, {"G", "Guild"}, {"F", "Friends"}, {"L", "Family"},

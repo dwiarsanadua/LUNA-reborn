@@ -2,6 +2,7 @@
 #include <cstdio>
 
 void CashShopDialog::Open(GameState* state, WindowManager* wm, CashShopSystem* shop) {
+    (void)info_label_;
     shop_ = shop;
     window_ = wm->Open("Cash Shop", 120, 40, 520, 480);
     window_->SetClosable(true);

@@ -2,6 +2,7 @@
 #include <cstdio>
 
 void FamilyDialog::Open(GameState* state, WindowManager* wm, FamilySystem* family) {
+    (void)status_label_;
     family_ = family;
     window_ = wm->Open("Family & Couple", 200, 100, 420, 360);
     window_->SetClosable(true);

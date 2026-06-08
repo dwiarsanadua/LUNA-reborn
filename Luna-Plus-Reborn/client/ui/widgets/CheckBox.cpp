@@ -1,7 +1,7 @@
 #include "CheckBox.hpp"
 
 CheckBox::CheckBox(const std::string& text, float x, float y)
-    : Widget(x, y, 0, box_size_), text_(text) {}
+    : Widget(x, y, 0, 14.0f), text_(text) { box_size_ = 14.0f; }
 
 void CheckBox::Update(float dt, float mx, float my, bool mousedown, bool mousepressed) {
     if (!visible_ || !enabled_) return;

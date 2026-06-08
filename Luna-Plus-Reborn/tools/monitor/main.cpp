@@ -30,6 +30,7 @@
     #define INVALID_SOCKET -1
 #endif
 
+#include <fcntl.h>
 #include <spdlog/spdlog.h>
 
 // ── Configuration ──────────────────────────────────────────────────────────
@@ -311,6 +312,8 @@ static void ClearScreen() {
 #endif
 }
 
+static const char* kSeparator = "--------------------------------------------------";
+
 static void DrawProgressBar(float pct, int width) {
     int filled = (int)(pct * width);
     printf("[");
@@ -341,7 +344,7 @@ static void DisplayMetrics() {
                s_config.server_host.c_str(), s_config.server_port);
     }
 
-    printf("  %s", std::string(50, '─').c_str());
+    printf("  %s", kSeparator);
     printf("\n");
 
     // Server info
@@ -353,7 +356,7 @@ static void DisplayMetrics() {
     int up_s = s_metrics.uptime_seconds % 60;
     printf(COLOR_CYAN "  Uptime:" COLOR_RESET " %02d:%02d:%02d\n", up_h, up_m, up_s);
 
-    printf("  %s\n", std::string(50, '─').c_str());
+    printf("  %s\n", kSeparator);
 
     // Players
     printf(COLOR_CYAN "  Players:" COLOR_RESET " %d / %d  (unique accounts: %d)\n",
@@ -364,7 +367,7 @@ static void DisplayMetrics() {
     DrawProgressBar(player_pct, 40);
     printf(" %d%%\n", (int)(player_pct * 100));
 
-    printf("  %s\n", std::string(50, '─').c_str());
+    printf("  %s\n", kSeparator);
 
     // Performance
     printf(COLOR_CYAN "  Performance:\n" COLOR_RESET);
@@ -373,7 +376,7 @@ static void DisplayMetrics() {
     printf("    Tick Rate:  %6.1f /s\n", s_metrics.tick_rate);
     printf("    Threads:    %6d\n", s_metrics.active_threads);
 
-    printf("  %s\n", std::string(50, '─').c_str());
+    printf("  %s\n", kSeparator);
 
     // Network
     printf(COLOR_CYAN "  Network:\n" COLOR_RESET);
@@ -383,7 +386,7 @@ static void DisplayMetrics() {
     printf("    Bandwidth Out: %6d KB/s\n", s_metrics.bandwidth_out_kbps);
     printf("    Channels:    %6d\n", s_metrics.channel_count);
 
-    printf("  %s\n", std::string(50, '─').c_str());
+    printf("  %s\n", kSeparator);
 
     // Errors / Warnings
     if (s_metrics.error_count > 0 || s_metrics.warning_count > 0) {
@@ -397,7 +400,7 @@ static void DisplayMetrics() {
             if (!s_metrics.last_warning.empty())
                 printf("    Last: %s\n", s_metrics.last_warning.c_str());
         }
-        printf("  %s\n", std::string(50, '─').c_str());
+        printf("  %s\n", kSeparator);
     }
 
     // Alerts
