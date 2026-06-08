@@ -131,7 +131,7 @@ int main(int argc, char** argv) {
     EngineMap map;
     map.SetTerrain(&terrain);
     map.SetProps(&props);
-    // map.SetAudio(&audio); // BGM will be played by screen manager when screen is active
+    map.SetAudio(&audio);
     map.SetSpawnSystem(&spawn_sys);
     map.SetRegistry(&registry);
     // GameDataDB — init before map load so EngineMap uses external DB
