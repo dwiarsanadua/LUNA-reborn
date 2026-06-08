@@ -30,6 +30,9 @@ public:
     
     void Move(float dx, float dz, float dt = 0.016f);
     void SetPosition(float x, float y, float z);
+    void SetWaypoint(float x, float z);
+    void ClearWaypoint();
+    bool HasWaypoint() const { return has_waypoint_; }
     void TakeDamage(int dmg);
     void TakeDamage(int dmg, int stun_duration_ms);
     void Knockback(float from_x, float from_z, float distance);
@@ -65,6 +68,8 @@ public:
     void ExecuteAutoAttack();
     bool IsInAttackRange() const;
 
+    void SetNavMesh(class NavMeshSystem* nav) { navmesh_ = nav; }
+
     // PK Integration
     void SetPKManager(PKManagerDlg* mgr) { pk_mgr_ = mgr; }
     bool IsPKFlagged() const { return pk_flagged_; }
@@ -93,6 +98,11 @@ private:
     float attack_cooldown_ = 0;
     float skill_cooldown_ = 0;
     float dash_cooldown_ = 0;
+    float battle_delay_timer_ = 0.0f;
+
+    bool has_waypoint_ = false;
+    float waypoint_x_ = 0, waypoint_z_ = 0;
+    class NavMeshSystem* navmesh_ = nullptr;
     
     int hp_ = 500, max_hp_ = 500;
     int mp_ = 100, max_mp_ = 100;

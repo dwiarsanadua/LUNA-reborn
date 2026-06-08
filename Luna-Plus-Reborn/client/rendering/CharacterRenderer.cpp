@@ -20,6 +20,7 @@
 static constexpr int MAX_BONES = 64;
 static uint16_t g_fb_width = 1280;
 static uint16_t g_fb_height = 720;
+static float g_frame_dt = 1.0f / 60.0f;
 
 // Map CharAnim to animation clip name
 static const char* AnimNameForCharAnim(CharAnim anim) {
@@ -105,6 +106,10 @@ void CharRenderer_Init() {
 
 void CharRenderer_SetFBSize(uint16_t w, uint16_t h) {
     g_fb_width = w; g_fb_height = h;
+}
+
+void CharRenderer_SetFrameDelta(float dt) {
+    if (dt > 0.0f && dt < 0.5f) g_frame_dt = dt;
 }
 
 uint32_t CharRenderer_LoadModel(const std::string& path) {
@@ -263,7 +268,7 @@ void CharRenderer_Render(const glm::mat4& view, const glm::mat4& proj, float tim
 
         // Update animation
         if (as) {
-            as->anim_sys.Update(0.016f);
+            as->anim_sys.Update(g_frame_dt);
         }
 
         // Compute skinning matrices

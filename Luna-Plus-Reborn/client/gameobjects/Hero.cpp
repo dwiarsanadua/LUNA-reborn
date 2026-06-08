@@ -1,4 +1,5 @@
 #include "Hero.hpp"
+#include "NavMeshSystem.hpp"
 #include <ui/GameState.hpp>
 #include <rendering/UIRenderer.hpp>
 #include <rendering/CharacterRenderer.hpp>
@@ -69,6 +70,16 @@ void Hero::Init(GameState* state, AudioManager* audio, PhysicsWorld* physics) {
     }
     
     UpdateEquipment();
+}
+
+void Hero::SetWaypoint(float x, float z) {
+    waypoint_x_ = x;
+    waypoint_z_ = z;
+    has_waypoint_ = true;
+}
+
+void Hero::ClearWaypoint() {
+    has_waypoint_ = false;
 }
 
 void Hero::SetPosition(float x, float y, float z) {
@@ -244,10 +255,47 @@ void Hero::ExecuteAutoAttack() {
 
 bool Hero::IsInAttackRange() const {
     if (!game_state_ || target_entity_ == 0) return false;
-    return true;
+    if (battle_delay_timer_ > 0.0f) return false;
+    for (const auto& e : game_state_->entities) {
+        if (e.id == target_entity_) {
+            float dx = e.x - x_, dz = e.z - z_;
+            return std::sqrt(dx * dx + dz * dz) < 3.0f;
+        }
+    }
+    return false;
 }
 
 void Hero::Update(float dt) {
+    if (game_state_) {
+        battle_delay_timer_ = game_state_->battle_delay_timer;
+        if (game_state_->has_waypoint) {
+            SetWaypoint(game_state_->waypoint_x, game_state_->waypoint_z);
+            game_state_->has_waypoint = false;
+        }
+    }
+    if (battle_delay_timer_ > 0.0f)
+        battle_delay_timer_ = std::max(0.0f, battle_delay_timer_ - dt);
+
+    if (has_waypoint_ && CanAct()) {
+        float dx = waypoint_x_ - x_, dz = waypoint_z_ - z_;
+        float dist = std::sqrt(dx * dx + dz * dz);
+        if (dist < 0.5f) {
+            has_waypoint_ = false;
+            SetState(HeroState::Idle);
+        } else {
+            float speed = 80.0f * dt;
+            if (navmesh_) {
+                auto seek = navmesh_->Seek({x_, z_}, {waypoint_x_, waypoint_z_}, speed / dt, dt);
+                dx = seek.x - x_;
+                dz = seek.y - z_;
+            } else {
+                dx = (dx / dist) * speed;
+                dz = (dz / dist) * speed;
+            }
+            Move(dx, dz, dt);
+        }
+    }
+
     // Auto-attack
     if (target_entity_ != 0 && IsAlive()) {
         attack_cooldown_ -= dt;
@@ -272,10 +320,15 @@ void Hero::Update(float dt) {
         }
     }
 
-    CharRenderer_Move(0, x_, y_, z_, moving_);
+    CharAnim anim = CHAR_IDLE;
+    if (state_ == HeroState::Attack || state_ == HeroState::Skill) anim = CHAR_ATTACK;
+    else if (state_ == HeroState::Die) anim = CHAR_DIE;
+    else if (moving_ || state_ == HeroState::Walk || state_ == HeroState::Run) anim = CHAR_WALK;
+    CharRenderer_Move(0, x_, y_, z_, moving_ || state_ == HeroState::Walk || state_ == HeroState::Run, anim);
     
     if (game_state_) {
         game_state_->player_x = x_; game_state_->player_y = y_; game_state_->player_z = z_;
+        game_state_->battle_delay_timer = battle_delay_timer_;
         game_state_->hp = hp_; game_state_->max_hp = max_hp_;
         game_state_->mp = mp_; game_state_->max_mp = max_mp_;
         game_state_->exp = exp_; game_state_->exp_next = exp_next_;

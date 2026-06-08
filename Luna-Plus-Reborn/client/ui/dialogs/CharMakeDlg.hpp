@@ -29,6 +29,7 @@ public:
 
     bool IsComplete() const { return complete_; }
     GameState* CreateCharacter();
+    void Render(UIRenderer& ui);
 
 private:
     Window* window_ = nullptr;

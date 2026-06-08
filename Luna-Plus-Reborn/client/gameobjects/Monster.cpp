@@ -112,10 +112,14 @@ void Monster::UpdateAI(float dt, float px, float pz) {
     
     switch (state_) {
     case MonsterState::Idle:
-        // Check aggro (with line-of-sight)
-        if (dist < aggro_range_ && HasLineOfSight(physics_world_, x_, y_, z_, px, 0, pz)) {
+        aggro_scan_timer_ -= dt;
+        if (aggro_scan_timer_ <= 0.0f
+            && dist < aggro_range_
+            && HasLineOfSight(physics_world_, x_, y_, z_, px, 0, pz)) {
+            aggro_scan_timer_ = 5.0f;
             state_ = MonsterState::Aggro;
-            target_id_ = 0; // Player
+            target_id_ = 0;
+            just_aggroed_ = true;
         }
         // Random patrol
         patrol_timer_ -= dt;
@@ -137,10 +141,14 @@ void Monster::UpdateAI(float dt, float px, float pz) {
         } else {
             state_ = MonsterState::Idle;
         }}
-        // Check aggro during patrol (with line-of-sight)
-        if (dist < aggro_range_ && HasLineOfSight(physics_world_, x_, y_, z_, px, 0, pz)) {
+        aggro_scan_timer_ -= dt;
+        if (aggro_scan_timer_ <= 0.0f
+            && dist < aggro_range_
+            && HasLineOfSight(physics_world_, x_, y_, z_, px, 0, pz)) {
+            aggro_scan_timer_ = 5.0f;
             state_ = MonsterState::Aggro;
             target_id_ = 0;
+            just_aggroed_ = true;
         }
         break;
         
@@ -156,6 +164,12 @@ void Monster::UpdateAI(float dt, float px, float pz) {
         
     case MonsterState::Attack:
         attack_timer_ -= dt;
+        battle_attack_timer_ += dt;
+        if (battle_attack_timer_ >= 10.0f) {
+            battle_attack_timer_ = 0.0f;
+            state_ = MonsterState::Chase;
+            break;
+        }
         if (dist > attack_range_ + 1.0f) { state_ = MonsterState::Chase; break; }
         if (dist > chase_range_) { state_ = MonsterState::Return; break; }
         if (!HasLineOfSight(physics_world_, x_, y_, z_, px, 0, pz)) {
@@ -164,7 +178,6 @@ void Monster::UpdateAI(float dt, float px, float pz) {
         }
         if (attack_timer_ <= 0) {
             attack_timer_ = attack_cooldown_;
-            // Deal damage to target (handled by GameScreen combat)
         }
         break;
         
@@ -266,6 +279,14 @@ void Monster::RenderOverhead(UIRenderer& ui) {
 bool Monster::ShouldRespawn(float dt) {
     if (!alive_) { respawn_timer_ -= dt; return respawn_timer_ <= 0; }
     return false;
+}
+
+void Monster::ForceAggro(float px, float pz) {
+    if (!alive_ || state_ == MonsterState::Chase || state_ == MonsterState::Attack) return;
+    state_ = MonsterState::Chase;
+    target_id_ = 0;
+    aggro_scan_timer_ = 5.0f;
+    (void)px; (void)pz;
 }
 
 void Monster::Respawn(float new_x, float new_z) {

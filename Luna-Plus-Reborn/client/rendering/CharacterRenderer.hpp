@@ -20,6 +20,7 @@ struct CharInstance {
 
 void CharRenderer_Init();
 void CharRenderer_SetFBSize(uint16_t w, uint16_t h);
+void CharRenderer_SetFrameDelta(float dt);
 uint32_t CharRenderer_LoadModel(const std::string& glb_path);
 void CharRenderer_Spawn(uint32_t instance_id, const std::string& model,
                          float x, float y, float z, uint32_t color = 0xff4488cc);

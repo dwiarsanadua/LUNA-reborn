@@ -59,7 +59,13 @@ void GameScreen::Enter() {
     consignment_.ListItem(2, 103, 3, 150, 350);
     consignment_.ListItem(4, 301, 1, 5000, 12000);
     if (ui_) sky_.SetSampler(ui_->GetSampler(), ui_->GetWhiteTexture());
-    SpawnMonstersFromMap();
+    navmesh_.Init(256.0f, 2.0f);
+    hero_.SetNavMesh(&navmesh_);
+    hero_.SetPKManager(&pk_dlg_);
+    pk_dlg_.SetModeChangeCallback([this](PKMode mode) {
+        state_->pk_mode = (mode != PKMode::Peaceful);
+    });
+    InitializeWorld();
 }
 
 void GameScreen::Exit() {
@@ -68,27 +74,8 @@ void GameScreen::Exit() {
 
 bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload) {
     switch (type) {
-    case 0x0208: {
-        auto resp = flatbuffers::GetRoot<luna::protocol::EnterWorldResponse>(payload.data());
-        if (resp->position()) {
-            state_->player_x = resp->position()->x();
-            state_->player_y = resp->position()->y();
-            state_->player_z = resp->position()->z();
-        }
-        state_->map_id = resp->map_id();
-        if (!state_->characters.empty()) {
-            auto& ch = state_->characters[state_->selected_char];
-            state_->name = ch.name;
-            state_->level = ch.level;
-            state_->hp = 500; state_->max_hp = 500 + ch.level * 20;
-            state_->mp = 100; state_->max_mp = 100 + ch.level * 5;
-        }
-        state_->connecting = true;
-        CharRenderer_Spawn(0, "assets/models/d_man.glb",
-                           state_->player_x, state_->player_y, state_->player_z, 0xffffffff);
-        SpawnMonstersFromMap();
+    case 0x0208:
         return true;
-    }
     case 0x0501: {
         auto msg = flatbuffers::GetRoot<luna::protocol::ChatMessage>(payload.data());
         std::string sender = msg->sender_name() ? msg->sender_name()->str() : "?";
@@ -155,14 +142,14 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
     if (action != 1) return true;
 
     float speed = 0.5f;
-    if (key == 87 || key == 265) { state_->player_z -= speed; hero_.Move(0, -speed); }
-    else if (key == 83 || key == 264) { state_->player_z += speed; hero_.Move(0, speed); }
-    else if (key == 65 || key == 263) { state_->player_x -= speed; hero_.Move(-speed, 0); }
-    else if (key == 68 || key == 262) { state_->player_x += speed; hero_.Move(speed, 0); }
+    if (key == 87 || key == 265) { hero_.ClearWaypoint(); state_->player_z -= speed; hero_.Move(0, -speed); }
+    else if (key == 83 || key == 264) { hero_.ClearWaypoint(); state_->player_z += speed; hero_.Move(0, speed); }
+    else if (key == 65 || key == 263) { hero_.ClearWaypoint(); state_->player_x -= speed; hero_.Move(-speed, 0); }
+    else if (key == 68 || key == 262) { hero_.ClearWaypoint(); state_->player_x += speed; hero_.Move(speed, 0); }
     else if (key == 32) SpawnRandomMonster();
     else if (key == 80) {
-        state_->pk_mode = !state_->pk_mode;
-        state_->chat_messages.push_back(state_->pk_mode ? "PK MODE: ON" : "PK MODE: OFF");
+        if (pk_dlg_.IsOpen()) pk_dlg_.Close();
+        else pk_dlg_.Open(&wm_);
     }
     else if (key == 68) {
         if (!state_->in_dungeon) {
@@ -231,12 +218,16 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
         if (state_->storage_open) storage_dlg_.Open(state_, &wm_);
         if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_UI, "window_open1.wav");
     }
-    else if (key == 112) { // F1 key - Help
+    else if (key == 112) {
         state_->help_open = !state_->help_open;
+        if (state_->help_open) helper_dlg_.Open(&wm_);
+        else helper_dlg_.Close();
         if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_UI, "window_open1.wav");
     }
-    else if (key == 77) { // M key - World Map
+    else if (key == 77) {
         state_->worldmap_open = !state_->worldmap_open;
+        if (state_->worldmap_open) worldmap_dlg_.Open(&wm_);
+        else worldmap_dlg_.Close();
         if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_UI, "window_open1.wav");
     }
     else if (key == 85) { // U key - Trade
@@ -367,24 +358,7 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
                     if (!arg.empty()) {
                         // Teleport to map
                         int map_id = std::atoi(arg.c_str());
-                        if (map_id > 0) {
-                            state_->map_id = map_id;
-                            if (map_) {
-                                map_->Unload();
-                                map_->Load(std::to_string(map_id));
-                            }
-                            state_->chat_messages.push_back("Teleported to map " + std::to_string(map_id));
-                            if (audio_) {
-                                switch (map_id) {
-                                    case 13: audio_->PlayBGM("14_Red_Orc_Outpost"); break;
-                                    case 20: audio_->PlayBGM("20_Alker_Harbor"); break;
-                                    case 51: audio_->PlayBGM("20_Alker_Harbor"); break;
-                                    case 14: audio_->PlayBGM("15_Moon_Blind_Forest"); break;
-                                    case 15: audio_->PlayBGM("16_17_Haunted_Mine"); break;
-                                    default: audio_->PlayBGM("BGM_Login"); break;
-                                }
-                            }
-                        }
+                        if (map_id > 0) ChangeMap((uint32_t)map_id);
                     } else {
                         state_->chat_messages.push_back("Usage: /teleport [map_id] — Available: 13,14,15,19,20,21,22,23,25,26,27,28,31,32,41,51,55,56,60,63,64,71,74,75,96");
                     }
@@ -402,9 +376,7 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
                         if (available[i] == cur) { next = available[0]; break; }
                     }
                     if (cur == 0) next = available[0];
-                    state_->map_id = next;
-                    if (map_) { map_->Unload(); map_->Load(std::to_string(next)); }
-                    state_->chat_messages.push_back("Teleported to map " + std::to_string(next));
+                    ChangeMap((uint32_t)next);
                 } else if (verb == "prevmap") {
                     int available[] = {13,14,15,19,20,21,22,23,25,26,27,28,31,32,41,51,55,56,60,63,64,71,74,75,96};
                     int count = sizeof(available)/sizeof(available[0]);
@@ -413,9 +385,7 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
                     for (int i = 0; i < count; i++) {
                         if (available[i] == cur && i > 0) { prev = available[i - 1]; break; }
                     }
-                    state_->map_id = prev;
-                    if (map_) { map_->Unload(); map_->Load(std::to_string(prev)); }
-                    state_->chat_messages.push_back("Teleported to map " + std::to_string(prev));
+                    ChangeMap((uint32_t)prev);
                 } else {
                     state_->chat_messages.push_back("Unknown command. Try /help");
                 }
@@ -578,7 +548,43 @@ bool GameScreen::HandleChar(unsigned int codepoint) {
     return false;
 }
 
+void GameScreen::InitializeWorld() {
+    std::string player_model = VFS::Find("assets/models/character/d_man.glb");
+    if (player_model.empty()) player_model = "assets/models/d_man.glb";
+    CharRenderer_Spawn(0, player_model, state_->player_x, state_->player_y, state_->player_z, 0xffffffff);
+    hero_.Init(state_, audio_);
+    hero_.SetPosition(state_->player_x, state_->player_y, state_->player_z);
+    if (state_->inventory.empty()) {
+        state_->inventory.push_back({1001, "Iron Sword", 1, 0, 0});
+        state_->inventory.push_back({21000001, "Health Potion", 5, 1, 0});
+    }
+    SpawnMonstersFromMap();
+    fade_dlg_.FadeIn(0.8f);
+    spdlog::info("GameScreen: world initialized on map {}", state_->map_id);
+}
+
+void GameScreen::ChangeMap(uint32_t map_id) {
+    pending_map_id_ = map_id;
+    fade_dlg_.FadeOut(0.6f);
+    fade_dlg_.SetCallback([this]() {
+        state_->map_id = pending_map_id_;
+        if (map_) {
+            map_->Unload();
+            map_->Load(std::to_string(pending_map_id_));
+        }
+        state_->current_state = ClientState::MapChange;
+        SpawnMonstersFromMap();
+        fade_dlg_.FadeIn(0.6f);
+        state_->current_state = ClientState::GameIn;
+        state_->chat_messages.push_back("Entered map " + std::to_string(pending_map_id_));
+    });
+}
+
 void GameScreen::Update(float dt) {
+    fade_dlg_.Update(dt);
+    pk_dlg_.Update(dt);
+    helper_dlg_.Update(dt);
+    minimap_dlg_.Update(dt);
     effect_mgr_.Update(dt);
     sky_.Update(dt);
     weather_.Update(dt, state_->player_x, state_->player_z);
@@ -634,18 +640,27 @@ void GameScreen::Update(float dt) {
     for (auto& m : monsters_) {
         float mh = terrain_ ? terrain_->GetHeight(m.GetX(), m.GetZ()) + 0.5f : 0.5f;
         m.SetPosition(m.GetX(), mh, m.GetZ());
-        m.Update(dt);
-        
-        // Auto-aggro if player is close
-        float dist = m.GetDistance(hero_.GetX(), hero_.GetZ());
-        if (dist < 12.0f && m.IsAlive()) {
-            m.SetTarget(0);
-        } else {
-            m.SetTarget(UINT32_MAX);
+        m.Update(dt, hero_.GetX(), hero_.GetZ());
+        if (m.JustAggroed()) {
+            for (auto& ally : monsters_) {
+                if (ally.GetID() == m.GetID() || !ally.IsAlive()) continue;
+                if (ally.GetDistance(m.GetX(), m.GetZ()) < 15.0f)
+                    ally.ForceAggro(hero_.GetX(), hero_.GetZ());
+            }
+            m.ClearAggroFlag();
         }
+        if (m.IsAlive() && m.GetDistance(hero_.GetX(), hero_.GetZ()) < 12.0f)
+            hero_.SetTarget(m.GetID());
     }
 
     DoCombat(dt);
+
+    minimap_dlg_.SetPlayerPos(hero_.GetX(), hero_.GetZ());
+    minimap_dlg_.ClearEntities();
+    for (auto& m : monsters_) {
+        if (m.IsAlive())
+            minimap_dlg_.AddEntity(m.GetID(), m.GetX(), m.GetZ(), 0xffff6633, 4.0f);
+    }
 
     for (auto& df : state_->damage_floats) df.life -= dt;
     state_->damage_floats.erase(
@@ -700,8 +715,11 @@ void GameScreen::Update(float dt) {
 }
 
 void GameScreen::DoCombat(float dt) {
-    // Animation Lock & Cast Time system
-    // 3-phase combat: IDLE -> CASTING (0.3s) -> RECOVERY (0.5s) -> IDLE
+    if (state_->battle_delay_timer > 0.0f) {
+        state_->battle_delay_timer = std::max(0.0f, state_->battle_delay_timer - dt);
+        return;
+    }
+
     if (state_->combat_anim_lock > 0) {
         state_->combat_anim_lock -= dt;
         // During animation lock, movement is prevented
@@ -718,9 +736,9 @@ void GameScreen::DoCombat(float dt) {
     if (state_->combat_timer < 1.0f) return;
     state_->combat_timer = 0;
 
-    // Begin attack: set cast time + animation lock
-    state_->combat_cast_time = 0.3f;    // 0.3s cast before damage
-    state_->combat_anim_lock = 0.8f;    // 0.8s total animation lock
+    state_->combat_cast_time = 0.3f;
+    state_->combat_anim_lock = 0.8f;
+    CharRenderer_Move(0, hero_.GetX(), hero_.GetY(), hero_.GetZ(), false, CHAR_ATTACK);
 
     // Drain weapon durability on attack
     if (!state_->inventory.empty()) {
@@ -766,6 +784,12 @@ void GameScreen::DoCombat(float dt) {
                 int goldGain = m.IsBoss() ? 100 + m.GetLevel() * 20 : 10 + m.GetLevel() * 5;
                 hero_.AddGold(goldGain); hero_.AddEXP(xpGain);
                 CharRenderer_Remove(m.GetID());
+                InvItem drop{21000001, "Health Potion", 1, (int)state_->inventory.size(), 0};
+                for (auto& item : state_->inventory) {
+                    if (item.id == drop.id) { item.count += drop.count; drop.count = 0; break; }
+                }
+                if (drop.count > 0) state_->inventory.push_back(drop);
+                state_->battle_delay_timer = 10.0f;
                 state_->chat_messages.push_back(m.GetName() + " defeated! +" + std::to_string(xpGain) + " XP");
                 effect_mgr_.SpawnBillboard(m.GetX(), m.GetY() + 2.0f, m.GetZ(), 0xFFFFD700, 24, 1.5f);
                 if (m.IsBoss()) {
@@ -1188,6 +1212,12 @@ void GameScreen::RenderUI(UIRenderer& ui) {
         macro_dlg_.GetWindow()->Render(ui);
     }
     
+    minimap_dlg_.Render(ui);
+    if (pk_dlg_.IsOpen()) pk_dlg_.Render(ui);
+    if (helper_dlg_.IsOpen()) helper_dlg_.Render(ui);
+    if (worldmap_dlg_.IsOpen()) worldmap_dlg_.Render(ui);
+    fade_dlg_.Render(ui);
+
     // Server announcement overlay
     if (ops_.HasActiveAnnouncement()) {
         std::string msg = ops_.GetCurrentAnnouncement();
