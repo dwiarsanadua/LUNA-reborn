@@ -61,6 +61,7 @@ public:
     int GetDefense() const { return defense_; }
     void AddGold(int g) { gold_ += g; }
     void AddEXP(int e) { exp_ += e; }
+    void ApplyServerStats(int hp, int max_hp, int mp, int max_mp, int gold, uint64_t exp = 0);
     const std::string& GetName() const { return name_; }
 
     // Auto-attack

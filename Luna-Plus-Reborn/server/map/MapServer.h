@@ -96,6 +96,7 @@ public:
 private:
     bool running_ = false;
     int map_id_ = 0;
+    uint16_t port_ = 0;
     std::unique_ptr<NetworkLayer> network_;
     std::unique_ptr<Database> db_;
     std::unique_ptr<entt::registry> registry_;
@@ -127,8 +128,24 @@ private:
     void HandleCombatAttack(uint16_t ack_type, const uint8_t* payload, size_t len);
     void HandleChat(const uint8_t* payload, size_t len);
     void BroadcastMonsterMovement(float dt);
+    void BroadcastNewMonsterSpawns();
+    void SendCharLifeUpdate();
+    void SendInventorySync();
     void GrantLootToPlayer(uint32_t item_id, uint16_t count);
     entt::entity FindMonsterEntity(uint32_t entity_id) const;
+    void RegisterWithDistribute();
+    void HandleChangeMap(const uint8_t* payload, size_t len);
+    static glm::vec3 GetMapSpawnPosition(uint16_t map_id);
+
+    struct PlayerInvSlot {
+        uint8_t slot = 0;
+        uint32_t item_id = 0;
+        uint16_t count = 0;
+    };
+    std::vector<PlayerInvSlot> player_inventory_;
+    uint32_t player_gold_ = 100;
+    uint64_t player_exp_ = 0;
+    int last_sent_hp_ = -1;
 
     struct MonsterNetState {
         float broadcast_timer = 0.0f;

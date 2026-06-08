@@ -2,7 +2,7 @@
 #include <glm/glm.hpp>
 #include <unordered_map>
 
-namespace luna::protocol { struct AttackResult; }
+namespace luna::protocol { struct AttackResult; struct ChangeMapResponse; }
 
 struct EntityInterp {
     glm::vec3 from{0.0f};
@@ -103,6 +103,8 @@ private:
     void SpawnMonstersFromMap();
     void InitializeWorld();
     void ChangeMap(uint32_t map_id);
+    void OnChangeMapAck(const luna::protocol::ChangeMapResponse* resp);
+    void ClearNetworkEntities();
     void CastHotbarSkill(int slot);
     void ApplySkillDamage(uint32_t skill_id);
     void ApplyNetworkAttackResult(const luna::protocol::AttackResult* result);
@@ -132,6 +134,7 @@ private:
     WorldMapDlg worldmap_dlg_;
     PKManagerDlg pk_dlg_;
     uint32_t pending_map_id_ = 0;
+    bool changemap_pending_ = false;
     float move_send_timer_ = 0.0f;
     bool skill_damage_applied_ = false;
     std::unordered_map<uint32_t, EntityInterp> entity_interp_;

@@ -15,6 +15,8 @@
 #include <Entity_generated.h>
 #include <Movement_generated.h>
 #include <Combat_generated.h>
+#include <CharLife_generated.h>
+#include <MapChange_generated.h>
 #include <PacketType_generated.h>
 #include <algorithm>
 #include <string>
@@ -88,6 +90,39 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
         return true;
     }
+    case luna::protocol::PacketType_MP_CHAR_LIFE_ACK: {
+        auto life = flatbuffers::GetRoot<luna::protocol::CharLifeUpdate>(payload.data());
+        uint32_t player_id = 0;
+        if (!state_->characters.empty() && state_->selected_char < (int)state_->characters.size())
+            player_id = state_->characters[state_->selected_char].id;
+        if (life->entity_id() == player_id || life->entity_id() == 0) {
+            int prev_hp = state_->hp;
+            hero_.ApplyServerStats(life->hp(), life->max_hp(), life->mp(), life->max_mp(),
+                static_cast<int>(life->gold()), life->exp());
+            state_->battle_delay_timer = 10.0f;
+            if (life->hp() < prev_hp && life->hp() > 0) {
+                effect_mgr_.SpawnDamageNumber(hero_.GetX(), hero_.GetY() + 1.5f, hero_.GetZ(),
+                    prev_hp - life->hp(), DamageType::Normal);
+            }
+        }
+        return true;
+    }
+    case luna::protocol::PacketType_MP_ITEM_STORAGEITEM_INFO:
+    case 0x060A: {
+        auto inv = flatbuffers::GetRoot<luna::protocol::InventoryData>(payload.data());
+        state_->inventory.clear();
+        if (inv->slots()) {
+            for (auto s : *inv->slots()) {
+                InvItem item;
+                item.slot = s->slot_index(); item.id = s->item_id(); item.count = s->count();
+                char buf[64]; snprintf(buf, 64, "Item_%u", item.id); item.name = buf;
+                state_->inventory.push_back(item);
+            }
+        }
+        state_->gold = inv->gold();
+        hero_.ApplyServerStats(state_->hp, state_->max_hp, state_->mp, state_->max_mp, state_->gold);
+        return true;
+    }
     case luna::protocol::PacketType_MP_INVENTORY_UPDATE: {
         auto upd = flatbuffers::GetRoot<luna::protocol::InventoryUpdate>(payload.data());
         bool found = false;
@@ -111,20 +146,6 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         }
         state_->chat_messages.push_back("Loot received!");
         if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
-        return true;
-    }
-    case 0x060A: {
-        auto inv = flatbuffers::GetRoot<luna::protocol::InventoryData>(payload.data());
-        state_->inventory.clear();
-        if (inv->slots()) {
-            for (auto s : *inv->slots()) {
-                InvItem item;
-                item.slot = s->slot_index(); item.id = s->item_id(); item.count = s->count();
-                char buf[64]; snprintf(buf, 64, "Item_%u", item.id); item.name = buf;
-                state_->inventory.push_back(item);
-            }
-        }
-        state_->gold = inv->gold();
         return true;
     }
     case luna::protocol::PacketType_MP_ENTITY_DESPAWN: {
@@ -157,6 +178,12 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         
         uint32_t colors[] = {0xff44cc44, 0xffcc4444, 0xffcccc44, 0xff44cccc, 0xffcc44cc};
         CharRenderer_Spawn(e.id, modelPath, e.x, e.y, e.z, colors[state_->next_entity_id++ % 5]);
+        return true;
+    }
+    case luna::protocol::PacketType_MP_USERCONN_CHANGEMAP_ACK:
+    case luna::protocol::PacketType_MP_USERCONN_CHANGEMAP_NACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::ChangeMapResponse>(payload.data());
+        OnChangeMapAck(resp);
         return true;
     }
     case luna::protocol::PacketType_MP_ENTITY_TRANSFORM: {
@@ -778,8 +805,74 @@ void GameScreen::SendMovementUpdate(float dt) {
         fbb.GetBufferPointer(), fbb.GetSize());
 }
 
+void GameScreen::ClearNetworkEntities() {
+    for (const auto& e : state_->entities)
+        CharRenderer_Remove(e.id);
+    state_->entities.clear();
+    entity_interp_.clear();
+    monsters_.clear();
+}
+
+void GameScreen::OnChangeMapAck(const luna::protocol::ChangeMapResponse* resp) {
+    changemap_pending_ = false;
+    if (!resp || resp->result() != 0) {
+        state_->map_changing = false;
+        state_->chat_messages.push_back("Change map failed (code " +
+            std::to_string(resp ? resp->result() : 255) + ")");
+        if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
+        return;
+    }
+
+    pending_map_id_ = resp->map_id();
+    state_->map_server_port = resp->map_port();
+    if (resp->position()) {
+        state_->player_x = resp->position()->x();
+        state_->player_y = resp->position()->y();
+        state_->player_z = resp->position()->z();
+    }
+
+    fade_dlg_.FadeOut(0.6f);
+    fade_dlg_.SetCallback([this]() {
+        network_->Disconnect();
+        ClearNetworkEntities();
+        state_->map_id = pending_map_id_;
+        if (map_) {
+            map_->Unload();
+            map_->Load(std::to_string(pending_map_id_));
+        }
+        hero_.SetPosition(state_->player_x, state_->player_y, state_->player_z);
+        state_->current_state = ClientState::MapChange;
+        if (state_->offline_mode)
+            SpawnMonstersFromMap();
+        fade_dlg_.FadeIn(0.6f);
+        state_->current_state = ClientState::GameIn;
+        state_->connecting = true;
+        state_->chat_messages.push_back("Entering map " + std::to_string(pending_map_id_) + "...");
+        if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
+    });
+}
+
 void GameScreen::ChangeMap(uint32_t map_id) {
+    if (map_id == state_->map_id) return;
     pending_map_id_ = map_id;
+
+    if (!state_->offline_mode && network_ && network_->IsConnected()) {
+        uint32_t char_id = 0;
+        if (!state_->characters.empty() && state_->selected_char < (int)state_->characters.size())
+            char_id = state_->characters[state_->selected_char].id;
+        flatbuffers::FlatBufferBuilder fbb;
+        auto req = luna::protocol::CreateChangeMapRequestDirect(
+            fbb, state_->session_token.c_str(), char_id, static_cast<uint16_t>(map_id));
+        fbb.Finish(req);
+        network_->SendPacket(luna::protocol::PacketType_MP_USERCONN_CHANGEMAP_SYN,
+            fbb.GetBufferPointer(), fbb.GetSize());
+        changemap_pending_ = true;
+        state_->map_changing = true;
+        state_->chat_messages.push_back("Requesting map change to " + std::to_string(map_id) + "...");
+        if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
+        return;
+    }
+
     fade_dlg_.FadeOut(0.6f);
     fade_dlg_.SetCallback([this]() {
         state_->map_id = pending_map_id_;
@@ -807,9 +900,12 @@ void GameScreen::Update(float dt) {
     state_->shake_y = effect_mgr_.GetShakeOffsetY();
     if (state_->connecting) {
         state_->connecting = false;
-        network_->Disconnect();
+        if (network_->IsConnected())
+            network_->Disconnect();
         uint32_t mid = state_->map_id ? state_->map_id : 51;
-        uint16_t map_port = static_cast<uint16_t>(8200 + mid);
+        uint16_t map_port = state_->map_server_port;
+        if (!map_port) map_port = static_cast<uint16_t>(8200 + mid);
+        state_->map_server_port = 0;
         if (network_->Connect("127.0.0.1", map_port)) {
             spdlog::info("Connected to MapServer on port {} (map {})", map_port, mid);
             if (!state_->characters.empty() && state_->selected_char < (int)state_->characters.size()) {
@@ -900,7 +996,8 @@ void GameScreen::Update(float dt) {
             hero_.SetTarget(m.GetID());
     }
 
-    DoCombat(dt);
+    if (state_->offline_mode)
+        DoCombat(dt);
 
     minimap_dlg_.SetPlayerPos(hero_.GetX(), hero_.GetZ());
     minimap_dlg_.ClearEntities();

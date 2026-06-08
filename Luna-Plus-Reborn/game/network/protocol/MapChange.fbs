@@ -1,0 +1,35 @@
+include "Types.fbs";
+include "PacketType.fbs";
+
+namespace luna.protocol;
+
+table MapServerRegister {
+    map_id: uint16;
+    port: uint16;
+    name: string;
+}
+
+table MapServerListEntry {
+    map_id: uint16;
+    port: uint16;
+    name: string;
+    player_count: uint16;
+    online: bool;
+}
+
+table MapServerListResponse {
+    servers: [MapServerListEntry];
+}
+
+table ChangeMapRequest {
+    session_token: string;
+    character_id: uint32;
+    target_map_id: uint16;
+}
+
+table ChangeMapResponse {
+    result: byte;
+    map_id: uint16;
+    map_port: uint16;
+    position: Vec3;
+}

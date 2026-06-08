@@ -35,8 +35,12 @@ public:
     void HandleWhisper(const std::string& sender, const std::string& target, const std::string& message);
     void BroadcastServerList(const std::vector<ServerInfo>& servers);
     void RoutePacket(int target_server_id, const uint8_t* data, size_t size);
+    void RegisterMap(uint16_t map_id, uint16_t port, const std::string& name);
+    const ServerInfo* FindMapServer(uint16_t map_id) const;
 
 private:
+    void HandlePacket(uint16_t type, const uint8_t* payload, size_t len);
+    void RegisterDefaultMaps();
     std::unique_ptr<NetworkLayer> network_;
     std::unordered_map<int, ServerInfo> servers_;
     std::unordered_map<std::string, int> player_server_map_; // player_name -> server_id

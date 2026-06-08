@@ -55,6 +55,8 @@ struct GameState {
     bool login_sent = false;
     bool login_ok = false;
     bool connecting = false;
+    bool map_changing = false;
+    uint16_t map_server_port = 0;
     bool offline_mode = false;
     bool enter_game_pending = false;
     float enter_game_load_timer = 0.0f;

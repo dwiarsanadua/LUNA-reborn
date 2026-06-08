@@ -111,6 +111,14 @@ bool OnPacket(uint16_t type, const std::vector<uint8_t>& payload,
             }
             if (resp->map_id()) map_id = resp->map_id();
         }
+        if (state.map_changing) {
+            state.map_changing = false;
+            state.player_x = x;
+            state.player_y = y;
+            state.player_z = z;
+            state.map_id = map_id;
+            return true;
+        }
         OnEnterWorldData(state, map_id, x, y, z);
         state.connecting = !state.offline_mode;
         BeginEnterGame(state);

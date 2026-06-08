@@ -143,6 +143,28 @@ bool Hero::UseSkill(int skill_id) {
     return true;
 }
 
+void Hero::ApplyServerStats(int hp, int max_hp, int mp, int max_mp, int gold, uint64_t exp) {
+    int prev_hp = hp_;
+    hp_ = hp;
+    max_hp_ = max_hp;
+    mp_ = mp;
+    max_mp_ = max_mp;
+    gold_ = gold;
+    if (exp > 0) exp_ = static_cast<int>(exp);
+    if (game_state_) {
+        game_state_->hp = hp_;
+        game_state_->max_hp = max_hp_;
+        game_state_->mp = mp_;
+        game_state_->max_mp = max_mp_;
+        game_state_->gold = gold_;
+        if (exp > 0) game_state_->exp = static_cast<int>(exp);
+    }
+    if (hp_ < prev_hp && hp_ > 0)
+        SetState(HeroState::Hit, 0.2f);
+    else if (hp_ <= 0)
+        SetState(HeroState::Die);
+}
+
 void Hero::TakeDamage(int dmg) {
     if (!IsAlive()) return;
     hp_ = std::max(0, hp_ - dmg);

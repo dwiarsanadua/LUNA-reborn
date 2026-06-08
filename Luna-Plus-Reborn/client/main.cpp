@@ -281,6 +281,14 @@ int main() {
         spdlog::info("Inventory update (type=0x{:04X}, {} bytes)", type, payload.size());
     });
 
+    client_dispatcher.Register(luna::protocol::PacketType_MP_CHAR_LIFE_ACK, [&](uint32_t, uint16_t type, const std::vector<uint8_t>& payload) {
+        spdlog::debug("Char life sync (type=0x{:04X}, {} bytes)", type, payload.size());
+    });
+
+    client_dispatcher.Register(luna::protocol::PacketType_MP_ITEM_STORAGEITEM_INFO, [&](uint32_t, uint16_t type, const std::vector<uint8_t>& payload) {
+        spdlog::info("Inventory sync (type=0x{:04X}, {} bytes)", type, payload.size());
+    });
+
     // Network packet handler
     g_network.SetPacketHandler([&](uint16_t type, const std::vector<uint8_t>& payload) {
         spdlog::debug("Packet Received: type=0x{:04X} ({} bytes)", type, payload.size());

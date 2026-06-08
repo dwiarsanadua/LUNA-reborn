@@ -21,6 +21,8 @@
 #include <Combat_generated.h>
 #include <Chat_generated.h>
 #include <Inventory_generated.h>
+#include <CharLife_generated.h>
+#include <MapChange_generated.h>
 #include <ecs/components/AIComponent.hpp>
 #include <PacketType_generated.h>
 #include <spdlog/spdlog.h>
@@ -47,8 +49,80 @@ MapServer::MapServer()
 
 MapServer::~MapServer() { Shutdown(); }
 
+glm::vec3 MapServer::GetMapSpawnPosition(uint16_t map_id) {
+    switch (map_id) {
+        case 13: return {12.0f, 0.0f, 8.0f};
+        case 20: return {6.0f, 0.0f, 4.0f};
+        case 51: return {0.0f, 0.0f, 0.0f};
+        default: return {0.0f, 0.0f, 0.0f};
+    }
+}
+
+void MapServer::RegisterWithDistribute() {
+    std::thread([map_id = map_id_, port = port_]() {
+        NetworkLayer dist;
+        if (!dist.Connect("127.0.0.1", 8300)) {
+            spdlog::warn("MapServer: could not register with DistributeServer (port 8300)");
+            return;
+        }
+        flatbuffers::FlatBufferBuilder fbb;
+        std::string name = (map_id == 51) ? "Alker Harbor"
+            : (map_id == 13) ? "Red Orc Outpost"
+            : (map_id == 20) ? "Alker Harbor Town"
+            : ("Map_" + std::to_string(map_id));
+        auto reg = luna::protocol::CreateMapServerRegister(
+            fbb, static_cast<uint16_t>(map_id), port, fbb.CreateString(name));
+        fbb.Finish(reg);
+        dist.SendPacket(luna::protocol::PacketType_MP_MAPSERVER_REGISTER_SYN,
+            fbb.GetBufferPointer(), fbb.GetSize());
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        dist.Disconnect();
+        spdlog::info("MapServer: registered map {} with DistributeServer", map_id);
+    }).detach();
+}
+
+void MapServer::HandleChangeMap(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+
+    auto req = flatbuffers::GetRoot<ChangeMapRequest>(payload);
+    uint16_t target = req->target_map_id();
+    glm::vec3 spawn = GetMapSpawnPosition(target);
+    uint16_t target_port = static_cast<uint16_t>(8200 + target);
+
+    flatbuffers::FlatBufferBuilder fbb;
+    Vec3 pos{spawn.x, spawn.y, spawn.z};
+
+    if (target == static_cast<uint16_t>(map_id_)) {
+        pos = Vec3(connected_player_.pos_x, connected_player_.pos_y, connected_player_.pos_z);
+        auto resp = CreateChangeMapResponse(fbb, 2, target, port_, &pos);
+        fbb.Finish(resp);
+        network_->SendPacket(PacketType_MP_USERCONN_CHANGEMAP_NACK,
+            fbb.GetBufferPointer(), fbb.GetSize());
+        return;
+    }
+
+    SavePlayerPosition(connected_player_.id,
+        connected_player_.pos_x, connected_player_.pos_y, connected_player_.pos_z);
+    SendEntityDespawn(static_cast<uint32_t>(connected_player_.id),
+        static_cast<int8_t>(DespawnReason_Logout));
+    DespawnPlayer(connected_player_.id);
+    player_joined_ = false;
+    player_entity_ = entt::null;
+    monster_net_.clear();
+
+    auto resp = CreateChangeMapResponse(fbb, 0, target, target_port, &pos);
+    fbb.Finish(resp);
+    network_->SendPacket(PacketType_MP_USERCONN_CHANGEMAP_ACK,
+        fbb.GetBufferPointer(), fbb.GetSize());
+    spdlog::info("MapServer: player {} changemap {} -> {} (port {})",
+        connected_player_.id, map_id_, target, target_port);
+}
+
 bool MapServer::Initialize(int map_id, uint16_t port) {
     map_id_ = map_id;
+    port_ = port;
 
     if (!db_->Initialize("assets/data/luna_map.db")) {
         spdlog::error("MapServer: database init failed");
@@ -125,6 +199,7 @@ bool MapServer::Initialize(int map_id, uint16_t port) {
     }
 
     running_ = true;
+    RegisterWithDistribute();
     spdlog::info("MapServer: map {} initialized on port {}", map_id, port);
     return true;
 }
@@ -143,10 +218,20 @@ void MapServer::Update(float dt) {
     network_->Update();
 
     spawn_sys_->Update(*registry_, dt);
+    BroadcastNewMonsterSpawns();
     movement_->Update(*registry_, dt);
     ai_->Update(*registry_, dt);
     combat_->Update(*registry_, dt);
     BroadcastMonsterMovement(dt);
+
+    if (player_joined_ && registry_->valid(player_entity_)) {
+        int hp = registry_->get<CharacterStats>(player_entity_).hp;
+        if (hp != last_sent_hp_) {
+            last_sent_hp_ = hp;
+            connected_player_.hp = hp;
+            SendCharLifeUpdate();
+        }
+    }
 
     // Check encounter triggers for all moving players
     {
@@ -546,11 +631,74 @@ void MapServer::BroadcastMonsterMovement(float dt) {
 
 void MapServer::GrantLootToPlayer(uint32_t item_id, uint16_t count) {
     using namespace luna::protocol;
+    bool merged = false;
+    for (auto& slot : player_inventory_) {
+        if (slot.item_id == item_id) {
+            slot.count = static_cast<uint16_t>(slot.count + count);
+            merged = true;
+            break;
+        }
+    }
+    if (!merged) {
+        player_inventory_.push_back({next_loot_slot_++, item_id, count});
+    }
     flatbuffers::FlatBufferBuilder fbb;
-    auto upd = CreateInventoryUpdate(fbb, next_loot_slot_++, item_id, count);
+    auto upd = CreateInventoryUpdate(fbb, next_loot_slot_ - 1, item_id, count);
     fbb.Finish(upd);
     network_->SendPacket(PacketType_MP_INVENTORY_UPDATE, fbb.GetBufferPointer(), fbb.GetSize());
     spdlog::info("MapServer: loot item {} x{} -> player {}", item_id, count, connected_player_.id);
+}
+
+void MapServer::SendCharLifeUpdate() {
+    if (!registry_->valid(player_entity_)) return;
+    using namespace luna::protocol;
+    auto& stats = registry_->get<CharacterStats>(player_entity_);
+    flatbuffers::FlatBufferBuilder fbb;
+    auto msg = CreateCharLifeUpdate(fbb,
+        static_cast<uint32_t>(connected_player_.id),
+        stats.hp, stats.max_hp, stats.mp, stats.max_mp,
+        player_gold_, player_exp_);
+    fbb.Finish(msg);
+    network_->SendPacket(PacketType_MP_CHAR_LIFE_ACK, fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void MapServer::SendInventorySync() {
+    using namespace luna::protocol;
+    flatbuffers::FlatBufferBuilder fbb;
+    std::vector<flatbuffers::Offset<InventorySlot>> slots;
+    for (const auto& s : player_inventory_) {
+        InventorySlotBuilder sb(fbb);
+        sb.add_slot_index(s.slot);
+        sb.add_item_id(s.item_id);
+        sb.add_count(s.count);
+        sb.add_enchant(0);
+        slots.push_back(sb.Finish());
+    }
+    auto inv = CreateInventoryData(fbb, player_gold_, fbb.CreateVector(slots));
+    fbb.Finish(inv);
+    network_->SendPacket(PacketType_MP_ITEM_STORAGEITEM_INFO,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void MapServer::BroadcastNewMonsterSpawns() {
+    if (!player_joined_) return;
+    auto view = registry_->view<TagMonster, Transform, SpawnInfo, CharacterStats>();
+    for (auto entity : view) {
+        uint32_t eid = static_cast<uint32_t>(entt::to_entity(entity));
+        if (monster_net_.count(eid)) continue;
+        auto& xform = view.get<Transform>(entity);
+        auto& spawn = view.get<SpawnInfo>(entity);
+        auto& stats = view.get<CharacterStats>(entity);
+        std::string model = "m224.chx";
+        std::string name = "Monster_" + std::to_string(spawn.monster_id);
+        SendEntitySpawn(eid, static_cast<int8_t>(luna::protocol::EntityType_Monster),
+            model, name, stats.level,
+            xform.position.x, xform.position.y, xform.position.z,
+            stats.max_hp > 0 ? static_cast<float>(stats.hp) / stats.max_hp : 1.0f);
+        monster_net_[eid] = {};
+        monster_net_[eid].last_sent = xform.position;
+        monster_net_[eid].initialized = true;
+    }
 }
 
 void MapServer::SendWorldSnapshot() {
@@ -586,8 +734,16 @@ void MapServer::HandlePacket(uint16_t type, const uint8_t* payload, size_t len) 
         connected_player_.hp = 500;
         connected_player_.max_hp = 500;
         player_joined_ = true;
+        player_inventory_ = {{0, 1001, 1}, {1, 21000001, 5}};
+        player_gold_ = 100;
+        player_exp_ = 0;
+        next_loot_slot_ = 10;
+        last_sent_hp_ = -1;
+        monster_net_.clear();
         SpawnPlayer(connected_player_.id, connected_player_);
         SendWorldSnapshot();
+        SendInventorySync();
+        SendCharLifeUpdate();
         Vec3 pos{connected_player_.pos_x, connected_player_.pos_y, connected_player_.pos_z};
         flatbuffers::FlatBufferBuilder fbb;
         auto ack = CreateEnterWorldResponse(fbb, 0,
@@ -595,6 +751,11 @@ void MapServer::HandlePacket(uint16_t type, const uint8_t* payload, size_t len) 
             static_cast<uint32_t>(connected_player_.id));
         fbb.Finish(ack);
         network_->SendPacket(PacketType_MP_USERCONN_GAMEIN_ACK, fbb.GetBufferPointer(), fbb.GetSize());
+        return;
+    }
+
+    if (type == PacketType_MP_USERCONN_CHANGEMAP_SYN) {
+        HandleChangeMap(payload, len);
         return;
     }
 
@@ -705,9 +866,14 @@ void MapServer::HandleCombatAttack(uint16_t ack_type, const uint8_t* payload, si
 
     if (def.hp <= 0) {
         monster_net_.erase(target_id);
+        uint32_t gold_gain = 10 + def.level * 5;
+        uint64_t exp_gain = 50 + def.level * 10;
+        player_gold_ += gold_gain;
+        player_exp_ += exp_gain;
         GrantLootToPlayer(21000001, static_cast<uint16_t>(1 + (target_id % 3)));
         if ((target_id % 4) == 0)
             GrantLootToPlayer(1001, 1);
+        SendCharLifeUpdate();
         SendEntityDespawn(target_id, static_cast<int8_t>(DespawnReason_Death));
         if (registry_->all_of<SpawnInfo>(target)) {
             auto& spawn = registry_->get<SpawnInfo>(target);
