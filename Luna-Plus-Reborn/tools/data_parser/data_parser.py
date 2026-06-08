@@ -841,79 +841,91 @@ def export_npcs(db_path: str, output_path: str) -> int:
 
 
 def main():
-    if not DATA_SRC.is_dir():
-        print(f"ERROR: Data directory not found: {DATA_SRC}")
-        sys.exit(1)
+    # Check if we should only run the export step
+    export_only = "--export-only" in sys.argv
 
-    files = sorted(DATA_SRC.glob("*.bin.txt"))
-    print(f"Found {len(files)} game data files in {DATA_SRC}")
+    if not export_only and DATA_SRC.is_dir():
+        files = sorted(DATA_SRC.glob("*.bin.txt"))
+        print(f"Found {len(files)} game data files in {DATA_SRC}")
 
-    DB_OUT.parent.mkdir(parents=True, exist_ok=True)
-    if DB_OUT.exists():
-        DB_OUT.unlink()
+        DB_OUT.parent.mkdir(parents=True, exist_ok=True)
+        if DB_OUT.exists():
+            DB_OUT.unlink()
 
-    db = sqlite3.connect(str(DB_OUT))
-    db.execute("PRAGMA synchronous = OFF")
-    db.execute("PRAGMA journal_mode = MEMORY")
-    db.execute("PRAGMA cache_size = -64000")
+        db = sqlite3.connect(str(DB_OUT))
+        db.execute("PRAGMA synchronous = OFF")
+        db.execute("PRAGMA journal_mode = MEMORY")
+        db.execute("PRAGMA cache_size = -64000")
 
-    total_rows = 0
-    parsed = 0
-    skipped = 0
-    for f in files:
-        try:
-            table, rows, cols = process_file(f, db)
-            total_rows += rows
-            parsed += 1
-            status = "OK" if rows > 0 else "EMPTY"
-            print(f"  {status:5} | {table:40s} | {rows:5d} rows | {cols} cols | {f.name}")
-            db.commit()
-        except Exception as e:
-            print(f"  ERROR  | {f.name:47s} | {e}")
-            skipped += 1
+        total_rows = 0
+        parsed = 0
+        skipped = 0
+        for f in files:
+            try:
+                table, rows, cols = process_file(f, db)
+                total_rows += rows
+                parsed += 1
+                status = "OK" if rows > 0 else "EMPTY"
+                print(f"  {status:5} | {table:40s} | {rows:5d} rows | {cols} cols | {f.name}")
+                db.commit()
+            except Exception as e:
+                print(f"  ERROR  | {f.name:47s} | {e}")
+                skipped += 1
 
-    # Create metadata table
-    db.execute("""
-        CREATE TABLE IF NOT EXISTS _metadata (
-            file TEXT PRIMARY KEY,
-            table_name TEXT,
-            row_count INTEGER,
-            col_count INTEGER
-        )
-    """)
-    for f in files:
-        table = table_name_from_file(f.name)
-        try:
-            row_count = db.execute(f"SELECT COUNT(*) FROM [{table}]").fetchone()[0]
-            col_count = len(db.execute(f"PRAGMA table_info([{table}])").fetchall())
-            db.execute(
-                "INSERT INTO _metadata VALUES (?, ?, ?, ?)",
-                (f.name, table, row_count, col_count),
+        # Create metadata table
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS _metadata (
+                file TEXT PRIMARY KEY,
+                table_name TEXT,
+                row_count INTEGER,
+                col_count INTEGER
             )
-        except sqlite3.Error:
-            pass
-    db.commit()
-    db.close()
+        """)
+        for f in files:
+            table = table_name_from_file(f.name)
+            try:
+                row_count = db.execute(f"SELECT COUNT(*) FROM [{table}]").fetchone()[0]
+                col_count = len(db.execute(f"PRAGMA table_info([{table}])").fetchall())
+                db.execute(
+                    "INSERT INTO _metadata VALUES (?, ?, ?, ?)",
+                    (f.name, table, row_count, col_count),
+                )
+            except sqlite3.Error:
+                pass
+        db.commit()
+        db.close()
 
-    print(f"\n{'='*60}")
-    print(f"  Parsed: {parsed} files")
-    print(f"  Skipped: {skipped} files")
-    print(f"  Total rows: {total_rows:,}")
-    print(f"  Database: {DB_OUT}")
-    if DB_OUT.exists():
-        print(f"  Size: {DB_OUT.stat().st_size / 1024:.1f} KB")
-    print(f"{'='*60}\n")
+        print(f"\n{'='*60}")
+        print(f"  Parsed: {parsed} files")
+        print(f"  Skipped: {skipped} files")
+        print(f"  Total rows: {total_rows:,}")
+        print(f"  Database: {DB_OUT}")
+        if DB_OUT.exists():
+            print(f"  Size: {DB_OUT.stat().st_size / 1024:.1f} KB")
+        print(f"{'='*60}\n")
 
-    # Generate legacy DB
-    print("Generating game_data_legacy.db with normalized schema...")
-    create_legacy_db(DB_OUT, LEGACY_DB_OUT)
-    print(f"\n{'='*60}")
-    print(f"  Legacy DB: {LEGACY_DB_OUT}")
-    if LEGACY_DB_OUT.exists():
-        print(f"  Size: {LEGACY_DB_OUT.stat().st_size / 1024:.1f} KB")
-    print(f"{'='*60}")
+        # Generate legacy DB
+        print("Generating game_data_legacy.db with normalized schema...")
+        create_legacy_db(DB_OUT, LEGACY_DB_OUT)
+        print(f"\n{'='*60}")
+        print(f"  Legacy DB: {LEGACY_DB_OUT}")
+        if LEGACY_DB_OUT.exists():
+            print(f"  Size: {LEGACY_DB_OUT.stat().st_size / 1024:.1f} KB")
+        print(f"{'='*60}")
 
-    print("\n" + SCHEMA_DOC)
+        print("\n" + SCHEMA_DOC)
+    else:
+        if not LEGACY_DB_OUT.exists():
+            print(f"Legacy DB not found at {LEGACY_DB_OUT}, cannot export.")
+            if not export_only:
+                sys.exit(1)
+            # Try falling back to just running create_legacy_db
+            if DB_OUT.exists():
+                print("Source DB exists, generating legacy DB...")
+                create_legacy_db(DB_OUT, LEGACY_DB_OUT)
+            else:
+                print("Source DB also not found. Export cannot proceed.")
+                sys.exit(1)
 
     # Export to JSON
     print("\nExporting legacy data to JSON for ECS consumption...")

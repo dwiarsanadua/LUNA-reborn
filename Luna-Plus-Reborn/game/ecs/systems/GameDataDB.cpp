@@ -1,6 +1,224 @@
 #include "GameDataDB.hpp"
 #include <spdlog/spdlog.h>
 #include <cstring>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
+#include <cctype>
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Minimal JSON parser — handles the specific JSON format we export
+// ═══════════════════════════════════════════════════════════════════════
+
+namespace {
+
+std::string trim(const std::string& s) {
+    auto start = s.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) return "";
+    auto end = s.find_last_not_of(" \t\r\n");
+    return s.substr(start, end - start + 1);
+}
+
+struct JsonVal {
+    enum Type { NIL, STRING, NUMBER, OBJECT, ARRAY };
+    Type type = NIL;
+    std::string str_val;
+    double num_val = 0.0;
+    std::vector<std::pair<std::string, JsonVal>> obj_val;
+    std::vector<JsonVal> arr_val;
+};
+
+class JsonParser {
+public:
+    JsonParser(const std::string& input) : s(input), pos(0) {}
+
+    JsonVal parse() {
+        skipWs();
+        if (pos >= s.size()) return {};
+        char c = s[pos];
+        if (c == '{') return parseObject();
+        if (c == '[') return parseArray();
+        if (c == '"') return parseString();
+        if (c == 't' || c == 'f' || c == 'n') return parseLiteral();
+        return parseNumber();
+    }
+
+private:
+    const std::string& s;
+    size_t pos;
+
+    void skipWs() {
+        while (pos < s.size() && (s[pos] == ' ' || s[pos] == '\t' || s[pos] == '\n' || s[pos] == '\r'))
+            pos++;
+    }
+
+    JsonVal parseString() {
+        JsonVal v;
+        v.type = JsonVal::STRING;
+        if (pos < s.size() && s[pos] == '"') pos++;
+        while (pos < s.size() && s[pos] != '"') {
+            if (s[pos] == '\\') {
+                pos++;
+                if (pos < s.size()) {
+                    switch (s[pos]) {
+                        case '"': v.str_val += '"'; break;
+                        case '\\': v.str_val += '\\'; break;
+                        case '/': v.str_val += '/'; break;
+                        case 'b': v.str_val += '\b'; break;
+                        case 'f': v.str_val += '\f'; break;
+                        case 'n': v.str_val += '\n'; break;
+                        case 'r': v.str_val += '\r'; break;
+                        case 't': v.str_val += '\t'; break;
+                        case 'u': {
+                            if (pos + 4 < s.size()) {
+                                std::string hex = s.substr(pos + 1, 4);
+                                // Simple unicode escape handling
+                                v.str_val += "?";
+                                pos += 4;
+                            }
+                            break;
+                        }
+                        default: v.str_val += s[pos]; break;
+                    }
+                    pos++;
+                }
+            } else {
+                v.str_val += s[pos];
+                pos++;
+            }
+        }
+        if (pos < s.size()) pos++; // skip closing "
+        return v;
+    }
+
+    JsonVal parseNumber() {
+        JsonVal v;
+        v.type = JsonVal::NUMBER;
+        size_t start = pos;
+        if (pos < s.size() && s[pos] == '-') pos++;
+        while (pos < s.size() && (std::isdigit(s[pos]) || s[pos] == '.' || s[pos] == 'e' || s[pos] == 'E' || s[pos] == '+' || s[pos] == '-')) {
+            if (s[pos] == '+' || s[pos] == '-') {
+                if (pos > start && s[pos-1] != 'e' && s[pos-1] != 'E') break;
+            }
+            pos++;
+        }
+        v.str_val = s.substr(start, pos - start);
+        v.num_val = std::stod(v.str_val);
+        return v;
+    }
+
+    JsonVal parseLiteral() {
+        JsonVal v;
+        v.type = JsonVal::NIL;
+        if (s.substr(pos, 4) == "true") {
+            v.type = JsonVal::NUMBER;
+            v.num_val = 1.0;
+            v.str_val = "1";
+            pos += 4;
+        } else if (s.substr(pos, 5) == "false") {
+            v.type = JsonVal::NUMBER;
+            v.num_val = 0.0;
+            v.str_val = "0";
+            pos += 5;
+        } else if (s.substr(pos, 4) == "null") {
+            pos += 4;
+        }
+        return v;
+    }
+
+    JsonVal parseObject() {
+        JsonVal v;
+        v.type = JsonVal::OBJECT;
+        pos++; // skip {
+        skipWs();
+        if (pos < s.size() && s[pos] == '}') { pos++; return v; }
+        while (true) {
+            skipWs();
+            auto key = parseString();
+            skipWs();
+            if (pos < s.size() && s[pos] == ':') pos++;
+            skipWs();
+            auto val = parse();
+            v.obj_val.push_back({key.str_val, val});
+            skipWs();
+            if (pos < s.size() && s[pos] == ',') { pos++; continue; }
+            if (pos < s.size() && s[pos] == '}') { pos++; break; }
+            break;
+        }
+        return v;
+    }
+
+    JsonVal parseArray() {
+        JsonVal v;
+        v.type = JsonVal::ARRAY;
+        pos++; // skip [
+        skipWs();
+        if (pos < s.size() && s[pos] == ']') { pos++; return v; }
+        while (true) {
+            skipWs();
+            v.arr_val.push_back(parse());
+            skipWs();
+            if (pos < s.size() && s[pos] == ',') { pos++; continue; }
+            if (pos < s.size() && s[pos] == ']') { pos++; break; }
+            break;
+        }
+        return v;
+    }
+};
+
+// Helper to extract values from parsed JSON
+std::string jsonStr(const JsonVal& obj, const std::string& key, const std::string& def = "") {
+    for (auto& [k, v] : obj.obj_val) {
+        if (k == key && v.type == JsonVal::STRING) return v.str_val;
+    }
+    return def;
+}
+
+double jsonNum(const JsonVal& obj, const std::string& key, double def = 0.0) {
+    for (auto& [k, v] : obj.obj_val) {
+        if (k == key && v.type == JsonVal::NUMBER) return v.num_val;
+    }
+    return def;
+}
+
+int32_t jsonInt(const JsonVal& obj, const std::string& key, int32_t def = 0) {
+    return static_cast<int32_t>(jsonNum(obj, key, static_cast<double>(def)));
+}
+
+uint32_t jsonUint(const JsonVal& obj, const std::string& key, uint32_t def = 0) {
+    auto v = jsonNum(obj, key, static_cast<double>(def));
+    return v < 0 ? 0 : static_cast<uint32_t>(v);
+}
+
+std::vector<uint32_t> jsonUintArray(const JsonVal& obj, const std::string& key) {
+    std::vector<uint32_t> result;
+    for (auto& [k, v] : obj.obj_val) {
+        if (k == key && v.type == JsonVal::ARRAY) {
+            for (auto& elem : v.arr_val) {
+                if (elem.type == JsonVal::NUMBER)
+                    result.push_back(static_cast<uint32_t>(elem.num_val));
+            }
+        }
+    }
+    return result;
+}
+
+std::vector<JsonVal> jsonArray(const JsonVal& obj, const std::string& key) {
+    for (auto& [k, v] : obj.obj_val) {
+        if (k == key && v.type == JsonVal::ARRAY) return v.arr_val;
+    }
+    return {};
+}
+
+std::string readFile(const std::string& path) {
+    std::ifstream f(path);
+    if (!f.is_open()) return "";
+    std::stringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+}
+
+} // anonymous namespace
 
 template<> int32_t GameDataDB::Col<int32_t>(sqlite3_stmt* s, int i) const { return sqlite3_column_int(s, i); }
 template<> uint32_t GameDataDB::Col<uint32_t>(sqlite3_stmt* s, int i) const { return static_cast<uint32_t>(sqlite3_column_int(s, i)); }
@@ -661,6 +879,272 @@ void GameDataDB::LoadMapData() {
 
     spdlog::info("LoadMapData: {} maps, {} warps, {} boundaries loaded",
         map_data_.size(), map_warps_.size(), map_boundaries_.size());
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  JSON-based loaders  (Tasks A3–A7)
+// ═══════════════════════════════════════════════════════════════════════
+
+void GameDataDB::LoadItemTemplates(const std::string& json_path) {
+    items_json_.clear();
+    auto content = readFile(json_path);
+    if (content.empty()) {
+        spdlog::warn("LoadItemTemplates(JSON): cannot read {}", json_path);
+        return;
+    }
+    JsonParser parser(content);
+    auto root = parser.parse();
+    if (root.type != JsonVal::ARRAY) {
+        spdlog::error("LoadItemTemplates(JSON): expected array at root");
+        return;
+    }
+    int count = 0;
+    for (auto& elem : root.arr_val) {
+        if (elem.type != JsonVal::OBJECT) continue;
+        ItemTemplate t;
+        t.id = jsonUint(elem, "id");
+        t.name = jsonStr(elem, "name");
+        t.item_type = static_cast<uint16_t>(jsonUint(elem, "item_type"));
+        t.item_subtype = static_cast<uint16_t>(jsonUint(elem, "item_subtype"));
+        t.rarity = static_cast<uint16_t>(jsonUint(elem, "rarity"));
+        t.required_level = static_cast<uint16_t>(jsonUint(elem, "level_required"));
+        t.stats[0] = jsonInt(elem, "attack");
+        t.stats[1] = jsonInt(elem, "defense");
+        t.stats[2] = jsonInt(elem, "magic_attack");
+        t.stats[3] = jsonInt(elem, "magic_defense");
+        t.buy_price = jsonInt(elem, "price_buy");
+        t.sell_price = jsonInt(elem, "price_sell");
+        t.drop_rate = static_cast<float>(jsonNum(elem, "drop_rate", 0.0));
+        t.durability = static_cast<uint16_t>(jsonUint(elem, "durability"));
+        t.max_stack = static_cast<uint16_t>(jsonUint(elem, "max_stack", 1));
+        items_json_[t.id] = t;
+        count++;
+    }
+    spdlog::info("LoadItemTemplates(JSON): {} items loaded from {}", count, json_path);
+}
+
+void GameDataDB::LoadMonsterTemplates(const std::string& json_path) {
+    monsters_json_.clear();
+    auto content = readFile(json_path);
+    if (content.empty()) {
+        spdlog::warn("LoadMonsterTemplates(JSON): cannot read {}", json_path);
+        return;
+    }
+    JsonParser parser(content);
+    auto root = parser.parse();
+    if (root.type != JsonVal::ARRAY) {
+        spdlog::error("LoadMonsterTemplates(JSON): expected array at root");
+        return;
+    }
+    int count = 0;
+    for (auto& elem : root.arr_val) {
+        if (elem.type != JsonVal::OBJECT) continue;
+        MonsterTemplate t;
+        t.id = jsonUint(elem, "id");
+        t.name = jsonStr(elem, "name");
+        t.level = static_cast<uint16_t>(jsonUint(elem, "level"));
+        t.hp = jsonInt(elem, "hp");
+        t.mp = jsonInt(elem, "mp");
+        t.atk = jsonInt(elem, "attack");
+        t.def = jsonInt(elem, "defense");
+        t.matk = jsonInt(elem, "magic_attack");
+        t.mdef = jsonInt(elem, "magic_defense");
+        t.speed = static_cast<float>(jsonNum(elem, "speed", 1.0));
+        t.exp = jsonUint(elem, "exp_reward");
+        t.gold_min = jsonUint(elem, "gold_min");
+        t.gold_max = jsonUint(elem, "gold_max");
+        t.aggro_range = static_cast<uint16_t>(jsonUint(elem, "aggro_range"));
+        t.attack_range = static_cast<uint16_t>(jsonUint(elem, "attack_range", 3));
+        t.ai_type = static_cast<uint16_t>(jsonUint(elem, "ai_type"));
+
+        // loot table from drops array
+        auto drops = jsonArray(elem, "drops");
+        for (auto& d : drops) {
+            if (d.type == JsonVal::OBJECT) {
+                t.loot_table.push_back(jsonUint(d, "item_id"));
+            }
+        }
+
+        // spawn maps from spawns array
+        auto spawns = jsonArray(elem, "spawns");
+        for (auto& s : spawns) {
+            if (s.type == JsonVal::OBJECT) {
+                t.spawn_map.push_back(jsonUint(s, "map_id"));
+            }
+        }
+
+        monsters_json_[t.id] = t;
+        count++;
+    }
+    spdlog::info("LoadMonsterTemplates(JSON): {} monsters loaded from {}", count, json_path);
+}
+
+void GameDataDB::LoadSkillTemplates(const std::string& json_path) {
+    skills_json_.clear();
+    auto content = readFile(json_path);
+    if (content.empty()) {
+        spdlog::warn("LoadSkillTemplates(JSON): cannot read {}", json_path);
+        return;
+    }
+    JsonParser parser(content);
+    auto root = parser.parse();
+    if (root.type != JsonVal::ARRAY) {
+        spdlog::error("LoadSkillTemplates(JSON): expected array at root");
+        return;
+    }
+    int count = 0;
+    for (auto& elem : root.arr_val) {
+        if (elem.type != JsonVal::OBJECT) continue;
+        SkillTemplate t;
+        t.id = jsonUint(elem, "id");
+        t.name = jsonStr(elem, "name");
+        t.type = static_cast<uint16_t>(jsonUint(elem, "skill_type"));
+        t.required_level = static_cast<uint16_t>(jsonUint(elem, "level_required"));
+        t.required_class = static_cast<uint16_t>(jsonUint(elem, "class_id"));
+        t.mp_cost = jsonInt(elem, "cost_mp");
+        t.cooldown_ms = jsonUint(elem, "cooldown_ms");
+        t.damage_mult = static_cast<float>(jsonNum(elem, "damage_mult", 1.0));
+        t.range = static_cast<float>(jsonNum(elem, "range"));
+        t.duration = static_cast<float>(jsonNum(elem, "duration"));
+        t.target_type = static_cast<uint16_t>(jsonUint(elem, "target_type"));
+        t.animation = jsonStr(elem, "animation");
+        t.effect_id = jsonUint(elem, "effect_id");
+        skills_json_[t.id] = t;
+        count++;
+    }
+    spdlog::info("LoadSkillTemplates(JSON): {} skills loaded from {}", count, json_path);
+}
+
+void GameDataDB::LoadQuestTemplates(const std::string& json_path) {
+    quests_json_.clear();
+    auto content = readFile(json_path);
+    if (content.empty()) {
+        spdlog::warn("LoadQuestTemplates(JSON): cannot read {}", json_path);
+        return;
+    }
+    JsonParser parser(content);
+    auto root = parser.parse();
+    if (root.type != JsonVal::ARRAY) {
+        spdlog::error("LoadQuestTemplates(JSON): expected array at root");
+        return;
+    }
+    int count = 0;
+    for (auto& elem : root.arr_val) {
+        if (elem.type != JsonVal::OBJECT) continue;
+        QuestTemplate t;
+        t.id = jsonUint(elem, "id");
+        t.name = jsonStr(elem, "title");
+        t.level_required = static_cast<uint16_t>(jsonUint(elem, "level_required"));
+        t.npc_start_id = jsonUint(elem, "giver_npc_id");
+        t.npc_complete_id = jsonUint(elem, "completer_npc_id");
+        t.dialog_start = jsonStr(elem, "dialog_start");
+        t.dialog_progress = jsonStr(elem, "dialog_progress");
+        t.dialog_complete = jsonStr(elem, "dialog_complete");
+
+        // Conditions
+        auto conds = jsonArray(elem, "conditions");
+        for (auto& c : conds) {
+            if (c.type == JsonVal::OBJECT) {
+                t.conditions.push_back(jsonUint(c, "target_id"));
+            }
+        }
+
+        // Rewards
+        t.rewards.push_back(jsonUint(elem, "reward_exp"));
+        t.rewards.push_back(jsonUint(elem, "reward_gold"));
+        t.rewards.push_back(jsonUint(elem, "reward_item_id"));
+
+        quests_json_[t.id] = t;
+        count++;
+    }
+    spdlog::info("LoadQuestTemplates(JSON): {} quests loaded from {}", count, json_path);
+}
+
+void GameDataDB::LoadNPCTemplates(const std::string& json_path) {
+    npcs_json_.clear();
+    auto content = readFile(json_path);
+    if (content.empty()) {
+        spdlog::warn("LoadNPCTemplates(JSON): cannot read {}", json_path);
+        return;
+    }
+    JsonParser parser(content);
+    auto root = parser.parse();
+    if (root.type != JsonVal::ARRAY) {
+        spdlog::error("LoadNPCTemplates(JSON): expected array at root");
+        return;
+    }
+    int count = 0;
+    for (auto& elem : root.arr_val) {
+        if (elem.type != JsonVal::OBJECT) continue;
+        NPCData t;
+        t.id = jsonUint(elem, "id");
+        t.name = jsonStr(elem, "name");
+        t.type = static_cast<uint16_t>(jsonUint(elem, "npc_type"));
+        t.pos_x = static_cast<float>(jsonNum(elem, "pos_x"));
+        t.pos_y = static_cast<float>(jsonNum(elem, "pos_y"));
+        t.pos_z = static_cast<float>(jsonNum(elem, "pos_z"));
+        t.map_id = jsonUint(elem, "map_id");
+
+        // Shop items
+        auto shop = jsonArray(elem, "shop_items");
+        for (auto& s : shop) {
+            if (s.type == JsonVal::OBJECT) {
+                t.shop_items.push_back(jsonUint(s, "item_id"));
+            }
+        }
+
+        // Dialog texts
+        std::string dt = jsonStr(elem, "dialog_text");
+        if (!dt.empty()) t.dialog_texts.push_back(dt);
+
+        // Also try positions array for map/position data
+        auto positions = jsonArray(elem, "positions");
+        if (!positions.empty() && positions[0].type == JsonVal::OBJECT) {
+            t.map_id = jsonUint(positions[0], "map_id");
+            t.pos_x = static_cast<float>(jsonNum(positions[0], "pos_x"));
+            t.pos_y = static_cast<float>(jsonNum(positions[0], "pos_y"));
+            t.pos_z = static_cast<float>(jsonNum(positions[0], "pos_z"));
+            for (auto& p : positions) {
+                if (p.type == JsonVal::OBJECT) {
+                    auto pit = jsonUint(p, "item_id");
+                    if (pit) t.shop_items.push_back(pit);
+                }
+            }
+        }
+
+        npcs_json_[t.id] = t;
+        count++;
+    }
+    spdlog::info("LoadNPCTemplates(JSON): {} NPCs loaded from {}", count, json_path);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  JSON template accessors
+// ═══════════════════════════════════════════════════════════════════════
+
+const ItemTemplate* GameDataDB::GetItemTemplate(uint32_t id) const {
+    auto it = items_json_.find(id);
+    return it != items_json_.end() ? &it->second : nullptr;
+}
+
+const MonsterTemplate* GameDataDB::GetMonsterTemplate(uint32_t id) const {
+    auto it = monsters_json_.find(id);
+    return it != monsters_json_.end() ? &it->second : nullptr;
+}
+
+const SkillTemplate* GameDataDB::GetSkillTemplate(uint32_t id) const {
+    auto it = skills_json_.find(id);
+    return it != skills_json_.end() ? &it->second : nullptr;
+}
+
+const QuestTemplate* GameDataDB::GetQuestTemplate(uint32_t id) const {
+    auto it = quests_json_.find(id);
+    return it != quests_json_.end() ? &it->second : nullptr;
+}
+
+const NPCData* GameDataDB::GetNPCData(uint32_t id) const {
+    auto it = npcs_json_.find(id);
+    return it != npcs_json_.end() ? &it->second : nullptr;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
