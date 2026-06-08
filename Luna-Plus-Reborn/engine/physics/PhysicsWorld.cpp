@@ -15,6 +15,11 @@
 #include <spdlog/spdlog.h>
 #include <memory>
 
+// Provide AssertFailed stub required by Jolt when asserts are enabled
+namespace JPH {
+    AssertFailedFunction AssertFailed = [](const char*, const char*, const char*, uint) -> bool { return true; };
+}
+
 JPH_SUPPRESS_WARNINGS
 
 namespace {

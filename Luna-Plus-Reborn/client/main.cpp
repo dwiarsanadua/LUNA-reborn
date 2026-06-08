@@ -42,6 +42,7 @@
 #include <input/Keyboard.hpp>
 #include <game/network/PacketDispatcher.hpp>
 #include <spdlog/spdlog.h>
+#include <atomic>
 #include <csignal>
 #include <chrono>
 #include <thread>
@@ -53,8 +54,8 @@
 #include <game/Log.h>
 #include <sys/stat.h>
 
-static bool g_running = true;
-void signal_handler(int) { g_running = false; }
+static std::atomic<bool> g_running = true;
+extern "C" void signal_handler(int) { g_running = false; }
 
 static NetworkClient g_network;
 static GameState g_state;
@@ -90,6 +91,7 @@ int main(int argc, char** argv) {
     });
 
     signal(SIGINT, signal_handler); signal(SIGTERM, signal_handler);
+    signal(SIGPIPE, SIG_IGN);
 
     // 3. RenderDevice (initializes VFS from executable location first)
     RenderDeviceConfig config{};
@@ -129,7 +131,7 @@ int main(int argc, char** argv) {
     EngineMap map;
     map.SetTerrain(&terrain);
     map.SetProps(&props);
-    map.SetAudio(&audio);
+    // map.SetAudio(&audio); // BGM will be played by screen manager when screen is active
     map.SetSpawnSystem(&spawn_sys);
     map.SetRegistry(&registry);
     // GameDataDB — init before map load so EngineMap uses external DB
@@ -204,29 +206,30 @@ int main(int argc, char** argv) {
     gfx.GetScene()->height = (float)device.GetHeight();
     ParticleRenderer particles; particles.Init();
 
-    if (g_audio) {
-        std::string bgm_path = Paths::Asset("audio/BGM/BGM_Login.mp3");
-        struct stat bgm_stat;
-        if (::stat(bgm_path.c_str(), &bgm_stat) == 0) {
-            audio.PlayBGM("BGM_Login");
-        } else {
-            spdlog::warn("BGM: login BGM not found at {}", bgm_path);
-        }
-    }
+    // BGM will be played by screen manager when screen is active
+    // if (g_audio) {
+    //     std::string bgm_path = Paths::Asset("audio/BGM/BGM_Login.mp3");
+    //     struct stat bgm_stat;
+    //     if (::stat(bgm_path.c_str(), &bgm_stat) == 0) {
+    //         audio.PlayBGM("BGM_Login");
+    //     } else {
+    //         spdlog::warn("BGM: login BGM not found at {}", bgm_path);
+    //     }
+    // }
 
     AmbientSystem ambient;
     ambient.Init();
 
-    // Persistence
+    // Persistence will be handled by screen manager after login
     PersistenceManager persistence;
-    std::string db_path = "character.db";
-    if (persistence.Init(db_path)) {
-        if (persistence.LoadGameState(g_state)) {
-            spdlog::info("Main: loaded saved game (Lv.{}, {})", g_state.level, g_state.name);
-        } else {
-            spdlog::info("Main: no saved game found, starting fresh");
-        }
-    }
+    // std::string db_path = "character.db";
+    // if (persistence.Init(db_path)) {
+    //     if (persistence.LoadGameState(g_state)) {
+    //         spdlog::info("Main: loaded saved game (Lv.{}, {})", g_state.level, g_state.name);
+    //     } else {
+    //         spdlog::info("Main: no saved game found, starting fresh");
+    //     }
+    // }
 
     // Asset Preloader
     AssetPreloader preloader;
@@ -399,7 +402,7 @@ int main(int argc, char** argv) {
     float fps = 0, time = 0;
     const float target_frame = fps_limit > 0 ? (1.0f / static_cast<float>(fps_limit)) : 0.0f;
 
-    while (!device.ShouldClose() && g_running) {
+    while (!device.ShouldClose() && g_running.load()) {
         auto frame_start = clock::now();
         float dt = std::chrono::duration<float>(frame_start - last_time).count();
         last_time = frame_start;
@@ -439,10 +442,12 @@ int main(int argc, char** argv) {
         sky.Update(dt);
         if (g_audio) g_audio->Update();
 
-        // Periodic auto-save
-        persistence.Update(dt);
-        if (frame % 1800 == 0) { // every ~30 seconds at 60fps
-            persistence.SaveGameState(g_state);
+        // Periodic auto-save (only when game screen is active)
+        if (screenManager.CurrentName() == "game") {
+            persistence.Update(dt);
+            if (frame % 1800 == 0) {
+                persistence.SaveGameState(g_state);
+            }
         }
 
         // --- RENDERING (update already applied this frame) ---
@@ -478,17 +483,18 @@ int main(int argc, char** argv) {
         device.EndFrame();
 
         if (target_frame > 0.0f) {
-            const auto frame_end = clock::now();
-            const float elapsed = std::chrono::duration<float>(frame_end - frame_start).count();
-            if (elapsed < target_frame) {
-                const auto sleep_ms = static_cast<int>((target_frame - elapsed) * 1000.0f);
-                if (sleep_ms > 0) std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+            // Spin-wait for last 2ms for accuracy (sleep granularity ~1-15ms on macOS)
+            while (std::chrono::duration<float>(clock::now() - frame_start).count() < target_frame - 0.002f) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
+            while (std::chrono::duration<float>(clock::now() - frame_start).count() < target_frame) { }
         }
     }
 
-    // Save game state on exit
-    persistence.SaveGameState(g_state);
+    // Save game state on exit (only if initialized)
+    if (screenManager.CurrentName() == "game") {
+        persistence.SaveGameState(g_state);
+    }
     persistence.Shutdown();
 
     g_network.Disconnect();
@@ -496,7 +502,10 @@ int main(int argc, char** argv) {
     ambient.Shutdown();
     audio.Shutdown(); g_char_renderer->Shutdown(); delete g_char_renderer; g_char_renderer = nullptr;
     map.Unload(); props.Shutdown(); terrain.Shutdown(); gfx.Shutdown();
-    ui.Shutdown(); particles.Shutdown(); device.Shutdown();
+    ui.Shutdown(); particles.Shutdown();
+    signal(SIGINT, SIG_DFL);
+    signal(SIGTERM, SIG_DFL);
+    device.Shutdown();
     spdlog::info("Shutdown");
     return 0;
 }

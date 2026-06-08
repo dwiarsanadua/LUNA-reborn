@@ -29,6 +29,9 @@ void UiSkinManager::Init(const std::string& ui_texture_path, const std::string& 
     if (initialized_) return;
     texture_path_ = ui_texture_path;
 
+    spdlog::info("UiSkin: texture_path={}", ui_texture_path);
+    spdlog::info("UiSkin: interface_path={}", interface_path);
+
     UiAtlasRegistry::Init(interface_path + "Windows/image_path.bin.txt");
     UiStringTable::Init(interface_path + "Windows/InterfaceMsg.bin.txt");
     UiSoundIndex::Init();
@@ -77,6 +80,12 @@ void UiSkinManager::Init(const std::string& ui_texture_path, const std::string& 
 
     // Load window layout definitions
     int layouts = LoadWindowLayouts(interface_path + "Windows/");
+    // Debug: test load common skin textures
+    LoadTexture("close");
+    LoadTexture("close_f");
+    LoadTexture("min");
+    LoadTexture("min_f");
+
     spdlog::info("UiSkinManager: initialized ({} window layouts, {} textures pre-cached)",
                  layouts, (int)textures_.size());
     initialized_ = true;
@@ -105,9 +114,27 @@ bgfx::TextureHandle UiSkinManager::LoadTexture(const std::string& name, const st
     int w, h, n;
     unsigned char* d = stbi_load(full_path.c_str(), &w, &h, &n, 4);
     if (!d) {
-        spdlog::warn("UiSkin: cannot load texture {}", full_path);
-        textures_[name] = BGFX_INVALID_HANDLE;
-        return BGFX_INVALID_HANDLE;
+        // Fallback: try other common paths
+        std::string fallbacks[] = {
+            VFS::Resolve("assets/textures/" + name + ".png"),
+            VFS::Resolve("assets/textures/ui/" + name + ".png"),
+            VFS::Resolve("assets/textures/interface/" + name + ".png"),
+            VFS::Resolve("assets/interface/" + name + ".png"),
+            VFS::Resolve("assets/textures/unpacked/" + name + ".png"),
+        };
+        for (auto& fp : fallbacks) {
+            d = stbi_load(fp.c_str(), &w, &h, &n, 4);
+            if (d) {
+                full_path = fp;
+                spdlog::info("UiSkin: found texture '{}' at fallback path {}", name, fp);
+                break;
+            }
+        }
+        if (!d) {
+            spdlog::warn("UiSkin: cannot load texture {} (tried {} and {} fallbacks)", name, full_path, (int)(sizeof(fallbacks)/sizeof(fallbacks[0])));
+            textures_[name] = BGFX_INVALID_HANDLE;
+            return BGFX_INVALID_HANDLE;
+        }
     }
     auto tex = bgfx::createTexture2D((uint16_t)w, (uint16_t)h, false, 1,
                                       bgfx::TextureFormat::RGBA8, 0,

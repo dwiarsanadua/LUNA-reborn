@@ -50,7 +50,7 @@ bool RenderDevice::Init(const RenderDeviceConfig& config) {
     bgfx_init.type = bgfx::RendererType::Metal; 
     bgfx_init.resolution.width = (uint32_t)width_;
     bgfx_init.resolution.height = (uint32_t)height_;
-    bgfx_init.resolution.reset = BGFX_RESET_VSYNC | BGFX_RESET_HIDPI | BGFX_RESET_FLUSH_AFTER_RENDER;
+    bgfx_init.resolution.reset = (config.vsync ? BGFX_RESET_VSYNC : BGFX_RESET_NONE) | BGFX_RESET_HIDPI | BGFX_RESET_FLUSH_AFTER_RENDER;
     bgfx_init.platformData = pd;
 
     if (!bgfx::init(bgfx_init)) {
