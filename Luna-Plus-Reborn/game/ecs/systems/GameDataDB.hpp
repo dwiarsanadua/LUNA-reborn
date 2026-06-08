@@ -306,6 +306,15 @@ public:
     const QuestTemplate* GetQuestTemplate(uint32_t id) const;
     const NPCData* GetNPCData(uint32_t id) const;
 
+    // Economy data loaders (from economy.json)
+    void LoadEconomyData(const std::string& json_path);
+
+    // Economy getters
+    uint32_t GetExpForLevel(uint32_t level) const;
+    std::vector<DropEntry> GetDropTable(uint32_t monster_id) const;
+    int32_t GetItemBuyPrice(uint32_t item_id) const;
+    int32_t GetItemSellPrice(uint32_t item_id) const;
+
 private:
     sqlite3* db_ = nullptr;
     sqlite3* legacy_db_ = nullptr;
@@ -329,10 +338,27 @@ private:
     std::vector<MapData> map_data_;
     std::vector<MapBoundary> map_boundaries_;
 
+    // Economy data caches
+    struct ExpEntry {
+        uint32_t level;
+        uint32_t xp_required;
+    };
+    struct PriceEntry {
+        int32_t buy_price;
+        int32_t sell_price;
+        uint16_t level_required;
+        uint16_t rarity;
+    };
+
     // JSON-loaded template caches
     std::unordered_map<uint32_t, ItemTemplate> items_json_;
     std::unordered_map<uint32_t, MonsterTemplate> monsters_json_;
     std::unordered_map<uint32_t, SkillTemplate> skills_json_;
     std::unordered_map<uint32_t, QuestTemplate> quests_json_;
     std::unordered_map<uint32_t, NPCData> npcs_json_;
+
+    // Economy caches
+    std::vector<ExpEntry> exp_table_;
+    std::unordered_map<uint32_t, std::vector<DropEntry>> drop_table_;
+    std::unordered_map<uint32_t, PriceEntry> price_table_;
 };

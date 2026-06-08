@@ -1227,3 +1227,97 @@ std::vector<SkillTreeDBEntry> GameDataDB::GetSkillTree(uint16_t class_id) const 
     auto it = skill_trees_by_class_.find(class_id);
     return it != skill_trees_by_class_.end() ? it->second : std::vector<SkillTreeDBEntry>{};
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Economy Data Loader  (Agent E)
+// ═══════════════════════════════════════════════════════════════════════
+
+void GameDataDB::LoadEconomyData(const std::string& json_path) {
+    exp_table_.clear();
+    drop_table_.clear();
+    price_table_.clear();
+
+    auto content = readFile(json_path);
+    if (content.empty()) {
+        spdlog::warn("LoadEconomyData: cannot read {}", json_path);
+        return;
+    }
+
+    JsonParser parser(content);
+    auto root = parser.parse();
+    if (root.type != JsonVal::OBJECT) {
+        spdlog::error("LoadEconomyData: expected object at root in {}", json_path);
+        return;
+    }
+
+    // Parse exp_curve
+    auto exp_arr = jsonArray(root, "exp_curve");
+    for (auto& elem : exp_arr) {
+        if (elem.type != JsonVal::OBJECT) continue;
+        ExpEntry e;
+        e.level = jsonUint(elem, "level");
+        e.xp_required = jsonUint(elem, "xp_required");
+        exp_table_.push_back(e);
+    }
+
+    // Parse drop_rates_by_monster
+    for (auto& [k, v] : root.obj_val) {
+        if (k == "drop_rates_by_monster" && v.type == JsonVal::OBJECT) {
+            for (auto& [monster_key, drops_val] : v.obj_val) {
+                if (drops_val.type != JsonVal::ARRAY) continue;
+                uint32_t monster_id = static_cast<uint32_t>(std::stoul(monster_key));
+                for (auto& drop_elem : drops_val.arr_val) {
+                    if (drop_elem.type != JsonVal::OBJECT) continue;
+                    DropEntry d;
+                    d.item_id = jsonUint(drop_elem, "item_id");
+                    d.min_count = static_cast<uint16_t>(jsonUint(drop_elem, "min_count", 1));
+                    d.max_count = static_cast<uint16_t>(jsonUint(drop_elem, "max_count", 1));
+                    d.probability = static_cast<float>(jsonNum(drop_elem, "rate", 0.0));
+                    d.drop_table_id = 0;
+                    drop_table_[monster_id].push_back(d);
+                }
+            }
+        }
+    }
+
+    // Parse shop_prices
+    for (auto& [k, v] : root.obj_val) {
+        if (k == "shop_prices" && v.type == JsonVal::OBJECT) {
+            for (auto& [item_key, price_val] : v.obj_val) {
+                if (price_val.type != JsonVal::OBJECT) continue;
+                uint32_t item_id = static_cast<uint32_t>(std::stoul(item_key));
+                PriceEntry p;
+                p.buy_price = jsonInt(price_val, "buy_price");
+                p.sell_price = jsonInt(price_val, "sell_price");
+                p.level_required = static_cast<uint16_t>(jsonUint(price_val, "level_required"));
+                p.rarity = static_cast<uint16_t>(jsonUint(price_val, "rarity"));
+                price_table_[item_id] = p;
+            }
+        }
+    }
+
+    spdlog::info("LoadEconomyData: {} levels, {} drop tables, {} prices loaded from {}",
+        exp_table_.size(), drop_table_.size(), price_table_.size(), json_path);
+}
+
+uint32_t GameDataDB::GetExpForLevel(uint32_t level) const {
+    for (auto& e : exp_table_) {
+        if (e.level == level) return e.xp_required;
+    }
+    return 0;
+}
+
+std::vector<DropEntry> GameDataDB::GetDropTable(uint32_t monster_id) const {
+    auto it = drop_table_.find(monster_id);
+    return it != drop_table_.end() ? it->second : std::vector<DropEntry>{};
+}
+
+int32_t GameDataDB::GetItemBuyPrice(uint32_t item_id) const {
+    auto it = price_table_.find(item_id);
+    return it != price_table_.end() ? it->second.buy_price : 0;
+}
+
+int32_t GameDataDB::GetItemSellPrice(uint32_t item_id) const {
+    auto it = price_table_.find(item_id);
+    return it != price_table_.end() ? it->second.sell_price : 0;
+}
