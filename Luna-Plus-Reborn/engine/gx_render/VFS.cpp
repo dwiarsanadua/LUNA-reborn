@@ -79,16 +79,16 @@ void VFS::InitFromExecutable() {
 #endif
 
     const std::vector<std::string> candidates = {
-        exe_dir + "assets/",
-        exe_dir + "../assets/",
-        "./assets/",
-        "../assets/",
+        exe_dir,
+        exe_dir + "../",
+        "./",
+        "../",
     };
 
     // Probe each candidate for known game data
     for (const auto& c : candidates) {
         AddSearchRoot(c);
-        if (fs::exists(c + "data/game_data.db")) {
+        if (fs::exists(c + "assets/data/game_data.db")) {
             base_path_ = search_roots_.front();
             spdlog::info("VFS: initialized from {} (found game_data.db)", c);
             initialized = true;
