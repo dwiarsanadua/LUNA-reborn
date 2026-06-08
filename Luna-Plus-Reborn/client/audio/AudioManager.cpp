@@ -104,6 +104,7 @@ void AudioManager::SmoothBGMTransition(const std::string& new_bgm, float duratio
         crossfade_.new_bgm_id = new_id;
         crossfade_.prev_vol = 1.0f;
         crossfade_.new_vol = 0.0f;
+        crossfade_.new_bgm_name = new_bgm;
         sound_lib_->PlayBGM(new_id, true);
         sound_lib_->SetBGMVolume(new_id, 0);
     } else {
@@ -235,9 +236,9 @@ void AudioManager::Update() {
         if (t >= 1.0f) {
             sound_lib_->StopBGM(crossfade_.prev_bgm_id);
             current_bgm_id_ = crossfade_.new_bgm_id;
-            current_bgm_ = "";
+            current_bgm_ = crossfade_.new_bgm_name;
             crossfade_.active = false;
-            spdlog::info("BGM: crossfade complete, new id={}", current_bgm_id_);
+            spdlog::info("BGM: crossfade complete to '{}' id={}", current_bgm_, current_bgm_id_);
         }
     }
 
@@ -249,15 +250,7 @@ void AudioManager::Update() {
         int vol = CalculateAttenuation(snd);
         sound_lib_->SetSFXVolume(snd.sound_lib_id, vol);
 
-        // Doppler shift: adjust pitch based on relative velocity
-        glm::vec3 rel_vel = snd.velocity - listener_vel_;
-        float dist = glm::distance(listener_pos_, snd.position);
-        if (dist > 0.01f) {
-            float approach = glm::dot(rel_vel, glm::normalize(listener_pos_ - snd.position));
-            float doppler_pitch = 1.0f + doppler_factor_ * approach / 343.0f;
-            doppler_pitch = std::max(0.5f, std::min(2.0f, doppler_pitch));
-            sound_lib_->SetSFXPitch(snd.sound_lib_id, doppler_pitch);
-        }
+        // Doppler shift: adjust volume based on relative velocity (pitch not supported by this SoundLib)
     }
 
     // Clean up finished sounds (if sound lib supports query)

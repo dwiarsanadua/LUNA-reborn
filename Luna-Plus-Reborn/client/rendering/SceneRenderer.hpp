@@ -52,7 +52,5 @@ private:
     float elapsed_ = 0;
     uint32_t last_draw_calls_ = 0;
     uint32_t last_primitives_ = 0;
-    uint32_t last_vertices_ = 0;
     uint32_t last_texture_memory_ = 0;
-    uint32_t last_uniform_memory_ = 0;
 };

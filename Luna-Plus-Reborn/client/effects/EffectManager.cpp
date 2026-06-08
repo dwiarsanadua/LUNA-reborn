@@ -204,7 +204,7 @@ void EffectManager::UpdateLegacyEftUnit(Effect& e, float dt) {
             p.pos += p.vel * dt;
             p.vel.y += unit.gravity * dt;
             p.size = p.start_size + (p.end_size - p.start_size) * t;
-            p.alpha = p.alpha_start + (p.alpha_end - p.alpha_start) * t;
+            p.alpha = 1.0f + (p.alpha_end - 1.0f) * t;
 
             // Color blend
             if (p.color != p.color_end) {

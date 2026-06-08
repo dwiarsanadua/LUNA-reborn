@@ -9,6 +9,7 @@
 #include <rendering/ParticleRenderer.hpp>
 #include <ecs/systems/ParticleSystem.hpp>
 #include <ecs/systems/SpawnSystem.hpp>
+#include <ecs/systems/GameDataDB.hpp>
 #include <ui/GameState.hpp>
 #include <ui/ScreenManager.hpp>
 #include <ui/screens/LoginScreen.hpp>
@@ -61,9 +62,9 @@ int main() {
     mkdir("logs", 0777);
 
     // 1. ConfigManager / Logger
+    ConfigManager::Init();
     Luna::InitLog("client", "client.log");
     spdlog::info("LUNA Plus Reborn — v1.1.0");
-    ConfigManager::Init();
 
     // 2. Input systems (before audio)
     Localization::Init();
@@ -154,7 +155,15 @@ int main() {
     gfx.GetScene()->height = (float)device.GetHeight();
     ParticleRenderer particles; particles.Init();
 
-    audio.PlayBGM("BGM_Login");
+    if (g_audio) {
+        std::string bgm_path = ASSETS_PATH + std::string("audio/BGM/BGM_Login.mp3");
+        struct stat bgm_stat;
+        if (::stat(bgm_path.c_str(), &bgm_stat) == 0) {
+            audio.PlayBGM("BGM_Login");
+        } else {
+            spdlog::warn("BGM: login BGM not found at {}", bgm_path);
+        }
+    }
 
     AmbientSystem ambient;
     ambient.Init();
@@ -212,6 +221,19 @@ int main() {
     gameScreen->SetUI(&ui);
     screenManager.Register("game", std::move(gameScreen));
 
+    // 12. GameDataDB
+    GameDataDB gamedb;
+    if (gamedb.Open("data/game_data.db")) {
+        gamedb.LoadMonsterTemplates();
+        gamedb.LoadNPCTemplates();
+        gamedb.LoadMapData();
+        map.SetGameDataDB(&gamedb);
+        spdlog::info("GameDataDB: initialized");
+    } else {
+        spdlog::warn("GameDataDB: failed to open data/game_data.db");
+    }
+
+    // 13. Enter Login Screen
     screenManager.SwitchTo("login");
 
     static Luna::PacketDispatcher client_dispatcher;

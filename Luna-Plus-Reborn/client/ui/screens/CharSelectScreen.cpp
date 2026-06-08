@@ -27,7 +27,7 @@ bool CharSelectScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& p
         if (resp->characters()) {
             for (auto c : *resp->characters()) {
                 CharInfo info;
-                info.id = c->character_id();
+                info.id = c->id();
                 info.name = c->name() ? c->name()->str() : "Unnamed";
                 info.level = c->level();
                 info.map_id = c->map_id();

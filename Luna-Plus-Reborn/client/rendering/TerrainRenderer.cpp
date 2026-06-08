@@ -35,7 +35,7 @@ static const bgfx::Memory* loadShader(const char* path) {
     return nullptr;
 }
 
-const bgfx::VertexLayout& TerrainRenderer::GetLayout() {
+bgfx::VertexLayout& TerrainRenderer::GetLayout() {
     static bgfx::VertexLayout layout;
     static bool init = false;
     if (!init) {

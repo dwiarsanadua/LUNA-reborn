@@ -145,6 +145,18 @@ void MapServer::Update(float dt) {
     ai_->Update(*registry_, dt);
     combat_->Update(*registry_, dt);
 
+    // Check encounter triggers for all moving players
+    {
+        auto view = registry_->view<PlayerData>();
+        for (auto entity : view) {
+            auto& pd = view.get<PlayerData>(entity);
+            if (CheckEncounterTrigger(pd.pos_x, pd.pos_z)) {
+                spdlog::debug("MapServer: encounter check for player {} ({}, {})",
+                              pd.id, pd.pos_x, pd.pos_z);
+            }
+        }
+    }
+
     // Update dungeon instances
     std::vector<uint32_t> to_cleanup;
     for (auto& [id, dungeon] : dungeons_) {
@@ -203,7 +215,8 @@ void MapServer::Update(float dt) {
 void MapServer::SpawnPlayer(int entity_id, const PlayerData& data) {
     auto entity = registry_->create();
     registry_->emplace<PlayerData>(entity, data);
-    spdlog::info("MapServer: player {} spawned", data.name);
+    SendNPCList(entity_id);
+    spdlog::info("MapServer: player {} spawned, NPC list sent", data.name);
 }
 
 void MapServer::DespawnPlayer(int entity_id) {
@@ -211,8 +224,9 @@ void MapServer::DespawnPlayer(int entity_id) {
     for (auto entity : view) {
         auto& pd = view.get<PlayerData>(entity);
         if (pd.id == entity_id) {
+            SavePlayerPosition(entity_id, pd.pos_x, pd.pos_y, pd.pos_z);
             registry_->destroy(entity);
-            spdlog::info("MapServer: player {} despawned", entity_id);
+            spdlog::info("MapServer: player {} despawned, position saved", entity_id);
             return;
         }
     }

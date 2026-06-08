@@ -6,11 +6,14 @@
 #include <audio/AudioManager.hpp>
 #include <game/ecs/systems/GameDataDB.hpp>
 #include <game/ecs/systems/SpawnSystem.hpp>
+#include <game/ecs/components/Tag.hpp>
+#include <game/ecs/components/Transform.hpp>
 #include <entt/entt.hpp>
 
 bool EngineMap::Load(const std::string& map_id) {
     current_map_ = map_id;
     if (!terrain_ || !props_) { spdlog::error("EngineMap: terrain/props not set"); return false; }
+    InitBGMMap();
     
     std::string hgt_path = "assets_converted/maps/" + map_id + ".hgt";
     if (!terrain_->LoadFromHGT(hgt_path.c_str(), 0.1f)) {
@@ -75,7 +78,12 @@ bool EngineMap::Load(const std::string& map_id) {
                 }
                 auto npcs = db->GetNPCPositions(id);
                 for (const auto& npc : npcs) {
-                    spdlog::info("EngineMap: placing NPC '{}' at ({}, {}, {})", npc.name, npc.pos_x, npc.pos_y, npc.pos_z);
+                    auto npc_entity = registry_->create();
+                    registry_->emplace<TagNPC>(npc_entity);
+                    registry_->emplace<Transform>(npc_entity,
+                        glm::vec3(npc.pos_x, npc.pos_y, npc.pos_z));
+                    spdlog::info("EngineMap: placed NPC '{}' (id={}) at ({}, {}, {})",
+                        npc.name, npc.npc_id, npc.pos_x, npc.pos_y, npc.pos_z);
                 }
             }
         } catch (...) {
@@ -145,7 +153,8 @@ void EngineMap::LoadSceneObjects(const std::string& json_path) {
         }
 
         std::string modLower = modelName;
-        std::transform(modLower.begin(), modLower.end(), modLower.begin(), ::tolower);
+        std::transform(modLower.begin(), modLower.end(), modLower.begin(),
+            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         size_t dot = modLower.find_last_of('.');
         if (dot != std::string::npos) modLower = modLower.substr(0, dot);
 

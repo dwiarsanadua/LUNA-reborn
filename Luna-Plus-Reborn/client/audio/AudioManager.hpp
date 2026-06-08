@@ -91,6 +91,7 @@ private:
         int new_bgm_id = -1;
         float prev_vol = 0.0f;
         float new_vol = 0.0f;
+        std::string new_bgm_name;
     };
     CrossfadeState crossfade_;
     std::unordered_map<int, std::string> bgm_map_;

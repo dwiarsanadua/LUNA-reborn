@@ -82,7 +82,7 @@ private:
     int visible_patches_ = 0;
 
     struct Vertex { float x, y, z; float nx, ny, nz; uint32_t color; float u, v; };
-    static constexpr bgfx::VertexLayout& GetLayout();
+    static bgfx::VertexLayout& GetLayout();
 
     std::vector<float> hgt_data_;
     int hgt_width_ = 0, hgt_height_ = 0;

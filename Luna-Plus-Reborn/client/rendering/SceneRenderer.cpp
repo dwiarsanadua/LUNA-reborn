@@ -120,10 +120,11 @@ void SceneRenderer::UpdateStats(float dt) {
     const bgfx::Stats* stats = bgfx::getStats();
     if (stats) {
         last_draw_calls_ = stats->numDraw;
-        last_primitives_ = stats->numPrims;
-        last_vertices_ = stats->numVertices;
-        last_texture_memory_ = stats->textureMemoryUsed;
-        last_uniform_memory_ = stats->uniformMemoryUsed;
+        last_primitives_ = 0;
+        for (uint32_t i = 0; i < bgfx::Topology::Count; ++i) {
+            last_primitives_ += stats->numPrims[i];
+        }
+        last_texture_memory_ = static_cast<uint32_t>(stats->textureMemoryUsed);
     }
 }
 
@@ -151,30 +152,20 @@ void SceneRenderer::RenderDebugOverlay() {
     snprintf(buf, sizeof(buf), " Primitives: %u", last_primitives_);
     bgfx::dbgTextPrintf(0, 2, 0x0c, buf);
 
-    // Vertex count
-    snprintf(buf, sizeof(buf), " Vertices: %u", last_vertices_);
-    bgfx::dbgTextPrintf(0, 3, 0x0a, buf);
-
     // Memory usage
     float tex_mb = last_texture_memory_ / (1024.0f * 1024.0f);
-    float uni_mb = last_uniform_memory_ / (1024.0f * 1024.0f);
     snprintf(buf, sizeof(buf), " Tex Memory: %.1f MB", tex_mb);
-    bgfx::dbgTextPrintf(0, 4, 0x0f, buf);
-    snprintf(buf, sizeof(buf), " Uniform Memory: %.1f MB", uni_mb);
-    bgfx::dbgTextPrintf(0, 5, 0x0f, buf);
+    bgfx::dbgTextPrintf(0, 3, 0x0f, buf);
 
     // Renderer info
     if (stats) {
         snprintf(buf, sizeof(buf), " Backend: %s", bgfx::getRendererName(bgfx::getRendererType()));
-        bgfx::dbgTextPrintf(0, 7, 0x0f, buf);
+        bgfx::dbgTextPrintf(0, 5, 0x0f, buf);
 
-        snprintf(buf, sizeof(buf), " GPU: \"%s\"", stats->gpuName);
-        bgfx::dbgTextPrintf(0, 8, 0x0f, buf);
-
-        float cpu_ms = stats->cpuTimeFrame;
-        float gpu_ms = stats->gpuTimeFrame;
+        float cpu_ms = static_cast<float>(stats->cpuTimeFrame);
+        float gpu_ms = static_cast<float>(stats->gpuTimeEnd - stats->gpuTimeBegin);
         snprintf(buf, sizeof(buf), " CPU: %.2f ms | GPU: %.2f ms", cpu_ms / 1000.0f, gpu_ms / 1000.0f);
-        bgfx::dbgTextPrintf(0, 9, 0x0f, buf);
+        bgfx::dbgTextPrintf(0, 6, 0x0f, buf);
     }
 
     // View resolution

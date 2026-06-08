@@ -359,7 +359,7 @@ void UIRenderer::Render() {
 
 void UIRenderer::Shutdown() {
     static bool done = false; if (done) return; done = true;
-    for (auto& [n, t] : textures_) if (bgfx::isValid(t.handle) && t.handle != atlas_tex_) bgfx::destroy(t.handle);
+    for (auto& [n, t] : textures_) if (bgfx::isValid(t.handle) && t.handle.idx != atlas_tex_.idx) bgfx::destroy(t.handle);
     textures_.clear();
     if (bgfx::isValid(atlas_tex_)) bgfx::destroy(atlas_tex_);
     if (bgfx::isValid(font_tex_)) bgfx::destroy(font_tex_);

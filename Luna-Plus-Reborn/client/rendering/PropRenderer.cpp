@@ -246,26 +246,7 @@ void PropRenderer::Render(const glm::mat4& view, const glm::mat4& proj, const En
         // Build instance data buffer: each instance is a 4x3 matrix (12 floats)
         const uint32_t instance_stride = sizeof(float) * 12;
         bgfx::InstanceDataBuffer idb;
-        bool ok = bgfx::allocInstanceDataBuffer(&idb, (uint16_t)xforms.size(), instance_stride);
-        if (!ok) {
-            // Fallback: render individually
-            for (auto& xf : xforms) {
-                const float* p = glm::value_ptr(xf);
-                float mtx[16];
-                memcpy(mtx, p, sizeof(mtx));
-                bgfx::setTransform(mtx);
-                bgfx::setTexture(0, s_tex_color_, bgfx::isValid(mesh.tex) ? mesh.tex : white_tex_);
-                if (bgfx::isValid(s_tex_normal_)) {
-                    bgfx::setTexture(1, s_tex_normal_, bgfx::isValid(mesh.normal_tex) ? mesh.normal_tex : white_tex_);
-                }
-                bgfx::setVertexBuffer(0, mesh.vb);
-                bgfx::setIndexBuffer(mesh.ib);
-                bgfx::setState(BGFX_STATE_DEFAULT | BGFX_STATE_WRITE_Z);
-                bgfx::submit(view_id_, program_);
-                last_draw_calls_++;
-            }
-            continue;
-        }
+        bgfx::allocInstanceDataBuffer(&idb, (uint16_t)xforms.size(), instance_stride);
 
         uint8_t* data = idb.data;
         for (auto& xf : xforms) {
