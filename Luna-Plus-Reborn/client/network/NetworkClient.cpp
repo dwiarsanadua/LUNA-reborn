@@ -66,9 +66,19 @@ bool NetworkClient::Login(const std::string& username, const std::string& passwo
     return true;
 }
 
+void NetworkClient::ProcessEvents() {
+    std::unique_lock<std::mutex> lock(queue_mutex_);
+    while (!event_queue_.empty()) {
+        auto evt = std::move(event_queue_.front());
+        event_queue_.pop();
+        lock.unlock();
+        if (handler_) handler_(evt.type, evt.payload);
+        lock.lock();
+    }
+}
+
 void NetworkClient::ReadThread() {
-    std::vector<uint8_t> buf;
-    buf.resize(4096);
+    std::vector<uint8_t> buf(4096);
     while (connected_) {
         ssize_t n = ::recv(sock_, buf.data(), buf.size(), 0);
         if (n <= 0) { connected_ = false; break; }
@@ -79,12 +89,14 @@ void NetworkClient::ReadThread() {
             if (hdr.magic != 0x4C4E50) { read_buf_.clear(); break; }
             size_t total = sizeof(PacketHeader) + hdr.length;
             if (read_buf_.size() < total) break;
-            if (handler_) {
-                std::vector<uint8_t> payload(read_buf_.begin() + sizeof(PacketHeader),
-                                              read_buf_.begin() + total);
-                handler_(hdr.type, payload);
-            }
+            std::vector<uint8_t> payload(read_buf_.begin() + sizeof(PacketHeader),
+                                          read_buf_.begin() + total);
             read_buf_.erase(read_buf_.begin(), read_buf_.begin() + total);
+            // Push to thread-safe queue instead of calling handler directly
+            {
+                std::lock_guard<std::mutex> lock(queue_mutex_);
+                event_queue_.push({hdr.type, std::move(payload)});
+            }
         }
     }
 }

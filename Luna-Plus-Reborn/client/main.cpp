@@ -213,6 +213,7 @@ int main() {
     screenManager.Init(&g_state, &g_network);
 
     auto loginScreen = std::make_unique<LoginScreen>();
+    loginScreen->SetSceneRenderer(gfx.GetScene());
     loginScreen->SetSceneClearer([&gfx](uint32_t c) { gfx.GetScene()->SetClearColor(c); });
     screenManager.Register("login", std::move(loginScreen));
 
@@ -319,36 +320,45 @@ int main() {
         input_sys.Update(dt);
         Mouse::Update();
 
-        cam.SetTarget(glm::vec3(g_state.player_x, 0, g_state.player_z));
-        cam.SetDistance(g_state.cam_dist);
-        cam.SetYaw(g_state.cam_yaw);
-        cam.SetPitch(g_state.cam_pitch);
-        cam.SetShake(g_state.shake_x, g_state.shake_y);
-        cam.Update(dt);
-        
-        // --- RENDERING SEQUENCE ---
         {
             bool is_login = (screenManager.CurrentName() == "login" || 
                             screenManager.CurrentName() == "charselect");
-            
-            if (!is_login) {
-                gfx.BeginFrame(cam.GetViewMatrix(), cam.GetProjectionMatrix());
-                ambient.Update(dt, 51, 0.5f, g_state.player_x, 0, g_state.player_z);
-                gfx.Render(&terrain, &props, nullptr, cam.GetViewMatrix(), cam.GetProjectionMatrix());
-                gfx.RenderCharacters(time, cam.GetViewMatrix(), cam.GetProjectionMatrix());
+            if (is_login) {
+                cam.SetTarget(glm::vec3(0, 0, 0));
+                cam.SetDistance(80.0f);
+                cam.SetYaw(-45.0f);
+                cam.SetPitch(-30.0f);
+            } else {
+                cam.SetTarget(glm::vec3(g_state.player_x, 0, g_state.player_z));
+                cam.SetDistance(g_state.cam_dist);
+                cam.SetYaw(g_state.cam_yaw);
+                cam.SetPitch(g_state.cam_pitch);
             }
         }
-        ui.BeginFrame();
+        cam.SetShake(g_state.shake_x, g_state.shake_y);
+        cam.Update(dt);
+        
+        // --- PROCESS NETWORK EVENTS (thread-safe) ---
+        g_network.ProcessEvents();
 
-        // UI Layer
+        // --- GAME STATE UPDATE BEFORE RENDER ---
         screenManager.Update(dt);
-        screenManager.Render(ui, cam.GetViewMatrix(), cam.GetProjectionMatrix());
 
         // Periodic auto-save
         persistence.Update(dt);
         if (frame % 1800 == 0) { // every ~30 seconds at 60fps
             persistence.SaveGameState(g_state);
         }
+
+        // --- RENDERING ---
+        {
+            gfx.BeginFrame(cam.GetViewMatrix(), cam.GetProjectionMatrix(), sky.GetLightDirection());
+            ambient.Update(dt, 51, 0.5f, g_state.player_x, 0, g_state.player_z);
+            gfx.Render(&terrain, &props, nullptr, cam.GetViewMatrix(), cam.GetProjectionMatrix());
+            gfx.RenderCharacters(time, cam.GetViewMatrix(), cam.GetProjectionMatrix());
+        }
+        ui.BeginFrame();
+        screenManager.Render(ui, cam.GetViewMatrix(), cam.GetProjectionMatrix());
 
         if (frame % 30 == 0) fps = 1.0f / dt;
         // Hanya tampil fps di game screen, bukan login/charselect

@@ -5,6 +5,8 @@
 #include <functional>
 #include <memory>
 #include <thread>
+#include <mutex>
+#include <queue>
 
 #pragma pack(push, 1)
 struct PacketHeader {
@@ -28,9 +30,15 @@ public:
 
     void Send(const uint8_t* data, size_t len);
     void SendPacket(uint16_t type, const uint8_t* payload, size_t len);
+    void ProcessEvents();
 
     using PacketHandler = std::function<void(uint16_t type, const std::vector<uint8_t>&)>;
     void SetPacketHandler(PacketHandler handler) { handler_ = handler; }
+
+    struct NetworkEvent {
+        uint16_t type;
+        std::vector<uint8_t> payload;
+    };
 
 private:
     void ReadThread();
@@ -41,5 +49,7 @@ private:
     PacketHandler handler_;
     uint32_t login_result_ = 0;
     std::string session_token_;
+    std::queue<NetworkEvent> event_queue_;
+    std::mutex queue_mutex_;
 };
 
