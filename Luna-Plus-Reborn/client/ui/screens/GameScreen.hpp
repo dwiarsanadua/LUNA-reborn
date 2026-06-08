@@ -77,10 +77,12 @@ public:
     void SetAudio(AudioManager* a) { audio_ = a; }
     void SetMap(EngineMap* m) { map_ = m; }
     void SetUI(UIRenderer* u) { ui_ = u; }
+    void SetGameDataDB(class GameDataDB* db) { gamedb_ = db; }
     WindowManager* GetWindowManager() { return &wm_; }
 
 private:
     void SpawnRandomMonster();
+    void SpawnMonstersFromMap();
     void DoCombat(float dt);
     void DoLevelUp();
     void RenderUI(UIRenderer& ui);
@@ -91,7 +93,8 @@ private:
     AudioManager* audio_ = nullptr;
     UIRenderer* ui_ = nullptr;
     EngineMap* map_ = nullptr;
-    
+    class GameDataDB* gamedb_ = nullptr;
+
     // Game Objects
     Hero hero_;
     std::vector<Monster> monsters_;

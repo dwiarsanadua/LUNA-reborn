@@ -70,32 +70,46 @@ void SpawnSystem::LoadSpawnData(const std::string& json_path) {
         return;
     }
 
-    if (!root.is_array()) {
-        spdlog::error("SpawnSystem: root is not array in {}", json_path);
-        return;
-    }
-
-    for (const auto& item : root) {
+    auto add_spawn = [&](const json& item, uint32_t monster_id_default) {
         SpawnPoint sp;
-        sp.id            = item.value("id", 0u);
-        sp.map_id        = item.value("map_id", 0);
-        sp.monster_id    = item.value("monster_id", 0u);
-        sp.x             = item.value("x", 0.0f);
-        sp.y             = item.value("y", 0.0f);
-        sp.z             = item.value("z", 0.0f);
-        sp.respawn_time  = item.value("respawn_time", 10.0f);
-        sp.max_count     = item.value("max_count", 1);
+        sp.id            = item.value("id", static_cast<uint32_t>(spawn_points_.size() + 1));
+        sp.map_id        = item.value("map_id", item.value("map", 0));
+        sp.monster_id    = item.value("monster_id", monster_id_default);
+        sp.x             = item.value("x", item.value("pos_x", 0.0f));
+        sp.y             = item.value("y", item.value("pos_y", 0.0f));
+        sp.z             = item.value("z", item.value("pos_z", 0.0f));
+        sp.respawn_time  = item.value("respawn_time", item.value("respawn", 10.0f));
+        sp.max_count     = item.value("max_count", item.value("count", 1));
         sp.current_count = 0;
         sp.aggro_range   = item.value("aggro_range", 10.0f);
         sp.patrol_radius = item.value("patrol_radius", 0u);
+        if (sp.map_id == 0 || sp.monster_id == 0) return;
 
         spawn_points_.push_back(sp);
         map_spawn_indices_[sp.map_id].push_back(
             static_cast<uint32_t>(spawn_points_.size() - 1));
+    };
+
+    if (root.is_array()) {
+        for (const auto& item : root) {
+            if (item.contains("spawns") && item["spawns"].is_array()) {
+                uint32_t monster_id = item.value("id", item.value("monster_id", 0u));
+                for (const auto& sp : item["spawns"]) add_spawn(sp, monster_id);
+            } else if (item.contains("map_id") || item.contains("map")) {
+                add_spawn(item, item.value("monster_id", 0u));
+            }
+        }
+    } else if (root.is_object()) {
+        if (root.contains("spawns") && root["spawns"].is_array()) {
+            for (const auto& sp : root["spawns"]) add_spawn(sp, 0u);
+        }
+    } else {
+        spdlog::error("SpawnSystem: unsupported JSON root in {}", json_path);
+        return;
     }
 
-    spdlog::info("SpawnSystem: loaded {} spawn points from {}",
-                 spawn_points_.size(), json_path);
+    spdlog::info("SpawnSystem: loaded {} spawn points ({} maps) from {}",
+                 spawn_points_.size(), map_spawn_indices_.size(), json_path);
 }
 
 void SpawnSystem::SpawnMonstersForMap(entt::registry& registry, int map_id) {

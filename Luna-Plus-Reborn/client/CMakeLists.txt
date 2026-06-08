@@ -100,6 +100,8 @@ add_executable(LunaPlusClient
     input/UserInput.cpp
     input/MouseCursor.cpp
     config/ConfigManager.cpp
+    config/Paths.cpp
+    config/ModelResolver.cpp
     config/KeyBindings.cpp
     ui/skin/UiSkinManager.cpp
     ui/UiScriptParser.cpp

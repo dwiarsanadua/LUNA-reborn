@@ -2,82 +2,88 @@
 # Usage: compile_shaders(TARGET_NAME SOURCES...)
 
 function(compile_shaders TARGET_NAME)
-    set(SHADERC_PATH "")
-    
-    # Hardcoded path for the user's machine to ensure compilation works
-    set(SHADERC_EXE "/Users/macbookair/PRIBADI/luna-plus-master/external/bgfx/tools/bin/darwin/shaderc")
-    
-    if(NOT EXISTS "${SHADERC_EXE}")
-        # Try to find shaderc fallback
-        if(APPLE)
-            find_program(SHADERC_EXE shaderc PATHS 
-                /opt/homebrew/bin 
-                /usr/local/bin
-                /Users/macbookair/PRIBADI/luna-plus-master/external/bgfx/tools/bin/darwin
-            )
-        elseif(WIN32)
-            find_program(SHADERC_EXE shaderc PATHS ${VCPKG_INSTALLATION_ROOT}/downloads/tools/bgfx)
-        endif()
+    set(BGFX_ROOT "${CMAKE_SOURCE_DIR}/external/bgfx")
+    if(NOT EXISTS "${BGFX_ROOT}/src")
+        set(BGFX_ROOT "${CMAKE_SOURCE_DIR}/../external/bgfx")
     endif()
-    
-    set(OUTPUT_DIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders")
 
-    if(NOT SHADERC_EXE)
-        message(WARNING "shaderc not found! Copying existing .bin shaders as fallback.")
+    set(SHADERC_EXE "")
+    if(EXISTS "${BGFX_ROOT}/tools/bin/darwin/shaderc")
+        set(SHADERC_EXE "${BGFX_ROOT}/tools/bin/darwin/shaderc")
+    elseif(EXISTS "${BGFX_ROOT}/.build/ci/tools/bin/shaderc")
+        set(SHADERC_EXE "${BGFX_ROOT}/.build/ci/tools/bin/shaderc")
+    else()
+        find_program(SHADERC_EXE shaderc
+            PATHS
+                "${BGFX_ROOT}/tools/bin/darwin"
+                "${BGFX_ROOT}/.build/ci/tools/bin"
+                /opt/homebrew/bin
+                /usr/local/bin
+        )
+    endif()
+
+    set(OUTPUT_DIR "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders")
+    set(BGFX_SRC_INCLUDE "${BGFX_ROOT}/src")
+
+    if(NOT SHADERC_EXE OR NOT EXISTS "${SHADERC_EXE}")
+        message(WARNING "shaderc not found under ${BGFX_ROOT}. Copying existing .bin shaders as fallback.")
         file(GLOB EXISTING_BINS "${CMAKE_SOURCE_DIR}/shaders/*.bin")
-        file(COPY ${EXISTING_BINS} DESTINATION "${OUTPUT_DIR}")
+        if(EXISTING_BINS)
+            file(COPY ${EXISTING_BINS} DESTINATION "${OUTPUT_DIR}")
+        endif()
         return()
     endif()
+
+    message(STATUS "ShaderCompile: using shaderc at ${SHADERC_EXE}")
 
     set(VARYING_DEF "${CMAKE_SOURCE_DIR}/shaders/varying.def.sc")
     file(MAKE_DIRECTORY "${OUTPUT_DIR}")
 
     foreach(SHADER_SOURCE ${ARGN})
         get_filename_component(SHADER_NAME ${SHADER_SOURCE} NAME_WE)
-        get_filename_component(SHADER_EXT ${SHADER_SOURCE} EXT)
-        
-        set(PROFILE "")
+
         set(TYPE "")
-        
+        set(PROFILE "")
+        set(PLATFORM "osx")
+
         if(SHADER_NAME MATCHES "^vs_")
             set(TYPE "vertex")
-            if(APPLE)
-                set(PROFILE "metal")
-            elseif(WIN32)
-                set(PROFILE "s_5_0")
-            else()
-                set(PROFILE "120")
-            endif()
         elseif(SHADER_NAME MATCHES "^fs_")
             set(TYPE "fragment")
-            if(APPLE)
-                set(PROFILE "metal")
-            elseif(WIN32)
-                set(PROFILE "s_5_0")
-            else()
-                set(PROFILE "120")
-            endif()
+        endif()
+
+        if(APPLE)
+            set(PROFILE "metal")
+            set(PLATFORM "osx")
+        elseif(WIN32)
+            set(PROFILE "s_5_0")
+            set(PLATFORM "windows")
+        else()
+            set(PROFILE "spirv")
+            set(PLATFORM "linux")
         endif()
 
         if(NOT TYPE STREQUAL "")
             set(OUTPUT_FILE "${OUTPUT_DIR}/${SHADER_NAME}.bin")
-            
-            set(BGFX_SRC_INCLUDE "/Users/macbookair/PRIBADI/luna-plus-master/external/bgfx/src")
-            set(PLATFORM "osx")
-            if(WIN32)
-                set(PLATFORM "windows")
-            endif()
-            
+
             add_custom_command(
                 OUTPUT "${OUTPUT_FILE}"
                 COMMAND ${SHADERC_EXE}
-                ARGS -f "${SHADER_SOURCE}" -o "${OUTPUT_FILE}" -i "${CMAKE_SOURCE_DIR}/shaders" -i "${BGFX_SRC_INCLUDE}" --varyingdef "${VARYING_DEF}" --type ${TYPE} --platform ${PLATFORM} -p ${PROFILE}
+                ARGS -f "${SHADER_SOURCE}" -o "${OUTPUT_FILE}"
+                     -i "${CMAKE_SOURCE_DIR}/shaders"
+                     -i "${BGFX_SRC_INCLUDE}"
+                     --varyingdef "${VARYING_DEF}"
+                     --type ${TYPE}
+                     --platform ${PLATFORM}
+                     -p ${PROFILE}
                 DEPENDS "${SHADER_SOURCE}" "${VARYING_DEF}"
-                COMMENT "Compiling shader ${SHADER_NAME} for ${PROFILE}..."
+                COMMENT "Compiling shader ${SHADER_NAME} (${PROFILE})"
             )
             list(APPEND SHADER_BINARIES "${OUTPUT_FILE}")
         endif()
     endforeach()
 
-    add_custom_target(${TARGET_NAME} ALL DEPENDS ${SHADER_BINARIES})
+    if(SHADER_BINARIES)
+        add_custom_target(${TARGET_NAME} ALL DEPENDS ${SHADER_BINARIES})
+    endif()
 endfunction()

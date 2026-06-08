@@ -1,11 +1,12 @@
 #include "UiSkinManager.hpp"
+#include <engine/gx_render/VFS.h>
 #include <fstream>
 #include <sstream>
 #include <algorithm>
 #include <cstring>
+#include <filesystem>
 #include <spdlog/spdlog.h>
 #include <stb_image.h>
-#include <algorithm>
 
 std::unordered_map<std::string, bgfx::TextureHandle> UiSkinManager::textures_;
 std::unordered_map<std::string, UISkinPart> UiSkinManager::skin_parts_;
@@ -245,13 +246,27 @@ void UiSkinManager::DrawSlot(UIRenderer& ui, float x, float y, float size,
 }
 
 int UiSkinManager::LoadWindowLayouts(const std::string& windows_path) {
-    // Parse .txt window definition files
-    // Format example: "WindowID_Inventory.bin.txt"
-    // Contains position, size, texture references for each UI element
+    namespace fs = std::filesystem;
     int count = 0;
-    // This is a simplified loader - full implementation would parse
-    // the .txt format and register all window skin parts
-    spdlog::info("UiSkin: scanning window layouts in {}", windows_path);
+    std::string resolved = VFS::Find(windows_path);
+    spdlog::info("UiSkin: scanning window layouts in {}", resolved);
+
+    std::error_code ec;
+    if (!fs::exists(resolved, ec) || !fs::is_directory(resolved, ec)) {
+        spdlog::warn("UiSkin: window layout directory not found: {}", resolved);
+        return 0;
+    }
+
+    for (const auto& entry : fs::directory_iterator(resolved, ec)) {
+        if (!entry.is_regular_file()) continue;
+        const auto name = entry.path().filename().string();
+        if (name.size() > 8 && name.substr(name.size() - 8) == ".bin.txt") {
+            WindowSkin skin;
+            skin.name = name.substr(0, name.size() - 8);
+            window_skins_[skin.name] = skin;
+            ++count;
+        }
+    }
     return count;
 }
 
