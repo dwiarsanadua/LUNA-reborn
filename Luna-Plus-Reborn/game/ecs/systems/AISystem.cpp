@@ -53,6 +53,10 @@ void AISystem::Update(entt::registry& registry, float dt) {
 }
 
 void AISystem::UpdateIdle(entt::registry& reg, entt::entity e, AIComponent& ai, float dt) {
+    if (ai.aggro_target != 0) {
+        TransitionState(ai, AIComponent::Chase);
+        return;
+    }
     if (ai.aggro_scan_timer >= 5.0f) {
         ScanForTargets(reg, e, ai, reg.get<Transform>(e));
         ai.aggro_scan_timer = 0;
@@ -165,6 +169,7 @@ void AISystem::ScanForTargets(entt::registry& reg, entt::entity e,
             ai.AddThreat(ai.aggro_target, 100);
             spdlog::info("Monster {} aggroed on player {} (dist: {:.1f})", static_cast<uint32_t>(e), ai.aggro_target, dist);
             TransitionState(ai, AIComponent::Chase);
+            RequestHelp(reg, e, ai, ai.aggro_target);
             return;
         }
     }

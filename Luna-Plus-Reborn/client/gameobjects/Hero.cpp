@@ -316,6 +316,8 @@ void Hero::Update(float dt) {
         battle_delay_timer_ = std::max(0.0f, battle_delay_timer_ - dt);
     if (skill_cooldown_ > 0.0f)
         skill_cooldown_ = std::max(0.0f, skill_cooldown_ - dt);
+    if (dash_cooldown_ > 0.0f)
+        dash_cooldown_ = std::max(0.0f, dash_cooldown_ - dt);
 
     if (has_waypoint_ && CanAct()) {
         float dx = waypoint_x_ - x_, dz = waypoint_z_ - z_;
