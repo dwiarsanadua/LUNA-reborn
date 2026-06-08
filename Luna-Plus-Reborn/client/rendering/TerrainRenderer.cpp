@@ -106,6 +106,8 @@ static uint32_t HeightColor(float h, float hmin, float hmax) {
 bgfx::TextureHandle TerrainRenderer::LoadTileTexture(const std::string& name, int index) {
     (void)index;
     std::string paths[] = {
+        "assets/textures/unpacked/map/" + name,
+        "assets/textures/unpacked/farm/" + name,
         "assets/textures/" + name,
         "assets_converted/mod_objs/" + name,
     };
