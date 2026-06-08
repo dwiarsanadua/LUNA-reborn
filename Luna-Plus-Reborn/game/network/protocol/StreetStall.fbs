@@ -1,0 +1,54 @@
+include "Types.fbs";
+include "PacketType.fbs";
+
+namespace luna.protocol;
+
+table StreetStallItem {
+    slot: uint8;
+    item_id: uint32;
+    item_name: string;
+    count: uint16;
+    price: uint32;
+}
+
+table StreetStallInfo {
+    owner_id: uint32;
+    owner_name: string;
+    title: string;
+    open: bool;
+    items: [StreetStallItem];
+}
+
+table StreetStallOpenRequest {
+    character_id: uint32;
+    title: string;
+}
+
+table StreetStallAddItemRequest {
+    character_id: uint32;
+    inv_slot: uint8;
+    stall_slot: uint8;
+    count: uint16;
+    price: uint32;
+}
+
+table StreetStallBuyRequest {
+    buyer_id: uint32;
+    owner_id: uint32;
+    stall_slot: uint8;
+    count: uint16;
+}
+
+table StreetStallCloseRequest {
+    character_id: uint32;
+}
+
+table StreetStallListRequest {
+    character_id: uint32;
+}
+
+table StreetStallResponse {
+    result: byte;
+    stall: StreetStallInfo;
+    nearby: [StreetStallInfo];
+}

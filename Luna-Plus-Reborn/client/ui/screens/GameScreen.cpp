@@ -17,6 +17,13 @@
 #include <Combat_generated.h>
 #include <CharLife_generated.h>
 #include <MapChange_generated.h>
+#include <Party_generated.h>
+#include <Storage_generated.h>
+#include <Friend_generated.h>
+#include <Guild_generated.h>
+#include <Trade_generated.h>
+#include <Consignment_generated.h>
+#include <StreetStall_generated.h>
 #include <PacketType_generated.h>
 #include <algorithm>
 #include <string>
@@ -57,11 +64,13 @@ void GameScreen::Enter() {
     siege_.ConquerTerritory(1, 1, "PlayerGuild");
     siege_.ScheduleSiege(2, time(nullptr) + 86400, 2, "RivalGuild");
     siege_.SetTaxRate(1, 15);
-    consignment_.ListItem(2, 101, 1, 200, 500);
-    consignment_.ListItem(2, 102, 5, 50, 120);
-    consignment_.ListItem(3, 201, 1, 1000, 2500);
-    consignment_.ListItem(2, 103, 3, 150, 350);
-    consignment_.ListItem(4, 301, 1, 5000, 12000);
+    if (state_->offline_mode) {
+        consignment_.ListItem(2, 101, 1, 200, 500);
+        consignment_.ListItem(2, 102, 5, 50, 120);
+        consignment_.ListItem(3, 201, 1, 1000, 2500);
+        consignment_.ListItem(2, 103, 3, 150, 350);
+        consignment_.ListItem(4, 301, 1, 5000, 12000);
+    }
     if (ui_) sky_.SetSampler(ui_->GetSampler(), ui_->GetWhiteTexture());
     navmesh_.Init(256.0f, 2.0f);
     hero_.SetNavMesh(&navmesh_);
@@ -81,13 +90,92 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
     case 0x0208:
         return true;
     case luna::protocol::PacketType_MP_CHAT_ALL_ACK:
+    case luna::protocol::PacketType_MP_CHAT_PARTY_ACK:
+    case luna::protocol::PacketType_MP_CHAT_GUILD_ACK:
+    case luna::protocol::PacketType_MP_CHAT_WHISPER_ACK:
     case 0x0501: {
         auto msg = flatbuffers::GetRoot<luna::protocol::ChatMessage>(payload.data());
         std::string sender = msg->sender_name() ? msg->sender_name()->str() : "?";
         std::string text = msg->message() ? msg->message()->str() : "";
-        state_->chat_messages.push_back("[" + sender + "] " + text);
-        chat_panel_.AddMessage("[" + sender + "] " + text);
+        std::string line;
+        if (msg->channel() == luna::protocol::ChatChannel_Party)
+            line = "[Party] " + sender + ": " + text;
+        else if (msg->channel() == luna::protocol::ChatChannel_Guild)
+            line = "[Guild] " + sender + ": " + text;
+        else if (msg->channel() == luna::protocol::ChatChannel_Whisper)
+            line = "[Whisper] " + text;
+        else
+            line = "[" + sender + "] " + text;
+        state_->chat_messages.push_back(line);
+        chat_panel_.AddMessage(line);
         if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
+        return true;
+    }
+    case luna::protocol::PacketType_MP_PARTY_CREATE_ACK:
+    case luna::protocol::PacketType_MP_PARTY_INVITE_ACK:
+    case luna::protocol::PacketType_MP_PARTY_LEAVE_ACK:
+    case luna::protocol::PacketType_MP_PARTY_INFO_UPDATE: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::PartyResponse>(payload.data());
+        ApplyPartyResponse(resp);
+        return true;
+    }
+    case luna::protocol::PacketType_MP_STORAGE_LIST_ACK:
+    case luna::protocol::PacketType_MP_STORAGE_DEPOSIT_ACK:
+    case luna::protocol::PacketType_MP_STORAGE_WITHDRAW_ACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::StorageResponse>(payload.data());
+        ApplyStorageResponse(resp);
+        return true;
+    }
+    case luna::protocol::PacketType_MP_FRIEND_LIST_ACK:
+    case luna::protocol::PacketType_MP_FRIEND_ADD_ACK:
+    case luna::protocol::PacketType_MP_FRIEND_DEL_ACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::FriendResponse>(payload.data());
+        ApplyFriendResponse(resp);
+        return true;
+    }
+    case luna::protocol::PacketType_MP_GUILD_CREATE_ACK:
+    case luna::protocol::PacketType_MP_GUILD_INFO:
+    case luna::protocol::PacketType_MP_GUILD_ADDMEMBER_ACK:
+    case luna::protocol::PacketType_MP_GUILD_SECEDE_ACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::GuildResponse>(payload.data());
+        ApplyGuildResponse(resp);
+        return true;
+    }
+    case luna::protocol::PacketType_MP_EXCHANGE_APPLY_NACK:
+    case luna::protocol::PacketType_MP_EXCHANGE_APPLY_ACK:
+    case luna::protocol::PacketType_MP_EXCHANGE_START:
+    case luna::protocol::PacketType_MP_EXCHANGE_ADDITEM_ACK:
+    case luna::protocol::PacketType_MP_EXCHANGE_SETGOLD_ACK:
+    case luna::protocol::PacketType_MP_EXCHANGE_CONFIRM_ACK:
+    case luna::protocol::PacketType_MP_EXCHANGE_STATE_UPDATE:
+    case luna::protocol::PacketType_MP_EXCHANGE_COMPLETE:
+    case luna::protocol::PacketType_MP_EXCHANGE_CANCEL_ACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::TradeResponse>(payload.data());
+        ApplyTradeResponse(resp);
+        return true;
+    }
+    case luna::protocol::PacketType_MP_CONSIGNMENT_GETLIST_ACK:
+    case luna::protocol::PacketType_MP_CONSIGNMENT_SEARCH_ACK:
+    case luna::protocol::PacketType_MP_CONSIGNMENT_REGIST_ACK:
+    case luna::protocol::PacketType_MP_CONSIGNMENT_UPDATE_ACK:
+    case luna::protocol::PacketType_MP_CONSIGNMENT_CANCEL_ACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::ConsignmentResponse>(payload.data());
+        ApplyConsignmentResponse(resp, pending_consignment_mine_, pending_consignment_bids_);
+        if (type == luna::protocol::PacketType_MP_CONSIGNMENT_REGIST_ACK ||
+            type == luna::protocol::PacketType_MP_CONSIGNMENT_UPDATE_ACK) {
+            RequestConsignmentSearch("");
+        }
+        pending_consignment_mine_ = false;
+        pending_consignment_bids_ = false;
+        return true;
+    }
+    case luna::protocol::PacketType_MP_STREETSTALL_OPEN_ACK:
+    case luna::protocol::PacketType_MP_STREETSTALL_ADDITEM_ACK:
+    case luna::protocol::PacketType_MP_STREETSTALL_BUY_ACK:
+    case luna::protocol::PacketType_MP_STREETSTALL_CLOSE_ACK:
+    case luna::protocol::PacketType_MP_STREETSTALL_LIST_ACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::StreetStallResponse>(payload.data());
+        ApplyStreetStallResponse(resp);
         return true;
     }
     case luna::protocol::PacketType_MP_CHAR_LIFE_ACK: {
@@ -271,17 +359,29 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
     }
     else if (key == 80) { // P key - Party
         state_->party_open = !state_->party_open;
-        if (state_->party_open) party_dlg_.Open(&wm_);
+        if (state_->party_open) {
+            party_dlg_.Open(&wm_);
+            if (!state_->offline_mode && network_ && network_->IsConnected() && state_->party_id == 0)
+                SendPartyCreate();
+        }
         if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_UI, "window_open1.wav");
     }
     else if (key == 71) { // G key - Guild
         state_->guild_open = !state_->guild_open;
-        if (state_->guild_open) guild_dlg_.Open(&wm_, &siege_);
+        if (state_->guild_open) {
+            guild_dlg_.Open(&wm_, &siege_);
+            if (!state_->offline_mode && network_ && network_->IsConnected())
+                RequestGuildInfo();
+        }
         if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_UI, "window_open1.wav");
     }
     else if (key == 70) { // F key - Friends
         state_->friend_open = !state_->friend_open;
-        if (state_->friend_open) friend_dlg_.Open(&wm_);
+        if (state_->friend_open) {
+            friend_dlg_.Open(&wm_);
+            if (!state_->offline_mode && network_ && network_->IsConnected())
+                RequestFriendList();
+        }
         if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_UI, "window_open1.wav");
     }
     else if (key == 72) { // H key - Farm / Harvest
@@ -295,7 +395,11 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
     }
     else if (key == 66) { // B key - Bank/Storage
         state_->storage_open = !state_->storage_open;
-        if (state_->storage_open) storage_dlg_.Open(state_, &wm_);
+        if (state_->storage_open) {
+            storage_dlg_.Open(state_, &wm_);
+            if (!state_->offline_mode && network_ && network_->IsConnected())
+                RequestStorageList();
+        }
         if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_UI, "window_open1.wav");
     }
     else if (key == 112) {
@@ -312,7 +416,16 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
     }
     else if (key == 85) { // U key - Trade
         state_->trade_open = !state_->trade_open;
-        if (state_->trade_open) trade_dlg_.Open(state_, &trading_);
+        if (state_->trade_open) {
+            SetupTradeNetworkCallbacks();
+            trade_dlg_.Open(state_, &trading_);
+            if (!state_->offline_mode && network_ && network_->IsConnected())
+                SendTradeApply("NPC_Trader");
+        } else {
+            if (state_->trade_active && !state_->offline_mode)
+                SendTradeCancel();
+            state_->trade_active = false;
+        }
         if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_UI, "window_open1.wav");
     }
     else if (key == 86) { // V key - Fishing
@@ -334,7 +447,14 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
     }
     else if (key == 89) { // Y key - Auction/Consignment
         state_->consignment_open = !state_->consignment_open;
-        if (state_->consignment_open) consignment_dlg_.Open(state_, &wm_, &consignment_);
+        if (state_->consignment_open) {
+            SetupConsignmentNetworkCallbacks();
+            consignment_dlg_.Open(state_, &wm_, &consignment_);
+            if (!state_->offline_mode && network_ && network_->IsConnected()) {
+                RequestConsignmentSearch("");
+                RequestStreetStallList();
+            }
+        }
         if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_UI, "window_open1.wav");
     }
     else if (key == 69) { // E key - Mail
@@ -444,8 +564,110 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
                     }
                 } else if (verb == "maps" || verb == "maplist") {
                     state_->chat_messages.push_back("Available maps: 13,14,15,19,20,21,22,23,25,26,27,28,31,32,41,51,55,56,60,63,64,71,74,75,96");
+                } else if (verb == "party") {
+                    if (arg.rfind("invite ", 0) == 0) {
+                        SendPartyInvite(arg.substr(7));
+                    } else if (arg == "leave" || arg == "quit") {
+                        SendPartyLeave();
+                    } else if (arg == "create") {
+                        SendPartyCreate();
+                    } else {
+                        state_->chat_messages.push_back("Party: /party create | invite [name] | leave");
+                    }
+                } else if (verb == "p") {
+                    SendPartyInvite(arg);
+                } else if (verb == "deposit" || verb == "dep") {
+                    int slot = arg.empty() ? 0 : std::atoi(arg.c_str());
+                    SendStorageDeposit(static_cast<uint8_t>(slot), 1);
+                } else if (verb == "withdraw" || verb == "wd") {
+                    int slot = arg.empty() ? 0 : std::atoi(arg.c_str());
+                    SendStorageWithdraw(static_cast<uint8_t>(slot), 1);
+                } else if (verb == "w" || verb == "whisper") {
+                    size_t sp = arg.find(' ');
+                    if (sp == std::string::npos || arg.empty()) {
+                        state_->chat_messages.push_back("Usage: /w [name] [message]");
+                    } else if (network_ && network_->IsConnected()) {
+                        std::string target = arg.substr(0, sp);
+                        std::string text = arg.substr(sp + 1);
+                        flatbuffers::FlatBufferBuilder fbb;
+                        auto chatMsg = luna::protocol::CreateChatMessageDirect(
+                            fbb, GetSelectedCharId(), target.c_str(), text.c_str(),
+                            luna::protocol::ChatChannel_Whisper, 0);
+                        fbb.Finish(chatMsg);
+                        network_->SendPacket(luna::protocol::PacketType_MP_CHAT_WHISPER_SYN,
+                            fbb.GetBufferPointer(), fbb.GetSize());
+                    }
+                } else if (verb == "pchat" && network_ && network_->IsConnected()) {
+                    flatbuffers::FlatBufferBuilder fbb;
+                    auto chatMsg = luna::protocol::CreateChatMessageDirect(
+                        fbb, GetSelectedCharId(), state_->name.c_str(), arg.c_str(),
+                        luna::protocol::ChatChannel_Party, 0);
+                    fbb.Finish(chatMsg);
+                    network_->SendPacket(luna::protocol::PacketType_MP_CHAT_PARTY_SYN,
+                        fbb.GetBufferPointer(), fbb.GetSize());
+                } else if (verb == "gchat" && network_ && network_->IsConnected()) {
+                    flatbuffers::FlatBufferBuilder fbb;
+                    auto chatMsg = luna::protocol::CreateChatMessageDirect(
+                        fbb, GetSelectedCharId(), state_->name.c_str(), arg.c_str(),
+                        luna::protocol::ChatChannel_Guild, 0);
+                    fbb.Finish(chatMsg);
+                    network_->SendPacket(luna::protocol::PacketType_MP_CHAT_GUILD_SYN,
+                        fbb.GetBufferPointer(), fbb.GetSize());
+                } else if (verb == "friend") {
+                    if (arg.rfind("add ", 0) == 0) {
+                        SendFriendAdd(arg.substr(4));
+                    } else if (arg.rfind("del ", 0) == 0) {
+                        SendFriendDelete(static_cast<uint32_t>(std::atoi(arg.substr(4).c_str())));
+                    } else if (arg == "list") {
+                        RequestFriendList();
+                    } else {
+                        state_->chat_messages.push_back("Friend: /friend add [name] | del [id] | list");
+                    }
+                } else if (verb == "guild") {
+                    if (arg.rfind("create ", 0) == 0) {
+                        SendGuildCreate(arg.substr(7));
+                    } else if (arg.rfind("invite ", 0) == 0) {
+                        SendGuildInvite(arg.substr(7));
+                    } else if (arg == "leave" || arg == "quit") {
+                        SendGuildLeave();
+                    } else if (arg == "info") {
+                        RequestGuildInfo();
+                    } else {
+                        state_->chat_messages.push_back("Guild: /guild create [name] | invite [name] | leave | info");
+                    }
+                } else if (verb == "trade") {
+                    if (arg.rfind("apply ", 0) == 0) {
+                        state_->trade_open = true;
+                        SetupTradeNetworkCallbacks();
+                        trade_dlg_.Open(state_, &trading_);
+                        SendTradeApply(arg.substr(6));
+                    } else if (arg == "cancel") {
+                        SendTradeCancel();
+                    } else if (arg == "confirm") {
+                        SendTradeConfirm();
+                    } else {
+                        state_->chat_messages.push_back("Trade: /trade apply [name] | confirm | cancel");
+                    }
+                } else if (verb == "ah" || verb == "auction") {
+                    if (arg == "list" || arg.empty()) RequestConsignmentSearch("");
+                    else RequestConsignmentSearch(arg);
+                } else if (verb == "stall") {
+                    if (arg.rfind("open ", 0) == 0) SendStreetStallOpen(arg.substr(5));
+                    else if (arg.rfind("add ", 0) == 0) {
+                        int price = std::atoi(arg.substr(4).c_str());
+                        if (!state_->inventory.empty())
+                            SendStreetStallAdd(static_cast<uint8_t>(state_->inventory[0].slot),
+                                static_cast<uint32_t>(price > 0 ? price : 50));
+                    } else if (arg.rfind("buy ", 0) == 0) {
+                        int owner = 9200, slot = 0;
+                        sscanf(arg.substr(4).c_str(), "%d %hhu", &owner, &slot);
+                        SendStreetStallBuy(static_cast<uint32_t>(owner), slot);
+                    } else if (arg == "close") SendStreetStallClose();
+                    else if (arg == "list") RequestStreetStallList();
+                    else state_->chat_messages.push_back("Stall: open [title] | add [price] | buy [owner slot] | close | list");
                 } else if (verb == "help" || verb == "h") {
-                    state_->chat_messages.push_back("Commands: /teleport [map_id], /maps, /nextmap, /prevmap");
+                    state_->chat_messages.push_back(
+                        "Cmds: /party, /guild, /friend, /trade, /ah, /stall, /deposit, /w, /tp [map]");
                 } else if (verb == "nextmap") {
                     int available[] = {13,14,15,19,20,21,22,23,25,26,27,28,31,32,41,51,55,56,60,63,64,71,74,75,96};
                     int count = sizeof(available)/sizeof(available[0]);
@@ -802,6 +1024,565 @@ void GameScreen::SendMovementUpdate(float dt) {
         hero_.GetState() == HeroState::Run ? luna::protocol::MoveMode_Run : luna::protocol::MoveMode_Walk);
     fbb.Finish(req);
     network_->SendPacket(luna::protocol::PacketType_MP_MOVE_WALK,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+uint32_t GameScreen::GetSelectedCharId() const {
+    if (!state_->characters.empty() && state_->selected_char < (int)state_->characters.size())
+        return state_->characters[state_->selected_char].id;
+    return 0;
+}
+
+void GameScreen::ApplyPartyResponse(const luna::protocol::PartyResponse* resp) {
+    if (!resp || !resp->party()) return;
+    auto party = resp->party();
+    state_->party_id = party->party_id();
+    state_->party_members.clear();
+    if (party->members()) {
+        for (auto m : *party->members()) {
+            PartyMember pm;
+            pm.id = m->character_id();
+            pm.name = m->name() ? m->name()->str() : "?";
+            pm.level = m->level();
+            pm.hp = m->hp();
+            pm.max_hp = m->max_hp();
+            pm.map_id = m->map_id();
+            pm.is_leader = m->is_leader();
+            state_->party_members.push_back(pm);
+        }
+    }
+    if (resp->result() != 0) {
+        state_->chat_messages.push_back("Party action failed (code " + std::to_string(resp->result()) + ")");
+    } else if (!state_->party_members.empty()) {
+        state_->chat_messages.push_back("Party updated (" +
+            std::to_string(state_->party_members.size()) + " members)");
+    } else {
+        state_->party_id = 0;
+        state_->chat_messages.push_back("Left party");
+    }
+    if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
+}
+
+void GameScreen::ApplyStorageResponse(const luna::protocol::StorageResponse* resp) {
+    if (!resp || !resp->storage()) return;
+    auto storage = resp->storage();
+    state_->storage_gold = storage->gold();
+    state_->storage_items.clear();
+    if (storage->slots()) {
+        for (auto s : *storage->slots()) {
+            InvItem item;
+            item.slot = s->slot_index();
+            item.id = s->item_id();
+            item.count = s->count();
+            char buf[64];
+            snprintf(buf, sizeof(buf), "Item_%u", item.id);
+            item.name = buf;
+            state_->storage_items.push_back(item);
+        }
+    }
+    if (resp->result() != 0)
+        state_->chat_messages.push_back("Storage action failed");
+    else if (state_->storage_open)
+        storage_dlg_.UpdateFromState(state_);
+}
+
+void GameScreen::SendPartyCreate() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreatePartyCreateRequest(fbb, GetSelectedCharId());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_PARTY_CREATE_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendPartyInvite(const std::string& name) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode || name.empty()) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreatePartyInviteRequestDirect(
+        fbb, GetSelectedCharId(), name.c_str());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_PARTY_INVITE_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendPartyLeave() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode || state_->party_id == 0) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreatePartyLeaveRequest(fbb, GetSelectedCharId(), state_->party_id);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_PARTY_LEAVE_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::RequestStorageList() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateStorageListRequest(fbb, GetSelectedCharId());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_STORAGE_LIST_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendStorageDeposit(uint8_t inv_slot, uint16_t count) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateStorageDepositRequest(
+        fbb, GetSelectedCharId(), inv_slot, 0, count);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_STORAGE_DEPOSIT_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendStorageWithdraw(uint8_t storage_slot, uint16_t count) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateStorageWithdrawRequest(
+        fbb, GetSelectedCharId(), storage_slot, 0, count);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_STORAGE_WITHDRAW_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::ApplyFriendResponse(const luna::protocol::FriendResponse* resp) {
+    if (!resp || !resp->list()) return;
+    state_->friends.clear();
+    if (resp->list()->friends()) {
+        for (auto f : *resp->list()->friends()) {
+            FriendEntry entry;
+            entry.id = f->character_id();
+            entry.name = f->name() ? f->name()->str() : "?";
+            entry.level = f->level();
+            entry.online = f->online();
+            entry.map_id = f->map_id();
+            state_->friends.push_back(entry);
+        }
+    }
+    if (resp->result() != 0)
+        state_->chat_messages.push_back("Friend action failed (code " + std::to_string(resp->result()) + ")");
+    else if (state_->friend_open)
+        friend_dlg_.UpdateFromState(state_);
+}
+
+void GameScreen::ApplyGuildResponse(const luna::protocol::GuildResponse* resp) {
+    if (!resp || !resp->guild()) return;
+    auto guild = resp->guild();
+    state_->guild_id = guild->guild_id();
+    state_->guild_name = guild->name() ? guild->name()->str() : "";
+    state_->guild_level = guild->level();
+    state_->guild_gp = guild->gp();
+    state_->guild_members.clear();
+    if (guild->members()) {
+        for (auto m : *guild->members()) {
+            GuildMemberEntry entry;
+            entry.id = m->character_id();
+            entry.name = m->name() ? m->name()->str() : "?";
+            entry.level = m->level();
+            entry.rank = m->rank();
+            entry.online = m->online();
+            state_->guild_members.push_back(entry);
+        }
+    }
+    if (resp->result() != 0)
+        state_->chat_messages.push_back("Guild action failed (code " + std::to_string(resp->result()) + ")");
+    else if (!state_->guild_name.empty())
+        state_->chat_messages.push_back("Guild: " + state_->guild_name +
+            " (" + std::to_string(state_->guild_members.size()) + " members)");
+    else if (state_->guild_id == 0)
+        state_->chat_messages.push_back("Left guild");
+    if (state_->guild_open)
+        guild_dlg_.UpdateFromState(state_);
+}
+
+void GameScreen::RequestFriendList() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateFriendListRequest(fbb, GetSelectedCharId());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_FRIEND_LIST_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendFriendAdd(const std::string& name) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode || name.empty()) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateFriendAddRequestDirect(fbb, GetSelectedCharId(), name.c_str());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_FRIEND_ADD_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendFriendDelete(uint32_t friend_id) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode || !friend_id) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateFriendDeleteRequest(fbb, GetSelectedCharId(), friend_id);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_FRIEND_DEL_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendGuildCreate(const std::string& name) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode || name.empty()) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateGuildCreateRequestDirect(fbb, GetSelectedCharId(), name.c_str());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_GUILD_CREATE_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::RequestGuildInfo() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateGuildInfoRequest(fbb, GetSelectedCharId());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_GUILD_INFO_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendGuildInvite(const std::string& name) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode || name.empty()) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateGuildInviteRequestDirect(fbb, GetSelectedCharId(), name.c_str());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_GUILD_ADDMEMBER_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendGuildLeave() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode || state_->guild_id == 0) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateGuildLeaveRequest(fbb, GetSelectedCharId(), state_->guild_id);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_GUILD_SECEDE_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+static void FillTradeSide(GameState* state, bool self,
+    const luna::protocol::TradeSide* side) {
+    if (!state || !side) return;
+    auto& items = self ? state->trade_my_items : state->trade_their_items;
+    items.clear();
+    if (side->items()) {
+        for (auto it : *side->items()) {
+            TradeOfferItem offer;
+            offer.trade_slot = it->trade_slot();
+            offer.item_id = it->item_id();
+            offer.count = it->count();
+            offer.inv_slot = it->inv_slot();
+            char buf[64];
+            snprintf(buf, sizeof(buf), "Item_%u", offer.item_id);
+            offer.name = buf;
+            items.push_back(offer);
+        }
+    }
+    if (self) {
+        state->trade_my_gold = side->gold();
+        state->trade_my_confirmed = side->confirmed();
+    } else {
+        state->trade_their_gold = side->gold();
+        state->trade_their_confirmed = side->confirmed();
+        if (side->name()) state->trade_partner_name = side->name()->str();
+    }
+}
+
+void GameScreen::ApplyTradeResponse(const luna::protocol::TradeResponse* resp) {
+    if (!resp) return;
+    if (resp->result() != 0) {
+        state_->chat_messages.push_back("Trade failed (code " + std::to_string(resp->result()) + ")");
+        if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
+        return;
+    }
+    if (!resp->session()) return;
+    auto session = resp->session();
+    state_->trade_session_id = session->session_id();
+    state_->trade_active = session->session_id() != 0;
+    state_->trade_completed = session->completed();
+    if (session->self_side()) FillTradeSide(state_, true, session->self_side());
+    if (session->partner_side()) FillTradeSide(state_, false, session->partner_side());
+    if (session->completed()) {
+        state_->trade_active = false;
+        state_->chat_messages.push_back("Trade completed with " + state_->trade_partner_name + "!");
+    }
+    if (state_->trade_open)
+        trade_dlg_.UpdateFromState(state_);
+}
+
+void GameScreen::SetupTradeNetworkCallbacks() {
+    TradeNetworkCallbacks cb;
+    cb.enabled = network_ && network_->IsConnected() && !state_->offline_mode;
+    if (!cb.enabled) {
+        trade_dlg_.SetNetworkCallbacks(cb);
+        return;
+    }
+    cb.on_add_item = [this](uint8_t inv_slot) { SendTradeAddItem(inv_slot); };
+    cb.on_add_gold = [this](uint32_t add) {
+        uint32_t next = state_->trade_my_gold + add;
+        if (next <= static_cast<uint32_t>(state_->gold)) SendTradeSetGold(next);
+    };
+    cb.on_confirm = [this]() { SendTradeConfirm(); };
+    cb.on_cancel = [this]() { SendTradeCancel(); };
+    trade_dlg_.SetNetworkCallbacks(cb);
+}
+
+void GameScreen::SendTradeApply(const std::string& target) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateTradeApplyRequestDirect(
+        fbb, GetSelectedCharId(), target.c_str());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_EXCHANGE_APPLY_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendTradeCancel() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    if (!state_->trade_session_id) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateTradeSessionRequest(
+        fbb, state_->trade_session_id, GetSelectedCharId());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_EXCHANGE_CANCEL_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+    state_->trade_active = false;
+    state_->trade_session_id = 0;
+}
+
+void GameScreen::SendTradeAddItem(uint8_t inv_slot) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode || !state_->trade_active) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateTradeAddItemRequest(
+        fbb, state_->trade_session_id, GetSelectedCharId(), inv_slot, 0, 1);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_EXCHANGE_ADDITEM_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendTradeSetGold(uint32_t gold) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode || !state_->trade_active) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateTradeSetGoldRequest(
+        fbb, state_->trade_session_id, GetSelectedCharId(), gold);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_EXCHANGE_SETGOLD_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendTradeConfirm() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode || !state_->trade_active) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateTradeSessionRequest(
+        fbb, state_->trade_session_id, GetSelectedCharId());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_EXCHANGE_CONFIRM_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+static AuctionListing FromConsignmentFb(const luna::protocol::ConsignmentListing* l) {
+    AuctionListing a;
+    if (!l) return a;
+    a.id = l->listing_id();
+    a.seller_id = l->seller_id();
+    a.seller_name = l->seller_name() ? l->seller_name()->str() : "";
+    a.item_id = l->item_id();
+    a.item_name = l->item_name() ? l->item_name()->str() : "";
+    a.item_count = l->item_count();
+    a.enchant_level = l->enchant_level();
+    a.bid_price = l->bid_price();
+    a.buyout_price = l->buyout_price();
+    a.current_bid = l->current_bid();
+    a.bidder_id = l->bidder_id();
+    a.bidder_name = l->bidder_name() ? l->bidder_name()->str() : "";
+    a.time_remaining = l->time_remaining();
+    a.sold = l->sold();
+    a.active = l->active();
+    return a;
+}
+
+static StreetStallView FromStallFb(const luna::protocol::StreetStallInfo* s) {
+    StreetStallView view;
+    if (!s) return view;
+    view.owner_id = s->owner_id();
+    view.owner_name = s->owner_name() ? s->owner_name()->str() : "";
+    view.title = s->title() ? s->title()->str() : "";
+    view.open = s->open();
+    if (s->items()) {
+        for (auto it : *s->items()) {
+            StreetStallSlot slot;
+            slot.slot = it->slot();
+            slot.item_id = it->item_id();
+            slot.count = it->count();
+            slot.price = it->price();
+            slot.item_name = it->item_name() ? it->item_name()->str() : "";
+            view.items.push_back(slot);
+        }
+    }
+    return view;
+}
+
+void GameScreen::ApplyConsignmentResponse(const luna::protocol::ConsignmentResponse* resp,
+    bool mine_only, bool bids_only) {
+    if (!resp) return;
+    if (resp->result() != 0) {
+        state_->chat_messages.push_back("Auction action failed (code " +
+            std::to_string(resp->result()) + ")");
+        return;
+    }
+    std::vector<AuctionListing> listings;
+    if (resp->listings() && resp->listings()->listings()) {
+        for (auto l : *resp->listings()->listings())
+            listings.push_back(FromConsignmentFb(l));
+    }
+    if (mine_only) state_->consignment_mine = listings;
+    else if (bids_only) state_->consignment_bids = listings;
+    else state_->consignment_browse = listings;
+    if (state_->consignment_open)
+        consignment_dlg_.UpdateFromState(state_);
+}
+
+void GameScreen::ApplyStreetStallResponse(const luna::protocol::StreetStallResponse* resp) {
+    if (!resp) return;
+    if (resp->result() != 0) {
+        state_->chat_messages.push_back("Street stall failed (code " +
+            std::to_string(resp->result()) + ")");
+        return;
+    }
+    state_->my_stall = FromStallFb(resp->stall());
+    state_->nearby_stalls.clear();
+    if (resp->nearby()) {
+        for (auto s : *resp->nearby())
+            state_->nearby_stalls.push_back(FromStallFb(s));
+    }
+    if (state_->consignment_open)
+        consignment_dlg_.UpdateFromState(state_);
+}
+
+void GameScreen::SetupConsignmentNetworkCallbacks() {
+    ConsignmentNetworkCallbacks cb;
+    cb.enabled = network_ && network_->IsConnected() && !state_->offline_mode;
+    if (!cb.enabled) {
+        consignment_dlg_.SetNetworkCallbacks(cb);
+        return;
+    }
+    cb.on_search = [this](const std::string& q) { RequestConsignmentSearch(q); };
+    cb.on_refresh = [this](bool mine, bool bids) { RequestConsignmentRefresh(mine, bids); };
+    cb.on_trade = [this](uint64_t id, bool buyout, uint32_t amount) {
+        SendConsignmentTrade(id, buyout, amount);
+    };
+    cb.on_list = [this](uint8_t slot, uint16_t count, uint32_t bid, uint32_t buyout) {
+        SendConsignmentList(slot, count, bid, buyout);
+    };
+    cb.on_cancel = [this](uint64_t id) { SendConsignmentCancel(id); };
+    cb.on_stall_open = [this](const std::string& title) { SendStreetStallOpen(title); };
+    cb.on_stall_add = [this](uint8_t inv_slot, uint32_t price) {
+        SendStreetStallAdd(inv_slot, price);
+    };
+    cb.on_stall_buy = [this](uint32_t owner, uint8_t slot) {
+        SendStreetStallBuy(owner, slot);
+    };
+    cb.on_stall_close = [this]() { SendStreetStallClose(); };
+    cb.on_stall_list = [this]() { RequestStreetStallList(); };
+    consignment_dlg_.SetNetworkCallbacks(cb);
+}
+
+void GameScreen::RequestConsignmentSearch(const std::string& query) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    pending_consignment_mine_ = false;
+    pending_consignment_bids_ = false;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateConsignmentListRequestDirect(
+        fbb, GetSelectedCharId(), query.c_str(), false, false);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_CONSIGNMENT_SEARCH_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::RequestConsignmentRefresh(bool mine, bool bids) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    pending_consignment_mine_ = mine;
+    pending_consignment_bids_ = bids;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateConsignmentListRequestDirect(
+        fbb, GetSelectedCharId(), "", mine, bids);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_CONSIGNMENT_GETLIST_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendConsignmentList(uint8_t inv_slot, uint16_t count,
+    uint32_t bid, uint32_t buyout) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateConsignmentRegisterRequest(
+        fbb, GetSelectedCharId(), inv_slot, count, bid, buyout);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_CONSIGNMENT_REGIST_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendConsignmentTrade(uint64_t listing_id, bool buyout, uint32_t amount) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateConsignmentTradeRequest(
+        fbb, GetSelectedCharId(), listing_id, amount, buyout);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_CONSIGNMENT_UPDATE_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendConsignmentCancel(uint64_t listing_id) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateConsignmentCancelRequest(
+        fbb, GetSelectedCharId(), listing_id);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_CONSIGNMENT_CANCEL_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendStreetStallOpen(const std::string& title) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateStreetStallOpenRequestDirect(
+        fbb, GetSelectedCharId(), title.c_str());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_STREETSTALL_OPEN_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendStreetStallAdd(uint8_t inv_slot, uint32_t price) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateStreetStallAddItemRequest(
+        fbb, GetSelectedCharId(), inv_slot, 0, 1, price);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_STREETSTALL_ADDITEM_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendStreetStallBuy(uint32_t owner_id, uint8_t stall_slot) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateStreetStallBuyRequest(
+        fbb, GetSelectedCharId(), owner_id, stall_slot, 1);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_STREETSTALL_BUY_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendStreetStallClose() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateStreetStallCloseRequest(fbb, GetSelectedCharId());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_STREETSTALL_CLOSE_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::RequestStreetStallList() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateStreetStallListRequest(fbb, GetSelectedCharId());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_STREETSTALL_LIST_SYN,
         fbb.GetBufferPointer(), fbb.GetSize());
 }
 
@@ -1493,12 +2274,15 @@ void GameScreen::RenderUI(UIRenderer& ui) {
         npc_dlg_.GetWindow()->Render(ui);
     }
     if (state_->party_open && party_dlg_.GetWindow()) {
+        party_dlg_.UpdateFromState(state_);
         party_dlg_.GetWindow()->Render(ui);
     }
     if (state_->guild_open && guild_dlg_.GetWindow()) {
+        guild_dlg_.UpdateFromState(state_);
         guild_dlg_.GetWindow()->Render(ui);
     }
     if (state_->friend_open && friend_dlg_.GetWindow()) {
+        friend_dlg_.UpdateFromState(state_);
         friend_dlg_.GetWindow()->Render(ui);
     }
     if (state_->options_open && options_dlg_.GetWindow()) {

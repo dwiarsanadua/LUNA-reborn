@@ -5,6 +5,7 @@
 #include <random>
 #include <cstdint>
 #include <game/ecs/components/Equipment.hpp>
+#include <gameobjects/ConsignmentSystem.hpp>
 
 struct CharInfo {
     uint32_t id;
@@ -28,6 +29,56 @@ struct InvItem {
     int count;
     int slot;
     int enchant = 0;
+};
+
+struct PartyMember {
+    uint32_t id = 0;
+    std::string name;
+    int level = 1;
+    int hp = 500;
+    int max_hp = 500;
+    uint16_t map_id = 51;
+    bool is_leader = false;
+};
+
+struct FriendEntry {
+    uint32_t id = 0;
+    std::string name;
+    int level = 1;
+    bool online = false;
+    uint16_t map_id = 51;
+};
+
+struct GuildMemberEntry {
+    uint32_t id = 0;
+    std::string name;
+    int level = 1;
+    uint8_t rank = 0;
+    bool online = false;
+};
+
+struct StreetStallSlot {
+    uint8_t slot = 0;
+    uint32_t item_id = 0;
+    uint16_t count = 0;
+    uint32_t price = 0;
+    std::string item_name;
+};
+
+struct StreetStallView {
+    uint32_t owner_id = 0;
+    std::string owner_name;
+    std::string title;
+    bool open = false;
+    std::vector<StreetStallSlot> items;
+};
+
+struct TradeOfferItem {
+    uint8_t trade_slot = 0;
+    uint32_t item_id = 0;
+    uint16_t count = 0;
+    uint8_t inv_slot = 0;
+    std::string name;
 };
 
 struct DamageFloat {
@@ -140,6 +191,31 @@ struct GameState {
     std::vector<DamageFloat> damage_floats;
     float shake_x = 0, shake_y = 0;
     std::vector<InvItem> inventory;
+    std::vector<InvItem> storage_items;
+    uint32_t storage_gold = 0;
+    uint32_t party_id = 0;
+    std::vector<PartyMember> party_members;
+    std::vector<FriendEntry> friends;
+    uint32_t guild_id = 0;
+    std::string guild_name;
+    uint8_t guild_level = 1;
+    uint32_t guild_gp = 0;
+    std::vector<GuildMemberEntry> guild_members;
+    uint32_t trade_session_id = 0;
+    std::string trade_partner_name;
+    std::vector<TradeOfferItem> trade_my_items;
+    std::vector<TradeOfferItem> trade_their_items;
+    uint32_t trade_my_gold = 0;
+    uint32_t trade_their_gold = 0;
+    bool trade_my_confirmed = false;
+    bool trade_their_confirmed = false;
+    bool trade_active = false;
+    bool trade_completed = false;
+    std::vector<AuctionListing> consignment_browse;
+    std::vector<AuctionListing> consignment_mine;
+    std::vector<AuctionListing> consignment_bids;
+    StreetStallView my_stall;
+    std::vector<StreetStallView> nearby_stalls;
     Equipment equipment;
     bool equipment_dirty = false;
     std::vector<std::string> skill_list;

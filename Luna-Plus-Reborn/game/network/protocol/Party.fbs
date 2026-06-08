@@ -1,0 +1,40 @@
+include "Types.fbs";
+include "PacketType.fbs";
+
+namespace luna.protocol;
+
+table PartyMemberInfo {
+    character_id: uint32;
+    name: string;
+    level: uint16;
+    hp: int32;
+    max_hp: int32;
+    map_id: uint16;
+    is_leader: bool;
+}
+
+table PartyInfo {
+    party_id: uint32;
+    leader_id: uint32;
+    option: uint8;
+    members: [PartyMemberInfo];
+}
+
+table PartyCreateRequest {
+    character_id: uint32;
+}
+
+table PartyInviteRequest {
+    character_id: uint32;
+    target_name: string;
+}
+
+table PartyLeaveRequest {
+    character_id: uint32;
+    party_id: uint32;
+}
+
+table PartyResponse {
+    result: byte;
+    party: PartyInfo;
+}

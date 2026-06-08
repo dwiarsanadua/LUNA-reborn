@@ -1,0 +1,58 @@
+include "Types.fbs";
+include "PacketType.fbs";
+
+namespace luna.protocol;
+
+table ConsignmentListing {
+    listing_id: uint64;
+    seller_id: uint32;
+    seller_name: string;
+    item_id: uint32;
+    item_name: string;
+    item_count: uint16;
+    enchant_level: uint8;
+    bid_price: uint32;
+    buyout_price: uint32;
+    current_bid: uint32;
+    bidder_id: uint32;
+    bidder_name: string;
+    time_remaining: float;
+    sold: bool;
+    active: bool;
+}
+
+table ConsignmentList {
+    listings: [ConsignmentListing];
+}
+
+table ConsignmentListRequest {
+    character_id: uint32;
+    query: string;
+    my_listings_only: bool;
+    my_bids_only: bool;
+}
+
+table ConsignmentRegisterRequest {
+    character_id: uint32;
+    inv_slot: uint8;
+    item_count: uint16;
+    bid_price: uint32;
+    buyout_price: uint32;
+}
+
+table ConsignmentTradeRequest {
+    character_id: uint32;
+    listing_id: uint64;
+    amount: uint32;
+    buyout: bool;
+}
+
+table ConsignmentCancelRequest {
+    character_id: uint32;
+    listing_id: uint64;
+}
+
+table ConsignmentResponse {
+    result: byte;
+    listings: ConsignmentList;
+}

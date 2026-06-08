@@ -19,23 +19,44 @@ void GuildDialog::Open(WindowManager* wm, SiegeSystem* siege) {
 
     auto* tabs = window_->AddWidget<TabPanel>(10, 30, 360, 310);
 
-    auto* member_list = new ListBox(0, 0, 340, 290);
-    member_list->AddItem("-- Guild Roster --");
-    member_list->AddItem("   (Not in a guild)");
-    tabs->AddTab("Members", member_list);
+    member_list_ = new ListBox(0, 0, 340, 290);
+    member_list_->AddItem("(Not in a guild)");
+    tabs->AddTab("Members", member_list_);
 
-    auto* info_list = new ListBox(0, 0, 340, 290);
-    info_list->AddItem("Guild Level: 1");
-    info_list->AddItem("Members: 0/30");
-    info_list->AddItem("GP: 0");
-    info_list->AddItem(" ");
-    info_list->AddItem("To create a guild, visit the");
-    info_list->AddItem("Guild Manager NPC in town.");
-    tabs->AddTab("Info", info_list);
+    info_list_ = new ListBox(0, 0, 340, 290);
+    info_list_->AddItem("Use /guild create [name]");
+    tabs->AddTab("Info", info_list_);
 
     auto* siege_list = new ListBox(0, 0, 340, 290);
     PopulateSiegeTab(siege_list, siege);
     tabs->AddTab("Siege/War", siege_list);
+}
+
+void GuildDialog::UpdateFromState(GameState* state) {
+    if (!state || !member_list_ || !info_list_) return;
+    member_list_->Clear();
+    info_list_->Clear();
+    if (state->guild_id == 0 || state->guild_members.empty()) {
+        member_list_->AddItem("(Not in a guild)");
+        info_list_->AddItem("/guild create [name]");
+        info_list_->AddItem("/guild invite [name]");
+        return;
+    }
+    char header[96];
+    snprintf(header, sizeof(header), "[%s] Lv%u  GP %u",
+        state->guild_name.c_str(), state->guild_level, state->guild_gp);
+    info_list_->AddItem(header);
+    snprintf(header, sizeof(header), "Members: %zu/30", state->guild_members.size());
+    info_list_->AddItem(header);
+    info_list_->AddItem("/guild invite [name]");
+    info_list_->AddItem("/guild leave");
+    for (const auto& m : state->guild_members) {
+        const char* rank = m.rank >= 2 ? "Master" : (m.rank >= 1 ? "Officer" : "Member");
+        char line[128];
+        snprintf(line, sizeof(line), "%s%s  Lv%d  %s",
+            m.online ? "" : "(off) ", m.name.c_str(), m.level, rank);
+        member_list_->AddItem(line);
+    }
 }
 
 void GuildDialog::PopulateSiegeTab(ListBox* lb, SiegeSystem* siege) {

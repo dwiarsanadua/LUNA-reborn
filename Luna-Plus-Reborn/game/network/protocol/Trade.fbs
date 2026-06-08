@@ -1,0 +1,55 @@
+include "Types.fbs";
+include "PacketType.fbs";
+
+namespace luna.protocol;
+
+table TradeItemOffer {
+    trade_slot: uint8;
+    item_id: uint32;
+    count: uint16;
+    inv_slot: uint8;
+}
+
+table TradeSide {
+    character_id: uint32;
+    name: string;
+    gold: uint32;
+    items: [TradeItemOffer];
+    confirmed: bool;
+}
+
+table TradeSessionInfo {
+    session_id: uint32;
+    self_side: TradeSide;
+    partner_side: TradeSide;
+    completed: bool;
+}
+
+table TradeApplyRequest {
+    character_id: uint32;
+    target_name: string;
+}
+
+table TradeSessionRequest {
+    session_id: uint32;
+    character_id: uint32;
+}
+
+table TradeAddItemRequest {
+    session_id: uint32;
+    character_id: uint32;
+    inv_slot: uint8;
+    trade_slot: uint8;
+    count: uint16;
+}
+
+table TradeSetGoldRequest {
+    session_id: uint32;
+    character_id: uint32;
+    gold: uint32;
+}
+
+table TradeResponse {
+    result: byte;
+    session: TradeSessionInfo;
+}

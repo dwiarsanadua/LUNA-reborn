@@ -1,0 +1,45 @@
+include "Types.fbs";
+include "PacketType.fbs";
+
+namespace luna.protocol;
+
+table GuildMemberInfo {
+    character_id: uint32;
+    name: string;
+    level: uint16;
+    rank: uint8;
+    online: bool;
+}
+
+table GuildInfo {
+    guild_id: uint32;
+    name: string;
+    level: uint8;
+    gp: uint32;
+    master_id: uint32;
+    members: [GuildMemberInfo];
+}
+
+table GuildCreateRequest {
+    character_id: uint32;
+    guild_name: string;
+}
+
+table GuildInfoRequest {
+    character_id: uint32;
+}
+
+table GuildInviteRequest {
+    character_id: uint32;
+    target_name: string;
+}
+
+table GuildLeaveRequest {
+    character_id: uint32;
+    guild_id: uint32;
+}
+
+table GuildResponse {
+    result: byte;
+    guild: GuildInfo;
+}

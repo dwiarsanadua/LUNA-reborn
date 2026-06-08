@@ -1,0 +1,38 @@
+include "Types.fbs";
+include "PacketType.fbs";
+
+namespace luna.protocol;
+
+table StorageSlot {
+    slot_index: uint8;
+    item_id: uint32;
+    count: uint16;
+}
+
+table StorageData {
+    gold: uint32;
+    slots: [StorageSlot];
+}
+
+table StorageListRequest {
+    character_id: uint32;
+}
+
+table StorageDepositRequest {
+    character_id: uint32;
+    inv_slot: uint8;
+    storage_slot: uint8;
+    count: uint16;
+}
+
+table StorageWithdrawRequest {
+    character_id: uint32;
+    storage_slot: uint8;
+    inv_slot: uint8;
+    count: uint16;
+}
+
+table StorageResponse {
+    result: byte;
+    storage: StorageData;
+}

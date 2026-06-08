@@ -1,6 +1,7 @@
 #include "DistributeServer.h"
 #include "engine/network/NetworkLayer.h"
 #include <MapChange_generated.h>
+#include <Chat_generated.h>
 #include <PacketType_generated.h>
 #include <flatbuffers/flatbuffers.h>
 #include <spdlog/spdlog.h>
@@ -121,6 +122,20 @@ void DistributeServer::HandlePacket(uint16_t type, const uint8_t* payload, size_
             fbb.GetBufferPointer(), fbb.GetSize());
         spdlog::info("DistributeServer: changemap -> map {} port {}", sv->map_id, sv->port);
         (void)len;
+        return;
+    }
+
+    if (type == PacketType_MP_CHAT_WHISPER_SYN) {
+        auto req = flatbuffers::GetRoot<ChatMessage>(payload);
+        std::string target = req->sender_name() ? req->sender_name()->str() : "";
+        std::string text = req->message() ? req->message()->str() : "";
+        spdlog::info("DistributeServer: whisper route to '{}' ({} bytes)", target, text.size());
+        std::string reply = "To [" + target + "]: " + text + " (routed via Distribute)";
+        flatbuffers::FlatBufferBuilder fbb;
+        auto msg = CreateChatMessageDirect(fbb, 0, "System", reply.c_str(), ChatChannel_Whisper, 0);
+        fbb.Finish(msg);
+        network_->SendPacket(PacketType_MP_CHAT_WHISPER_ACK,
+            fbb.GetBufferPointer(), fbb.GetSize());
         return;
     }
 

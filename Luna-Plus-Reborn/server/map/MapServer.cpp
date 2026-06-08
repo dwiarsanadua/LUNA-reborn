@@ -23,6 +23,13 @@
 #include <Inventory_generated.h>
 #include <CharLife_generated.h>
 #include <MapChange_generated.h>
+#include <Party_generated.h>
+#include <Storage_generated.h>
+#include <Friend_generated.h>
+#include <Guild_generated.h>
+#include <Trade_generated.h>
+#include <Consignment_generated.h>
+#include <StreetStall_generated.h>
 #include <ecs/components/AIComponent.hpp>
 #include <PacketType_generated.h>
 #include <spdlog/spdlog.h>
@@ -199,6 +206,7 @@ bool MapServer::Initialize(int map_id, uint16_t port) {
     }
 
     running_ = true;
+    SeedMarketData();
     RegisterWithDistribute();
     spdlog::info("MapServer: map {} initialized on port {}", map_id, port);
     return true;
@@ -735,11 +743,24 @@ void MapServer::HandlePacket(uint16_t type, const uint8_t* payload, size_t len) 
         connected_player_.max_hp = 500;
         player_joined_ = true;
         player_inventory_ = {{0, 1001, 1}, {1, 21000001, 5}};
+        player_storage_.clear();
+        storage_gold_ = 0;
         player_gold_ = 100;
         player_exp_ = 0;
         next_loot_slot_ = 10;
         last_sent_hp_ = -1;
         monster_net_.clear();
+        has_party_ = false;
+        party_.members.clear();
+        party_.party_id = 0;
+        party_.leader_id = 0;
+        friends_.clear();
+        has_guild_ = false;
+        guild_.members.clear();
+        guild_.guild_id = 0;
+        guild_.name.clear();
+        guild_.master_id = 0;
+        trade_ = {};
         SpawnPlayer(connected_player_.id, connected_player_);
         SendWorldSnapshot();
         SendInventorySync();
@@ -788,6 +809,160 @@ void MapServer::HandlePacket(uint16_t type, const uint8_t* payload, size_t len) 
 
     if (type == PacketType_MP_CHAT_ALL_SYN) {
         HandleChat(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_CHAT_PARTY_SYN) {
+        HandlePartyChat(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_CHAT_WHISPER_SYN) {
+        HandleWhisper(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_PARTY_CREATE_SYN) {
+        HandlePartyCreate(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_PARTY_INVITE_SYN) {
+        HandlePartyInvite(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_PARTY_LEAVE_SYN) {
+        HandlePartyLeave(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_STORAGE_LIST_SYN) {
+        HandleStorageList(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_STORAGE_DEPOSIT_SYN) {
+        HandleStorageDeposit(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_STORAGE_WITHDRAW_SYN) {
+        HandleStorageWithdraw(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_FRIEND_LIST_SYN) {
+        HandleFriendList(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_FRIEND_ADD_SYN) {
+        HandleFriendAdd(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_FRIEND_DEL_SYN) {
+        HandleFriendDelete(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_GUILD_CREATE_SYN) {
+        HandleGuildCreate(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_GUILD_INFO_SYN) {
+        HandleGuildInfo(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_GUILD_ADDMEMBER_SYN) {
+        HandleGuildInvite(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_GUILD_SECEDE_SYN) {
+        HandleGuildLeave(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_CHAT_GUILD_SYN) {
+        HandleGuildChat(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_EXCHANGE_APPLY_SYN) {
+        HandleTradeApply(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_EXCHANGE_CANCEL_SYN) {
+        HandleTradeCancel(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_EXCHANGE_ADDITEM_SYN) {
+        HandleTradeAddItem(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_EXCHANGE_SETGOLD_SYN) {
+        HandleTradeSetGold(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_EXCHANGE_CONFIRM_SYN) {
+        HandleTradeConfirm(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_CONSIGNMENT_GETLIST_SYN ||
+        type == PacketType_MP_CONSIGNMENT_SEARCH_SYN) {
+        HandleConsignmentList(payload, len,
+            type == PacketType_MP_CONSIGNMENT_SEARCH_SYN
+                ? PacketType_MP_CONSIGNMENT_SEARCH_ACK
+                : PacketType_MP_CONSIGNMENT_GETLIST_ACK);
+        return;
+    }
+
+    if (type == PacketType_MP_CONSIGNMENT_REGIST_SYN) {
+        HandleConsignmentRegister(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_CONSIGNMENT_UPDATE_SYN) {
+        HandleConsignmentTrade(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_CONSIGNMENT_CANCEL_SYN) {
+        HandleConsignmentCancel(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_STREETSTALL_OPEN_SYN) {
+        HandleStreetStallOpen(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_STREETSTALL_ADDITEM_SYN) {
+        HandleStreetStallAddItem(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_STREETSTALL_BUY_SYN) {
+        HandleStreetStallBuy(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_STREETSTALL_CLOSE_SYN) {
+        HandleStreetStallClose(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_STREETSTALL_LIST_SYN) {
+        HandleStreetStallList(payload, len);
         return;
     }
 }
@@ -884,6 +1059,985 @@ void MapServer::HandleCombatAttack(uint16_t ack_type, const uint8_t* payload, si
     } else {
         SendEntityTransform(target_id, xform.position.x, xform.position.y, xform.position.z, "hit");
     }
+}
+
+void MapServer::SendPartyInfo(uint8_t result, uint16_t ack_type) {
+    using namespace luna::protocol;
+    flatbuffers::FlatBufferBuilder fbb;
+    std::vector<flatbuffers::Offset<PartyMemberInfo>> members;
+    if (has_party_) {
+        for (const auto& m : party_.members) {
+            members.push_back(CreatePartyMemberInfoDirect(fbb, m.character_id,
+                m.name.c_str(), m.level, m.hp, m.max_hp, m.map_id, m.is_leader));
+        }
+    }
+    auto party = CreatePartyInfo(fbb, has_party_ ? party_.party_id : 0,
+        has_party_ ? party_.leader_id : 0, 0, fbb.CreateVector(members));
+    auto resp = CreatePartyResponse(fbb, result, party);
+    fbb.Finish(resp);
+    network_->SendPacket(ack_type, fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void MapServer::HandlePartyCreate(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    auto req = flatbuffers::GetRoot<PartyCreateRequest>(payload);
+    if (req->character_id() != static_cast<uint32_t>(connected_player_.id)) return;
+    if (has_party_) {
+        SendPartyInfo(1, PacketType_MP_PARTY_CREATE_NACK);
+        return;
+    }
+    has_party_ = true;
+    party_.party_id = next_party_id_++;
+    party_.leader_id = static_cast<uint32_t>(connected_player_.id);
+    party_.members.clear();
+    PartyMemberState leader;
+    leader.character_id = party_.leader_id;
+    leader.name = connected_player_.name;
+    leader.level = static_cast<uint16_t>(std::max(1, connected_player_.level));
+    leader.hp = connected_player_.hp;
+    leader.max_hp = connected_player_.max_hp;
+    leader.map_id = static_cast<uint16_t>(map_id_);
+    leader.is_leader = true;
+    party_.members.push_back(leader);
+    SendPartyInfo(0, PacketType_MP_PARTY_CREATE_ACK);
+    spdlog::info("MapServer: party {} created by {}", party_.party_id, connected_player_.id);
+}
+
+void MapServer::HandlePartyInvite(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_ || !has_party_) {
+        SendPartyInfo(1, PacketType_MP_PARTY_INVITE_NACK);
+        return;
+    }
+    if (party_.leader_id != static_cast<uint32_t>(connected_player_.id)) {
+        SendPartyInfo(2, PacketType_MP_PARTY_INVITE_NACK);
+        return;
+    }
+    auto req = flatbuffers::GetRoot<PartyInviteRequest>(payload);
+    std::string target = req->target_name() ? req->target_name()->str() : "";
+    if (target.empty() || party_.members.size() >= 6) {
+        SendPartyInfo(3, PacketType_MP_PARTY_INVITE_NACK);
+        return;
+    }
+    for (const auto& m : party_.members) {
+        if (m.name == target) {
+            SendPartyInfo(4, PacketType_MP_PARTY_INVITE_NACK);
+            return;
+        }
+    }
+    PartyMemberState member;
+    member.character_id = 9000 + static_cast<uint32_t>(party_.members.size());
+    member.name = target;
+    member.level = 10;
+    member.hp = 400;
+    member.max_hp = 400;
+    member.map_id = static_cast<uint16_t>(map_id_);
+    member.is_leader = false;
+    party_.members.push_back(member);
+    SendPartyInfo(0, PacketType_MP_PARTY_INVITE_ACK);
+    SendPartyInfo(0, PacketType_MP_PARTY_INFO_UPDATE);
+    spdlog::info("MapServer: {} invited to party {}", target, party_.party_id);
+}
+
+void MapServer::HandlePartyLeave(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_ || !has_party_) return;
+    auto req = flatbuffers::GetRoot<PartyLeaveRequest>(payload);
+    if (req->party_id() != party_.party_id) return;
+
+    if (party_.leader_id == static_cast<uint32_t>(connected_player_.id)) {
+        has_party_ = false;
+        party_.members.clear();
+        party_.party_id = 0;
+        party_.leader_id = 0;
+    } else {
+        party_.members.erase(
+            std::remove_if(party_.members.begin(), party_.members.end(),
+                [&](const PartyMemberState& m) {
+                    return m.character_id == static_cast<uint32_t>(connected_player_.id);
+                }),
+            party_.members.end());
+        if (party_.members.size() <= 1) {
+            has_party_ = false;
+            party_.members.clear();
+            party_.party_id = 0;
+            party_.leader_id = 0;
+        }
+    }
+    SendPartyInfo(0, PacketType_MP_PARTY_LEAVE_ACK);
+    spdlog::info("MapServer: player {} left party", connected_player_.id);
+}
+
+void MapServer::SendStorageSync(uint8_t result, uint16_t ack_type) {
+    using namespace luna::protocol;
+    flatbuffers::FlatBufferBuilder fbb;
+    std::vector<flatbuffers::Offset<StorageSlot>> slots;
+    for (const auto& s : player_storage_) {
+        slots.push_back(CreateStorageSlot(fbb, s.slot, s.item_id, s.count));
+    }
+    auto storage = CreateStorageData(fbb, storage_gold_, fbb.CreateVector(slots));
+    auto resp = CreateStorageResponse(fbb, result, storage);
+    fbb.Finish(resp);
+    network_->SendPacket(ack_type, fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void MapServer::HandleStorageList(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    auto req = flatbuffers::GetRoot<StorageListRequest>(payload);
+    if (req->character_id() != static_cast<uint32_t>(connected_player_.id)) return;
+    SendStorageSync(0, PacketType_MP_STORAGE_LIST_ACK);
+}
+
+void MapServer::HandleStorageDeposit(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    auto req = flatbuffers::GetRoot<StorageDepositRequest>(payload);
+    uint8_t inv_slot = req->inv_slot();
+    uint16_t count = req->count() ? req->count() : 1;
+    PlayerInvSlot* from = nullptr;
+    for (auto& s : player_inventory_) {
+        if (s.slot == inv_slot) { from = &s; break; }
+    }
+    if (!from || from->count < count) {
+        SendStorageSync(1, PacketType_MP_STORAGE_DEPOSIT_ACK);
+        return;
+    }
+    bool merged = false;
+    for (auto& s : player_storage_) {
+        if (s.item_id == from->item_id) {
+            s.count = static_cast<uint16_t>(s.count + count);
+            merged = true;
+            break;
+        }
+    }
+    if (!merged) {
+        uint8_t slot = req->storage_slot();
+        if (slot == 0) {
+            for (uint8_t i = 0; i < 40; ++i) {
+                bool used = false;
+                for (const auto& s : player_storage_) {
+                    if (s.slot == i) { used = true; break; }
+                }
+                if (!used) { slot = i; break; }
+            }
+        }
+        player_storage_.push_back({slot, from->item_id, count});
+    }
+    from->count = static_cast<uint16_t>(from->count - count);
+    if (from->count == 0) from->item_id = 0;
+    SendInventorySync();
+    SendStorageSync(0, PacketType_MP_STORAGE_DEPOSIT_ACK);
+}
+
+void MapServer::HandleStorageWithdraw(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    auto req = flatbuffers::GetRoot<StorageWithdrawRequest>(payload);
+    uint8_t storage_slot = req->storage_slot();
+    uint16_t count = req->count() ? req->count() : 1;
+    PlayerInvSlot* from = nullptr;
+    for (auto& s : player_storage_) {
+        if (s.slot == storage_slot) { from = &s; break; }
+    }
+    if (!from || from->count < count) {
+        SendStorageSync(1, PacketType_MP_STORAGE_WITHDRAW_ACK);
+        return;
+    }
+    bool merged = false;
+    for (auto& s : player_inventory_) {
+        if (s.item_id == from->item_id) {
+            s.count = static_cast<uint16_t>(s.count + count);
+            merged = true;
+            break;
+        }
+    }
+    if (!merged) {
+        uint8_t inv_slot = req->inv_slot();
+        if (inv_slot == 0) {
+            for (uint8_t i = 0; i < 40; ++i) {
+                bool used = false;
+                for (const auto& s : player_inventory_) {
+                    if (s.slot == i) { used = true; break; }
+                }
+                if (!used) { inv_slot = i; break; }
+            }
+        }
+        player_inventory_.push_back({inv_slot, from->item_id, count});
+    }
+    from->count = static_cast<uint16_t>(from->count - count);
+    if (from->count == 0) {
+        player_storage_.erase(
+            std::remove_if(player_storage_.begin(), player_storage_.end(),
+                [&](const PlayerInvSlot& s) { return s.slot == storage_slot; }),
+            player_storage_.end());
+    }
+    SendInventorySync();
+    SendStorageSync(0, PacketType_MP_STORAGE_WITHDRAW_ACK);
+}
+
+void MapServer::HandleWhisper(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    auto req = flatbuffers::GetRoot<ChatMessage>(payload);
+    std::string target = req->sender_name() ? req->sender_name()->str() : "";
+    std::string text = req->message() ? req->message()->str() : "";
+    std::string reply = "To [" + target + "]: " + text;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto msg = CreateChatMessageDirect(fbb,
+        static_cast<uint32_t>(connected_player_.id),
+        connected_player_.name.c_str(),
+        reply.c_str(),
+        ChatChannel_Whisper,
+        0);
+    fbb.Finish(msg);
+    network_->SendPacket(PacketType_MP_CHAT_WHISPER_ACK, fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void MapServer::HandlePartyChat(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_ || !has_party_) return;
+    auto req = flatbuffers::GetRoot<ChatMessage>(payload);
+    flatbuffers::FlatBufferBuilder fbb;
+    auto msg = CreateChatMessageDirect(fbb,
+        static_cast<uint32_t>(connected_player_.id),
+        connected_player_.name.c_str(),
+        req->message() ? req->message()->c_str() : "",
+        ChatChannel_Party,
+        0);
+    fbb.Finish(msg);
+    network_->SendPacket(PacketType_MP_CHAT_PARTY_ACK, fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void MapServer::SendFriendList(uint8_t result, uint16_t ack_type) {
+    using namespace luna::protocol;
+    flatbuffers::FlatBufferBuilder fbb;
+    std::vector<flatbuffers::Offset<FriendEntry>> entries;
+    for (const auto& f : friends_) {
+        entries.push_back(CreateFriendEntryDirect(fbb, f.character_id, f.name.c_str(),
+            f.level, f.online, f.map_id));
+    }
+    auto list = CreateFriendList(fbb, fbb.CreateVector(entries));
+    auto resp = CreateFriendResponse(fbb, result, list);
+    fbb.Finish(resp);
+    network_->SendPacket(ack_type, fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void MapServer::HandleFriendList(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    auto req = flatbuffers::GetRoot<FriendListRequest>(payload);
+    if (req->character_id() != static_cast<uint32_t>(connected_player_.id)) return;
+    SendFriendList(0, PacketType_MP_FRIEND_LIST_ACK);
+}
+
+void MapServer::HandleFriendAdd(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    auto req = flatbuffers::GetRoot<FriendAddRequest>(payload);
+    std::string target = req->target_name() ? req->target_name()->str() : "";
+    if (target.empty() || friends_.size() >= 50) {
+        SendFriendList(1, PacketType_MP_FRIEND_ADD_NACK);
+        return;
+    }
+    for (const auto& f : friends_) {
+        if (f.name == target) {
+            SendFriendList(2, PacketType_MP_FRIEND_ADD_NACK);
+            return;
+        }
+    }
+    FriendState entry;
+    entry.character_id = next_friend_id_++;
+    entry.name = target;
+    entry.level = 10;
+    entry.online = true;
+    entry.map_id = static_cast<uint16_t>(map_id_);
+    friends_.push_back(entry);
+    SendFriendList(0, PacketType_MP_FRIEND_ADD_ACK);
+    spdlog::info("MapServer: {} added friend {}", connected_player_.name, target);
+}
+
+void MapServer::HandleFriendDelete(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    auto req = flatbuffers::GetRoot<FriendDeleteRequest>(payload);
+    uint32_t fid = req->friend_id();
+    friends_.erase(
+        std::remove_if(friends_.begin(), friends_.end(),
+            [fid](const FriendState& f) { return f.character_id == fid; }),
+        friends_.end());
+    SendFriendList(0, PacketType_MP_FRIEND_DEL_ACK);
+}
+
+void MapServer::SendGuildInfo(uint8_t result, uint16_t ack_type) {
+    using namespace luna::protocol;
+    flatbuffers::FlatBufferBuilder fbb;
+    std::vector<flatbuffers::Offset<GuildMemberInfo>> members;
+    if (has_guild_) {
+        for (const auto& m : guild_.members) {
+            members.push_back(CreateGuildMemberInfoDirect(fbb, m.character_id,
+                m.name.c_str(), m.level, m.rank, m.online));
+        }
+    }
+    auto guild = CreateGuildInfo(fbb,
+        has_guild_ ? guild_.guild_id : 0,
+        has_guild_ ? fbb.CreateString(guild_.name) : 0,
+        has_guild_ ? guild_.level : 0,
+        has_guild_ ? guild_.gp : 0,
+        has_guild_ ? guild_.master_id : 0,
+        fbb.CreateVector(members));
+    auto resp = CreateGuildResponse(fbb, result, guild);
+    fbb.Finish(resp);
+    network_->SendPacket(ack_type, fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void MapServer::HandleGuildCreate(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    auto req = flatbuffers::GetRoot<GuildCreateRequest>(payload);
+    if (req->character_id() != static_cast<uint32_t>(connected_player_.id)) return;
+    std::string gname = req->guild_name() ? req->guild_name()->str() : "";
+    if (gname.empty() || has_guild_) {
+        SendGuildInfo(1, PacketType_MP_GUILD_CREATE_NACK);
+        return;
+    }
+    has_guild_ = true;
+    guild_.guild_id = next_guild_id_++;
+    guild_.name = gname;
+    guild_.level = 1;
+    guild_.gp = 0;
+    guild_.master_id = static_cast<uint32_t>(connected_player_.id);
+    guild_.members.clear();
+    GuildMemberState master;
+    master.character_id = guild_.master_id;
+    master.name = connected_player_.name;
+    master.level = static_cast<uint16_t>(std::max(1, connected_player_.level));
+    master.rank = 2;
+    master.online = true;
+    guild_.members.push_back(master);
+    SendGuildInfo(0, PacketType_MP_GUILD_CREATE_ACK);
+    SendGuildInfo(0, PacketType_MP_GUILD_INFO);
+    spdlog::info("MapServer: guild '{}' created by {}", gname, connected_player_.name);
+}
+
+void MapServer::HandleGuildInfo(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    auto req = flatbuffers::GetRoot<GuildInfoRequest>(payload);
+    if (req->character_id() != static_cast<uint32_t>(connected_player_.id)) return;
+    SendGuildInfo(0, PacketType_MP_GUILD_INFO);
+}
+
+void MapServer::HandleGuildInvite(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_ || !has_guild_) {
+        SendGuildInfo(1, PacketType_MP_GUILD_ADDMEMBER_NACK);
+        return;
+    }
+    if (guild_.master_id != static_cast<uint32_t>(connected_player_.id)) {
+        SendGuildInfo(2, PacketType_MP_GUILD_ADDMEMBER_NACK);
+        return;
+    }
+    auto req = flatbuffers::GetRoot<GuildInviteRequest>(payload);
+    std::string target = req->target_name() ? req->target_name()->str() : "";
+    if (target.empty() || guild_.members.size() >= 30) {
+        SendGuildInfo(3, PacketType_MP_GUILD_ADDMEMBER_NACK);
+        return;
+    }
+    for (const auto& m : guild_.members) {
+        if (m.name == target) {
+            SendGuildInfo(4, PacketType_MP_GUILD_ADDMEMBER_NACK);
+            return;
+        }
+    }
+    GuildMemberState member;
+    member.character_id = 9500 + static_cast<uint32_t>(guild_.members.size());
+    member.name = target;
+    member.level = 10;
+    member.rank = 0;
+    member.online = true;
+    guild_.members.push_back(member);
+    SendGuildInfo(0, PacketType_MP_GUILD_ADDMEMBER_ACK);
+    SendGuildInfo(0, PacketType_MP_GUILD_INFO);
+    spdlog::info("MapServer: {} invited to guild {}", target, guild_.name);
+}
+
+void MapServer::HandleGuildLeave(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_ || !has_guild_) return;
+    auto req = flatbuffers::GetRoot<GuildLeaveRequest>(payload);
+    if (req->guild_id() != guild_.guild_id) return;
+
+    if (guild_.master_id == static_cast<uint32_t>(connected_player_.id)) {
+        has_guild_ = false;
+        guild_.members.clear();
+        guild_.guild_id = 0;
+        guild_.name.clear();
+        guild_.master_id = 0;
+    } else {
+        guild_.members.erase(
+            std::remove_if(guild_.members.begin(), guild_.members.end(),
+                [&](const GuildMemberState& m) {
+                    return m.character_id == static_cast<uint32_t>(connected_player_.id);
+                }),
+            guild_.members.end());
+    }
+    SendGuildInfo(0, PacketType_MP_GUILD_SECEDE_ACK);
+    spdlog::info("MapServer: player {} left guild", connected_player_.id);
+}
+
+MapServer::PlayerInvSlot* MapServer::FindInvSlot(uint8_t slot) {
+    for (auto& s : player_inventory_) {
+        if (s.slot == slot) return &s;
+    }
+    return nullptr;
+}
+
+const MapServer::PlayerInvSlot* MapServer::FindInvSlot(uint8_t slot) const {
+    for (const auto& s : player_inventory_) {
+        if (s.slot == slot) return &s;
+    }
+    return nullptr;
+}
+
+void MapServer::SendTradeState(uint8_t result, uint16_t ack_type, bool completed) {
+    using namespace luna::protocol;
+    flatbuffers::FlatBufferBuilder fbb;
+    if (!trade_.active) {
+        auto resp = CreateTradeResponse(fbb, result, 0);
+        fbb.Finish(resp);
+        network_->SendPacket(ack_type, fbb.GetBufferPointer(), fbb.GetSize());
+        return;
+    }
+    std::vector<flatbuffers::Offset<TradeItemOffer>> my_items;
+    std::vector<flatbuffers::Offset<TradeItemOffer>> their_items;
+    if (trade_.active) {
+        for (const auto& it : trade_.player_items) {
+            my_items.push_back(CreateTradeItemOffer(fbb, it.trade_slot, it.item_id, it.count, it.inv_slot));
+        }
+        for (const auto& it : trade_.partner_items) {
+            their_items.push_back(CreateTradeItemOffer(fbb, it.trade_slot, it.item_id, it.count, 255));
+        }
+    }
+    auto self = CreateTradeSide(fbb,
+        static_cast<uint32_t>(connected_player_.id),
+        fbb.CreateString(connected_player_.name),
+        trade_.player_gold,
+        fbb.CreateVector(my_items),
+        trade_.player_confirmed);
+    auto partner = CreateTradeSide(fbb,
+        trade_.partner_id,
+        fbb.CreateString(trade_.partner_name),
+        trade_.partner_gold,
+        fbb.CreateVector(their_items),
+        trade_.partner_confirmed);
+    auto session = CreateTradeSessionInfo(fbb,
+        trade_.session_id, self, partner, completed);
+    auto resp = CreateTradeResponse(fbb, result, session);
+    fbb.Finish(resp);
+    network_->SendPacket(ack_type, fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void MapServer::HandleTradeApply(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    if (trade_.active) {
+        SendTradeState(2, PacketType_MP_EXCHANGE_APPLY_NACK);
+        return;
+    }
+    auto req = flatbuffers::GetRoot<TradeApplyRequest>(payload);
+    std::string target = req->target_name() ? req->target_name()->str() : "NPC_Trader";
+    trade_ = {};
+    trade_.active = true;
+    trade_.session_id = next_trade_id_++;
+    trade_.partner_id = 9100;
+    trade_.partner_name = target.empty() ? "NPC_Trader" : target;
+    trade_.partner_items = {
+        {0, 255, 201, 5},
+        {1, 255, 202, 3},
+    };
+    trade_.partner_gold = 500;
+    SendTradeState(0, PacketType_MP_EXCHANGE_APPLY_ACK);
+    SendTradeState(0, PacketType_MP_EXCHANGE_START);
+    spdlog::info("MapServer: trade {} started with {}", trade_.session_id, trade_.partner_name);
+}
+
+void MapServer::HandleTradeCancel(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    auto req = flatbuffers::GetRoot<TradeSessionRequest>(payload);
+    if (!trade_.active || req->session_id() != trade_.session_id) return;
+    trade_ = {};
+    SendTradeState(0, PacketType_MP_EXCHANGE_CANCEL_ACK);
+    spdlog::info("MapServer: trade cancelled");
+}
+
+void MapServer::HandleTradeAddItem(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_ || !trade_.active) {
+        SendTradeState(1, PacketType_MP_EXCHANGE_ADDITEM_ACK);
+        return;
+    }
+    auto req = flatbuffers::GetRoot<TradeAddItemRequest>(payload);
+    if (req->session_id() != trade_.session_id) return;
+    uint8_t inv_slot = req->inv_slot();
+    uint16_t count = req->count() ? req->count() : 1;
+    const PlayerInvSlot* inv = FindInvSlot(inv_slot);
+    if (!inv || inv->item_id == 0 || inv->count < count || trade_.player_items.size() >= 12) {
+        SendTradeState(2, PacketType_MP_EXCHANGE_ADDITEM_ACK);
+        return;
+    }
+    trade_.player_confirmed = false;
+    trade_.partner_confirmed = false;
+    for (auto& offer : trade_.player_items) {
+        if (offer.inv_slot == inv_slot) {
+            offer.count = static_cast<uint16_t>(offer.count + count);
+            SendTradeState(0, PacketType_MP_EXCHANGE_STATE_UPDATE);
+            return;
+        }
+    }
+    uint8_t trade_slot = req->trade_slot();
+    if (trade_slot == 0) trade_slot = static_cast<uint8_t>(trade_.player_items.size());
+    trade_.player_items.push_back({trade_slot, inv_slot, inv->item_id, count});
+    SendTradeState(0, PacketType_MP_EXCHANGE_ADDITEM_ACK);
+    SendTradeState(0, PacketType_MP_EXCHANGE_STATE_UPDATE);
+}
+
+void MapServer::HandleTradeSetGold(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_ || !trade_.active) {
+        SendTradeState(1, PacketType_MP_EXCHANGE_SETGOLD_ACK);
+        return;
+    }
+    auto req = flatbuffers::GetRoot<TradeSetGoldRequest>(payload);
+    if (req->session_id() != trade_.session_id) return;
+    uint32_t gold = req->gold();
+    if (gold > player_gold_) {
+        SendTradeState(2, PacketType_MP_EXCHANGE_SETGOLD_ACK);
+        return;
+    }
+    trade_.player_gold = gold;
+    trade_.player_confirmed = false;
+    trade_.partner_confirmed = false;
+    SendTradeState(0, PacketType_MP_EXCHANGE_SETGOLD_ACK);
+    SendTradeState(0, PacketType_MP_EXCHANGE_STATE_UPDATE);
+}
+
+void MapServer::ExecuteTrade() {
+    using namespace luna::protocol;
+    for (const auto& offer : trade_.player_items) {
+        PlayerInvSlot* inv = FindInvSlot(offer.inv_slot);
+        if (!inv || inv->item_id != offer.item_id || inv->count < offer.count) {
+            trade_ = {};
+            SendTradeState(3, PacketType_MP_EXCHANGE_APPLY_NACK);
+            return;
+        }
+    }
+    if (trade_.player_gold > player_gold_) {
+        trade_ = {};
+        SendTradeState(4, PacketType_MP_EXCHANGE_APPLY_NACK);
+        return;
+    }
+
+    for (const auto& offer : trade_.player_items) {
+        PlayerInvSlot* inv = FindInvSlot(offer.inv_slot);
+        if (!inv) continue;
+        inv->count = static_cast<uint16_t>(inv->count - offer.count);
+        if (inv->count == 0) inv->item_id = 0;
+    }
+    player_gold_ -= trade_.player_gold;
+
+    for (const auto& offer : trade_.partner_items) {
+        bool merged = false;
+        for (auto& inv : player_inventory_) {
+            if (inv.item_id == offer.item_id) {
+                inv.count = static_cast<uint16_t>(inv.count + offer.count);
+                merged = true;
+                break;
+            }
+        }
+        if (!merged) {
+            uint8_t slot = 0;
+            for (uint8_t i = 0; i < 40; ++i) {
+                bool used = false;
+                for (const auto& s : player_inventory_) {
+                    if (s.slot == i) { used = true; break; }
+                }
+                if (!used) { slot = i; break; }
+            }
+            player_inventory_.push_back({slot, offer.item_id, offer.count});
+        }
+    }
+    player_gold_ += trade_.partner_gold;
+
+    SendInventorySync();
+    SendCharLifeUpdate();
+    SendTradeState(0, PacketType_MP_EXCHANGE_COMPLETE, true);
+    spdlog::info("MapServer: trade {} completed", trade_.session_id);
+    trade_ = {};
+}
+
+void MapServer::HandleTradeConfirm(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_ || !trade_.active) {
+        SendTradeState(1, PacketType_MP_EXCHANGE_CONFIRM_ACK);
+        return;
+    }
+    auto req = flatbuffers::GetRoot<TradeSessionRequest>(payload);
+    if (req->session_id() != trade_.session_id) return;
+    trade_.player_confirmed = true;
+    trade_.partner_confirmed = true;
+    SendTradeState(0, PacketType_MP_EXCHANGE_CONFIRM_ACK);
+    SendTradeState(0, PacketType_MP_EXCHANGE_STATE_UPDATE);
+    ExecuteTrade();
+}
+
+void MapServer::SeedMarketData() {
+    if (!consignment_listings_.empty()) return;
+    auto add = [&](uint32_t seller, uint32_t item, uint16_t cnt, uint32_t bid, uint32_t buyout) {
+        ConsignmentListingState l;
+        l.id = next_consignment_id_++;
+        l.seller_id = seller;
+        l.seller_name = "NPC_" + std::to_string(seller);
+        l.item_id = item;
+        l.count = cnt;
+        l.bid_price = bid;
+        l.buyout_price = buyout;
+        consignment_listings_.push_back(l);
+    };
+    add(2, 101, 1, 200, 500);
+    add(2, 102, 5, 50, 120);
+    add(3, 201, 1, 1000, 2500);
+    add(4, 301, 1, 5000, 12000);
+
+    StreetStallState npc;
+    npc.owner_id = 9200;
+    npc.owner_name = "NPC_Merchant";
+    npc.title = "Discount Goods";
+    npc.open = true;
+    npc.items = {{0, 21000001, 10, 25}, {1, 1001, 1, 150}};
+    street_stalls_[npc.owner_id] = npc;
+}
+
+void MapServer::SendConsignmentList(uint8_t result, uint16_t ack_type,
+    const std::string& query, bool mine_only, bool bids_only) {
+    using namespace luna::protocol;
+    flatbuffers::FlatBufferBuilder fbb;
+    std::vector<flatbuffers::Offset<ConsignmentListing>> entries;
+    uint32_t player_id = static_cast<uint32_t>(connected_player_.id);
+    for (const auto& l : consignment_listings_) {
+        if (mine_only && l.seller_id != player_id) continue;
+        if (bids_only && l.bidder_id != player_id) continue;
+        if (!mine_only && !bids_only && (!l.active || l.sold)) continue;
+        std::string iname = "Item_" + std::to_string(l.item_id);
+        if (!query.empty() && iname.find(query) == std::string::npos &&
+            l.seller_name.find(query) == std::string::npos)
+            continue;
+        entries.push_back(CreateConsignmentListingDirect(fbb, l.id, l.seller_id,
+            l.seller_name.c_str(), l.item_id, iname.c_str(), l.count, l.enchant,
+            l.bid_price, l.buyout_price, l.current_bid, l.bidder_id,
+            l.bidder_name.c_str(), l.time_remaining, l.sold, l.active));
+    }
+    auto list = CreateConsignmentList(fbb, fbb.CreateVector(entries));
+    auto resp = CreateConsignmentResponse(fbb, result, list);
+    fbb.Finish(resp);
+    network_->SendPacket(ack_type, fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void MapServer::HandleConsignmentList(const uint8_t* payload, size_t len, uint16_t ack_type) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    auto req = flatbuffers::GetRoot<ConsignmentListRequest>(payload);
+    std::string query = req->query() ? req->query()->str() : "";
+    SendConsignmentList(0, ack_type, query, req->my_listings_only(), req->my_bids_only());
+}
+
+void MapServer::HandleConsignmentRegister(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    auto req = flatbuffers::GetRoot<ConsignmentRegisterRequest>(payload);
+    PlayerInvSlot* inv = FindInvSlot(req->inv_slot());
+    uint16_t count = req->item_count() ? req->item_count() : 1;
+    uint32_t fee = req->bid_price() * 5 / 100;
+    if (!inv || inv->item_id == 0 || inv->count < count || player_gold_ < fee) {
+        SendConsignmentList(1, PacketType_MP_CONSIGNMENT_REGIST_NACK, "", false, false);
+        return;
+    }
+    ConsignmentListingState l;
+    l.id = next_consignment_id_++;
+    l.seller_id = static_cast<uint32_t>(connected_player_.id);
+    l.seller_name = connected_player_.name;
+    l.item_id = inv->item_id;
+    l.count = count;
+    l.bid_price = req->bid_price();
+    l.buyout_price = req->buyout_price() ? req->buyout_price() : req->bid_price() * 2;
+    consignment_listings_.push_back(l);
+    inv->count = static_cast<uint16_t>(inv->count - count);
+    if (inv->count == 0) inv->item_id = 0;
+    player_gold_ -= fee;
+    SendInventorySync();
+    SendCharLifeUpdate();
+    SendConsignmentList(0, PacketType_MP_CONSIGNMENT_REGIST_ACK, "", false, false);
+}
+
+void MapServer::HandleConsignmentTrade(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    auto req = flatbuffers::GetRoot<ConsignmentTradeRequest>(payload);
+    for (auto& l : consignment_listings_) {
+        if (l.id != req->listing_id() || !l.active || l.sold) continue;
+        uint32_t buyer = static_cast<uint32_t>(connected_player_.id);
+        if (req->buyout()) {
+            if (l.buyout_price == 0 || player_gold_ < l.buyout_price) {
+                SendConsignmentList(2, PacketType_MP_CONSIGNMENT_UPDATE_NACK, "", false, false);
+                return;
+            }
+            player_gold_ -= l.buyout_price;
+            l.current_bid = l.buyout_price;
+            l.bidder_id = buyer;
+            l.bidder_name = connected_player_.name;
+            l.sold = true;
+            l.active = false;
+        } else {
+            uint32_t min_bid = l.current_bid > 0 ? l.current_bid + 1 : l.bid_price;
+            uint32_t amount = req->amount() ? req->amount() : min_bid;
+            if (amount < min_bid || player_gold_ < amount) {
+                SendConsignmentList(3, PacketType_MP_CONSIGNMENT_UPDATE_NACK, "", false, false);
+                return;
+            }
+            player_gold_ -= amount;
+            l.current_bid = amount;
+            l.bidder_id = buyer;
+            l.bidder_name = connected_player_.name;
+        }
+        bool merged = false;
+        for (auto& slot : player_inventory_) {
+            if (slot.item_id == l.item_id) {
+                slot.count = static_cast<uint16_t>(slot.count + l.count);
+                merged = true;
+                break;
+            }
+        }
+        if (!merged) {
+            uint8_t slot_idx = 0;
+            for (uint8_t i = 0; i < 40; ++i) {
+                bool used = false;
+                for (const auto& s : player_inventory_) {
+                    if (s.slot == i) { used = true; break; }
+                }
+                if (!used) { slot_idx = i; break; }
+            }
+            player_inventory_.push_back({slot_idx, l.item_id, l.count});
+        }
+        if (l.seller_id == static_cast<uint32_t>(connected_player_.id))
+            player_gold_ += l.current_bid;
+        SendInventorySync();
+        SendCharLifeUpdate();
+        SendConsignmentList(0, PacketType_MP_CONSIGNMENT_UPDATE_ACK, "", false, false);
+        return;
+    }
+    SendConsignmentList(4, PacketType_MP_CONSIGNMENT_UPDATE_NACK, "", false, false);
+}
+
+void MapServer::HandleConsignmentCancel(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    auto req = flatbuffers::GetRoot<ConsignmentCancelRequest>(payload);
+    for (auto& l : consignment_listings_) {
+        if (l.id != req->listing_id()) continue;
+        if (l.seller_id != static_cast<uint32_t>(connected_player_.id)) {
+            SendConsignmentList(1, PacketType_MP_CONSIGNMENT_CANCEL_ACK, "", true, false);
+            return;
+        }
+        if (!l.sold && l.active) {
+            player_inventory_.push_back({0, l.item_id, l.count});
+            l.active = false;
+            SendInventorySync();
+        }
+        SendConsignmentList(0, PacketType_MP_CONSIGNMENT_CANCEL_ACK, "", true, false);
+        return;
+    }
+    SendConsignmentList(2, PacketType_MP_CONSIGNMENT_CANCEL_ACK, "", true, false);
+}
+
+void MapServer::ReturnStallItems(uint32_t owner_id) {
+    auto it = street_stalls_.find(owner_id);
+    if (it == street_stalls_.end()) return;
+    if (owner_id != static_cast<uint32_t>(connected_player_.id)) return;
+    for (const auto& item : it->second.items) {
+        bool merged = false;
+        for (auto& inv : player_inventory_) {
+            if (inv.item_id == item.item_id) {
+                inv.count = static_cast<uint16_t>(inv.count + item.count);
+                merged = true;
+                break;
+            }
+        }
+        if (!merged)
+            player_inventory_.push_back({item.slot, item.item_id, item.count});
+    }
+    it->second.items.clear();
+    it->second.open = false;
+}
+
+void MapServer::SendStreetStallState(uint8_t result, uint16_t ack_type) {
+    using namespace luna::protocol;
+    flatbuffers::FlatBufferBuilder fbb;
+    uint32_t pid = static_cast<uint32_t>(connected_player_.id);
+    auto build_stall = [&](const StreetStallState& s) {
+        std::vector<flatbuffers::Offset<StreetStallItem>> items;
+        for (const auto& it : s.items) {
+            std::string name = "Item_" + std::to_string(it.item_id);
+            items.push_back(CreateStreetStallItemDirect(fbb, it.slot, it.item_id,
+                name.c_str(), it.count, it.price));
+        }
+        return CreateStreetStallInfo(fbb, s.owner_id, fbb.CreateString(s.owner_name),
+            fbb.CreateString(s.title), s.open, fbb.CreateVector(items));
+    };
+    StreetStallState empty;
+    auto my = street_stalls_.count(pid) ? build_stall(street_stalls_[pid]) : build_stall(empty);
+    std::vector<flatbuffers::Offset<StreetStallInfo>> nearby;
+    for (const auto& [id, stall] : street_stalls_) {
+        (void)id;
+        if (!stall.open) continue;
+        if (stall.owner_id == pid) continue;
+        nearby.push_back(build_stall(stall));
+    }
+    auto resp = CreateStreetStallResponse(fbb, result, my, fbb.CreateVector(nearby));
+    fbb.Finish(resp);
+    network_->SendPacket(ack_type, fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void MapServer::HandleStreetStallOpen(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    auto req = flatbuffers::GetRoot<StreetStallOpenRequest>(payload);
+    uint32_t pid = static_cast<uint32_t>(connected_player_.id);
+    ReturnStallItems(pid);
+    auto& stall = street_stalls_[pid];
+    stall.owner_id = pid;
+    stall.owner_name = connected_player_.name;
+    stall.title = req->title() ? req->title()->str() : "My Stall";
+    stall.open = true;
+    stall.items.clear();
+    SendStreetStallState(0, PacketType_MP_STREETSTALL_OPEN_ACK);
+}
+
+void MapServer::HandleStreetStallAddItem(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    auto req = flatbuffers::GetRoot<StreetStallAddItemRequest>(payload);
+    uint32_t pid = static_cast<uint32_t>(connected_player_.id);
+    auto& stall = street_stalls_[pid];
+    if (!stall.open) {
+        SendStreetStallState(1, PacketType_MP_STREETSTALL_ADDITEM_ACK);
+        return;
+    }
+    PlayerInvSlot* inv = FindInvSlot(req->inv_slot());
+    uint16_t count = req->count() ? req->count() : 1;
+    if (!inv || inv->item_id == 0 || inv->count < count) {
+        SendStreetStallState(2, PacketType_MP_STREETSTALL_ADDITEM_ACK);
+        return;
+    }
+    uint8_t slot = req->stall_slot();
+    if (slot == 0) slot = static_cast<uint8_t>(stall.items.size());
+    stall.items.push_back({slot, inv->item_id, count, req->price()});
+    inv->count = static_cast<uint16_t>(inv->count - count);
+    if (inv->count == 0) inv->item_id = 0;
+    SendInventorySync();
+    SendStreetStallState(0, PacketType_MP_STREETSTALL_ADDITEM_ACK);
+}
+
+void MapServer::HandleStreetStallBuy(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    auto req = flatbuffers::GetRoot<StreetStallBuyRequest>(payload);
+    auto it = street_stalls_.find(req->owner_id());
+    if (it == street_stalls_.end() || !it->second.open) {
+        SendStreetStallState(1, PacketType_MP_STREETSTALL_BUY_ACK);
+        return;
+    }
+    for (auto slot_it = it->second.items.begin(); slot_it != it->second.items.end(); ++slot_it) {
+        if (slot_it->slot != req->stall_slot()) continue;
+        uint16_t count = req->count() ? req->count() : slot_it->count;
+        uint32_t cost = slot_it->price * count;
+        if (player_gold_ < cost || slot_it->count < count) {
+            SendStreetStallState(2, PacketType_MP_STREETSTALL_BUY_ACK);
+            return;
+        }
+        player_gold_ -= cost;
+        player_inventory_.push_back({0, slot_it->item_id, count});
+        slot_it->count = static_cast<uint16_t>(slot_it->count - count);
+        if (slot_it->count == 0)
+            it->second.items.erase(slot_it);
+        SendInventorySync();
+        SendCharLifeUpdate();
+        SendStreetStallState(0, PacketType_MP_STREETSTALL_BUY_ACK);
+        return;
+    }
+    SendStreetStallState(3, PacketType_MP_STREETSTALL_BUY_ACK);
+}
+
+void MapServer::HandleStreetStallClose(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    (void)flatbuffers::GetRoot<StreetStallCloseRequest>(payload);
+    ReturnStallItems(static_cast<uint32_t>(connected_player_.id));
+    SendInventorySync();
+    SendStreetStallState(0, PacketType_MP_STREETSTALL_CLOSE_ACK);
+}
+
+void MapServer::HandleStreetStallList(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    (void)flatbuffers::GetRoot<StreetStallListRequest>(payload);
+    if (!player_joined_) return;
+    SendStreetStallState(0, PacketType_MP_STREETSTALL_LIST_ACK);
+}
+
+void MapServer::HandleGuildChat(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_ || !has_guild_) return;
+    auto req = flatbuffers::GetRoot<ChatMessage>(payload);
+    flatbuffers::FlatBufferBuilder fbb;
+    auto msg = CreateChatMessageDirect(fbb,
+        static_cast<uint32_t>(connected_player_.id),
+        connected_player_.name.c_str(),
+        req->message() ? req->message()->c_str() : "",
+        ChatChannel_Guild,
+        0);
+    fbb.Finish(msg);
+    network_->SendPacket(PacketType_MP_CHAT_GUILD_ACK, fbb.GetBufferPointer(), fbb.GetSize());
 }
 
 void MapServer::HandleChat(const uint8_t* payload, size_t len) {

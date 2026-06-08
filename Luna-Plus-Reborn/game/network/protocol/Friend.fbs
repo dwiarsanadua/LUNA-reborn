@@ -1,0 +1,35 @@
+include "Types.fbs";
+include "PacketType.fbs";
+
+namespace luna.protocol;
+
+table FriendEntry {
+    character_id: uint32;
+    name: string;
+    level: uint16;
+    online: bool;
+    map_id: uint16;
+}
+
+table FriendList {
+    friends: [FriendEntry];
+}
+
+table FriendListRequest {
+    character_id: uint32;
+}
+
+table FriendAddRequest {
+    character_id: uint32;
+    target_name: string;
+}
+
+table FriendDeleteRequest {
+    character_id: uint32;
+    friend_id: uint32;
+}
+
+table FriendResponse {
+    result: byte;
+    list: FriendList;
+}

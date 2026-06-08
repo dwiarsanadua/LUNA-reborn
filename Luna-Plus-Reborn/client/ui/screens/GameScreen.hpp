@@ -2,7 +2,17 @@
 #include <glm/glm.hpp>
 #include <unordered_map>
 
-namespace luna::protocol { struct AttackResult; struct ChangeMapResponse; }
+namespace luna::protocol {
+struct AttackResult;
+struct ChangeMapResponse;
+struct PartyResponse;
+struct StorageResponse;
+struct FriendResponse;
+struct GuildResponse;
+struct TradeResponse;
+struct ConsignmentResponse;
+struct StreetStallResponse;
+}
 
 struct EntityInterp {
     glm::vec3 from{0.0f};
@@ -105,6 +115,45 @@ private:
     void ChangeMap(uint32_t map_id);
     void OnChangeMapAck(const luna::protocol::ChangeMapResponse* resp);
     void ClearNetworkEntities();
+    void ApplyPartyResponse(const luna::protocol::PartyResponse* resp);
+    void ApplyStorageResponse(const luna::protocol::StorageResponse* resp);
+    void SendPartyCreate();
+    void SendPartyInvite(const std::string& name);
+    void SendPartyLeave();
+    void RequestStorageList();
+    void SendStorageDeposit(uint8_t inv_slot, uint16_t count);
+    void SendStorageWithdraw(uint8_t storage_slot, uint16_t count);
+    void ApplyFriendResponse(const luna::protocol::FriendResponse* resp);
+    void ApplyGuildResponse(const luna::protocol::GuildResponse* resp);
+    void RequestFriendList();
+    void SendFriendAdd(const std::string& name);
+    void SendFriendDelete(uint32_t friend_id);
+    void SendGuildCreate(const std::string& name);
+    void RequestGuildInfo();
+    void SendGuildInvite(const std::string& name);
+    void SendGuildLeave();
+    void ApplyTradeResponse(const luna::protocol::TradeResponse* resp);
+    void SendTradeApply(const std::string& target);
+    void SendTradeCancel();
+    void SendTradeAddItem(uint8_t inv_slot);
+    void SendTradeSetGold(uint32_t gold);
+    void SendTradeConfirm();
+    void SetupTradeNetworkCallbacks();
+    void ApplyConsignmentResponse(const luna::protocol::ConsignmentResponse* resp,
+        bool mine_only, bool bids_only);
+    void ApplyStreetStallResponse(const luna::protocol::StreetStallResponse* resp);
+    void SetupConsignmentNetworkCallbacks();
+    void RequestConsignmentSearch(const std::string& query);
+    void RequestConsignmentRefresh(bool mine, bool bids);
+    void SendConsignmentList(uint8_t inv_slot, uint16_t count, uint32_t bid, uint32_t buyout);
+    void SendConsignmentTrade(uint64_t listing_id, bool buyout, uint32_t amount);
+    void SendConsignmentCancel(uint64_t listing_id);
+    void SendStreetStallOpen(const std::string& title);
+    void SendStreetStallAdd(uint8_t inv_slot, uint32_t price);
+    void SendStreetStallBuy(uint32_t owner_id, uint8_t stall_slot);
+    void SendStreetStallClose();
+    void RequestStreetStallList();
+    uint32_t GetSelectedCharId() const;
     void CastHotbarSkill(int slot);
     void ApplySkillDamage(uint32_t skill_id);
     void ApplyNetworkAttackResult(const luna::protocol::AttackResult* result);
@@ -135,6 +184,8 @@ private:
     PKManagerDlg pk_dlg_;
     uint32_t pending_map_id_ = 0;
     bool changemap_pending_ = false;
+    bool pending_consignment_mine_ = false;
+    bool pending_consignment_bids_ = false;
     float move_send_timer_ = 0.0f;
     bool skill_damage_applied_ = false;
     std::unordered_map<uint32_t, EntityInterp> entity_interp_;

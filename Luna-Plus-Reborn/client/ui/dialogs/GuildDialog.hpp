@@ -11,7 +11,10 @@ public:
     Window* GetWindow() { return window_; }
     void Open(WindowManager* wm = nullptr, SiegeSystem* siege = nullptr);
     void Close() { window_ = nullptr; }
+    void UpdateFromState(GameState* state);
 private:
     Window* window_ = nullptr;
+    ListBox* member_list_ = nullptr;
+    ListBox* info_list_ = nullptr;
     void PopulateSiegeTab(ListBox* lb, SiegeSystem* siege);
 };

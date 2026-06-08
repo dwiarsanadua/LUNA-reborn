@@ -27,23 +27,23 @@ void StorageDialog::Open(GameState* state, WindowManager* wm) {
     // Info label
     gold_label_ = window_->AddWidget<Label>("Gold: 0", 10, 320, ColorPalette::TEXT_GOLD);
 
-    // Initialize empty storage
     items_.resize(40);
     for (int i = 0; i < 40; i++) items_[i] = {0, "", 0, i};
-
-    // Fill with some demo items if empty
-    if (state && state->gold > 0) {
-        items_[0] = {1001, "Health Potion", 10, 0};
-        items_[1] = {1002, "Mana Potion", 5, 1};
-        items_[2] = {1003, "Scroll of Recall", 2, 2};
-    }
+    if (state) UpdateFromState(state);
 }
 
 void StorageDialog::UpdateFromState(GameState* state) {
     if (!storage_grid_ || !state) return;
 
+    for (int i = 0; i < 40; i++) items_[i] = {0, "", 0, i};
+    for (const auto& s : state->storage_items) {
+        if (s.slot < 40) {
+            items_[s.slot] = {s.id, s.name.empty() ? ("Item_" + std::to_string(s.id)) : s.name, s.count, s.slot};
+        }
+    }
+
     storage_grid_->ClearAll();
-    for (int i = 0; i < (int)items_.size() && i < 40; i++) {
+    for (int i = 0; i < 40; i++) {
         auto& item = items_[i];
         if (item.id > 0) {
             GridSlot gs;
@@ -56,7 +56,8 @@ void StorageDialog::UpdateFromState(GameState* state) {
         }
     }
     if (gold_label_) {
-        char buf[64]; snprintf(buf, sizeof(buf), "Gold: %d", state->gold);
+        char buf[64];
+        snprintf(buf, sizeof(buf), "Storage Gold: %u", state->storage_gold);
         gold_label_->SetText(buf);
     }
 }
