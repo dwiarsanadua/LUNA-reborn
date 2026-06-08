@@ -15,13 +15,13 @@ bool EngineMap::Load(const std::string& map_id) {
     if (!terrain_ || !props_) { spdlog::error("EngineMap: terrain/props not set"); return false; }
     InitBGMMap();
     
-    std::string hgt_path = "assets_converted/maps/" + map_id + ".hgt";
+    std::string hgt_path = "assets/maps/" + map_id + ".hgt";
     if (!terrain_->LoadFromHGT(hgt_path.c_str(), 0.1f)) {
         terrain_->Init(100, 12.0f);
         spdlog::info("EngineMap: procedural terrain for map {}", map_id);
     }
     
-    std::string json_path = "assets_converted/maps/" + map_id + ".json";
+    std::string json_path = "assets/maps/" + map_id + ".json";
     LoadSceneObjects(json_path);
     
     // Parse environment data from JSON
@@ -71,7 +71,7 @@ bool EngineMap::Load(const std::string& map_id) {
             GameDataDB* db = gamedb_;
             GameDataDB local_db;
             if (!db) {
-                if (local_db.Open("data/game_data.db")) {
+                if (local_db.Open("assets/data/game_data.db")) {
                     local_db.LoadMonsterTemplates();
                     local_db.LoadNPCTemplates();
                     local_db.LoadMapData();

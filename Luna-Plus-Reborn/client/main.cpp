@@ -124,7 +124,7 @@ int main() {
     map.SetRegistry(&registry);
     // GameDataDB — init before map load so EngineMap uses external DB
     GameDataDB gamedb;
-    if (gamedb.Open("data/game_data.db")) {
+    if (gamedb.Open("assets/data/game_data.db")) {
         gamedb.LoadMonsterTemplates();
         gamedb.LoadNPCTemplates();
         gamedb.LoadMapData();

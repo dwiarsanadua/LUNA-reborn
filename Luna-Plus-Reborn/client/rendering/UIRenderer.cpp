@@ -321,7 +321,7 @@ TextureInfo UIRenderer::LoadTexture(const std::string& name, const std::string& 
         path,
         "assets/textures/ui/" + path,
         "assets/textures/" + path,
-        "assets_converted/mod_objs/" + path
+        "assets/textures/unpacked/map/" + path
     };
 
     for (auto& p : search) {

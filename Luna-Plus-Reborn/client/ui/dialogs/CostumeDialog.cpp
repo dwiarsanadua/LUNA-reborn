@@ -36,9 +36,9 @@ void CostumeDialog::Open(GameState* state, WindowManager* wm, CostumeSystem* cs)
     apply_btn->SetColors({40,60,100,220}, {80,100,160,220}, {30,40,70,220});
     apply_btn->OnEvent([this](const UIEvent& e) {
         if (e.type == UIEvent::Click && costume_) {
-            costume_->EquipItem(EquipSlot::Weapon, 1001, "assets_converted/mod_objs/d_man.glb");
-            costume_->EquipItem(EquipSlot::Armor, 1002, "assets_converted/mod_objs/d_man.glb");
-            costume_->ApplyFashion(EquipSlot::FashionHead, "assets_converted/mod_objs/n030.glb");
+            costume_->EquipItem(EquipSlot::Weapon, 1001, "assets/models/d_man.glb");
+            costume_->EquipItem(EquipSlot::Armor, 1002, "assets/models/d_man.glb");
+            costume_->ApplyFashion(EquipSlot::FashionHead, "assets/models/n030.glb");
             Refresh();
         }
     });

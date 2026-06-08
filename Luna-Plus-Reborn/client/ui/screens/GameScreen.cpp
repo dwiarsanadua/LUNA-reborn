@@ -80,7 +80,7 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
             state_->mp = 100; state_->max_mp = 100 + ch.level * 5;
         }
         state_->connecting = true;
-        CharRenderer_Spawn(0, "assets_converted/mod_objs/d_man.glb",
+        CharRenderer_Spawn(0, "assets/models/d_man.glb",
                            state_->player_x, state_->player_y, state_->player_z, 0xffffffff);
         GameDataDB gdb;
         if (gdb.Open(GAME_DATA_PATH)) {
@@ -131,7 +131,7 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         std::string modelPath = spawn->model_id() ? spawn->model_id()->str() : "monster_placeholder.glb";
         // Logic to find real asset path
         if (modelPath.find("/") == std::string::npos) {
-            modelPath = "assets_converted/mod_objs/" + modelPath;
+            modelPath = "assets/models/" + modelPath;
         }
         
         uint32_t colors[] = {0xff44cc44, 0xffcc4444, 0xffcccc44, 0xff44cccc, 0xffcc44cc};
@@ -187,7 +187,7 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
         uint32_t id = state_->next_entity_id++;
         float x = (float)(rand() % 80) - 40, z = (float)(rand() % 80) - 40;
         state_->entities.push_back({id, "Boss Leostein", x, 0, z, 50, 5000});
-        CharRenderer_Spawn(id, "assets_converted/mod_objs/monster_placeholder.glb", x, 0, z, 0xffff4444);
+        CharRenderer_Spawn(id, "assets/models/monster_placeholder.glb", x, 0, z, 0xffff4444);
         state_->chat_messages.push_back("BOSS Leostein has appeared!");
     }
     else if (key == 73) {

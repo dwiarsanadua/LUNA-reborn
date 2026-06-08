@@ -45,7 +45,7 @@ Monster::Monster(uint32_t id, const std::string& name, float x, float z, int lev
     uint32_t colors[] = {0xff44cc44, 0xffcc4444, 0xffcccc44, 0xff44cccc, 0xffcc44cc};
     if (type_ == MonsterType::Normal) color_ = colors[id % 5];
     
-    CharRenderer_Spawn(id_, "assets_converted/mod_objs/monster_placeholder.glb", x_, 0, z_, color_);
+    CharRenderer_Spawn(id_, "assets/models/monster_placeholder.glb", x_, 0, z_, color_);
 }
 
 float Monster::GetDistance(float px, float pz) const {
@@ -273,5 +273,5 @@ void Monster::Respawn(float new_x, float new_z) {
     for (auto& p : phases_) p.enraged = false;
     current_phase_ = 0;
     is_enraged_ = false;
-    CharRenderer_Spawn(id_, "assets_converted/mod_objs/monster_placeholder.glb", x_, 0, z_, color_);
+    CharRenderer_Spawn(id_, "assets/models/monster_placeholder.glb", x_, 0, z_, color_);
 }

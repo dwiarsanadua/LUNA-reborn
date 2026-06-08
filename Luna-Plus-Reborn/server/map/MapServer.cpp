@@ -39,7 +39,7 @@ MapServer::~MapServer() { Shutdown(); }
 bool MapServer::Initialize(int map_id, uint16_t port) {
     map_id_ = map_id;
 
-    if (!db_->Initialize("data/luna_map.db")) {
+    if (!db_->Initialize("assets/data/luna_map.db")) {
         spdlog::error("MapServer: database init failed");
         return false;
     }
@@ -87,7 +87,7 @@ bool MapServer::Initialize(int map_id, uint16_t port) {
         spawn_sys_->SpawnMonstersForMap(*registry_, map_id);
 
         sqlite3* gamedb = nullptr;
-        if (sqlite3_open("data/game_data.db", &gamedb) == SQLITE_OK) {
+        if (sqlite3_open("assets/data/game_data.db", &gamedb) == SQLITE_OK) {
             // Query NPC positions for this map
             const char* npc_sql = "SELECT col_0000, col_0001, col_0002, col_0003, col_0004, col_0005 FROM game_npc WHERE col_0002=?";
             sqlite3_stmt* stmt = nullptr;
@@ -248,7 +248,7 @@ void MapServer::DespawnMonster(int entity_id) {
 
 void MapServer::SendNPCList(int player_entity_id) {
     sqlite3* gamedb = nullptr;
-    if (sqlite3_open("data/game_data.db", &gamedb) != SQLITE_OK) return;
+    if (sqlite3_open("assets/data/game_data.db", &gamedb) != SQLITE_OK) return;
     const char* npc_sql = "SELECT col_0000, col_0001, col_0003, col_0004, col_0005, col_0006 FROM game_npc WHERE col_0002=?";
     sqlite3_stmt* stmt = nullptr;
     if (sqlite3_prepare_v2(gamedb, npc_sql, -1, &stmt, nullptr) == SQLITE_OK) {
@@ -269,7 +269,7 @@ void MapServer::SendNPCList(int player_entity_id) {
 
 bool MapServer::CheckEncounterTrigger(float player_x, float player_z) {
     sqlite3* gamedb = nullptr;
-    if (sqlite3_open("data/game_data.db", &gamedb) != SQLITE_OK) return false;
+    if (sqlite3_open("assets/data/game_data.db", &gamedb) != SQLITE_OK) return false;
     const char* spawn_sql = "SELECT col_0000, col_0001, col_0002, col_0003, col_0004, col_0005 FROM game_monsterlist WHERE col_0002=?";
     sqlite3_stmt* stmt = nullptr;
     bool triggered = false;

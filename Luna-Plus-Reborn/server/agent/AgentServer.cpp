@@ -42,7 +42,7 @@ AgentServer::AgentServer()
 AgentServer::~AgentServer() { Shutdown(); }
 
 bool AgentServer::Initialize(uint16_t port) {
-    if (!db_->Initialize("data/luna_agent.db")) {
+    if (!db_->Initialize("assets/data/luna_agent.db")) {
         spdlog::error("AgentServer: database init failed");
         return false;
     }
