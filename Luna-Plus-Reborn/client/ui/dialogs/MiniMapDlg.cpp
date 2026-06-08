@@ -58,7 +58,7 @@ void MiniMapDlg::CreateRenderTarget() {
         BGFX_TEXTURE_RT | BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT);
 
     bgfx::TextureHandle fb_texs[] = { render_target_ };
-    fbo_ = bgfx::createFrameBuffer(BX_COUNTOF(fb_texs), fb_texs, true);
+    fbo_ = bgfx::createFrameBuffer(1, fb_texs, true);
     fb_ready_ = bgfx::isValid(fbo_);
 }
 

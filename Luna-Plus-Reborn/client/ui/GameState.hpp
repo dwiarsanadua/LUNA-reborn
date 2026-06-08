@@ -41,6 +41,7 @@ enum class ClientState {
     Title,
     CharSelect,
     CharMake,
+    Loading,
     GameIn,
     MapChange,
     Ending
@@ -53,7 +54,13 @@ struct GameState {
     bool login_sent = false;
     bool login_ok = false;
     bool connecting = false;
+    bool offline_mode = false;
+    bool enter_game_pending = false;
+    float enter_game_load_timer = 0.0f;
+    float battle_delay_timer = 0.0f;
     float player_x = 0, player_z = 0;
+    bool has_waypoint = false;
+    float waypoint_x = 0, waypoint_z = 0;
     float player_y = 0;
     int hp = 500, max_hp = 500;
     int mp = 100, max_mp = 100;
@@ -62,6 +69,9 @@ struct GameState {
     int gold = 0;
     int attack = 50, defense = 20;
     int class_id = 0; // 0=Warrior, 1=Mage, 2=Archer
+    int race = 0, gender = 0;
+    int hair_style = 0, face_style = 0;
+    uint32_t hair_color = 0xff442200, skin_color = 0xffe8c090, eye_color = 0xff4488cc;
     int stat_str = 10, stat_dex = 10, stat_int = 10, stat_con = 10;
     std::vector<int> learned_skills;
     int skill_points = 5;

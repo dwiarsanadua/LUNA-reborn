@@ -11,6 +11,7 @@ add_executable(LunaPlusClient
     network/NetworkClient.cpp
     audio/AudioManager.cpp
     ui/ScreenManager.cpp
+    ui/ClientFlow.cpp
     ui/Window.cpp
     ui/WindowManager.cpp
     ui/widgets/Button.cpp
@@ -89,6 +90,12 @@ add_executable(LunaPlusClient
     ui/dialogs/CostumeDialog.cpp
     ui/dialogs/CashShopDialog.cpp
     ui/dialogs/FishingDialog.cpp
+    ui/dialogs/CharMakeDlg.cpp
+    ui/dialogs/WorldMapDlg.cpp
+    ui/dialogs/MiniMapDlg.cpp
+    ui/dialogs/HelperDlg.cpp
+    ui/dialogs/FadeDlg.cpp
+    ui/dialogs/PKManagerDlg.cpp
     ui/dialogs/OptionsDialog.cpp
     ui/dialogs/StorageDialog.cpp
     engine/GraphicEngine.cpp

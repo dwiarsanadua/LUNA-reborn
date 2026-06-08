@@ -49,6 +49,9 @@ public:
     bool IsBoss() const { return type_ == MonsterType::Boss; }
     MonsterType GetType() const { return type_; }
     MonsterState GetState() const { return state_; }
+    bool JustAggroed() const { return just_aggroed_; }
+    void ClearAggroFlag() { just_aggroed_ = false; }
+    void ForceAggro(float px, float pz);
     float GetDistance(float px, float pz) const;
     float GetAggroRange() const { return aggro_range_; }
     float GetMoveSpeed() const { return move_speed_; }
@@ -120,6 +123,9 @@ private:
     std::vector<BossPhase> phases_;
     int current_phase_ = 0;
     bool is_enraged_ = false;
+    float aggro_scan_timer_ = 0.0f;
+    float battle_attack_timer_ = 0.0f;
+    bool just_aggroed_ = false;
     
     void UpdateAI(float dt, float px, float pz);
     void UpdateBossPhases();

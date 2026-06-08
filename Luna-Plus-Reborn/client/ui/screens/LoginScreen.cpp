@@ -1,4 +1,5 @@
 #include "LoginScreen.hpp"
+#include <ui/ClientFlow.hpp>
 #include <ui/GameState.hpp>
 #include <Character_generated.h>
 #include <network/NetworkClient.hpp>
@@ -69,11 +70,6 @@ bool LoginScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payloa
     if (resp->result() == luna::protocol::LoginResult_Success) {
         state_->login_ok = true;
         if (resp->session_token()) state_->session_token = resp->session_token()->str();
-        flatbuffers::FlatBufferBuilder fbb;
-        auto req = luna::protocol::CreateCharacterListRequestDirect(fbb, state_->session_token.c_str());
-        fbb.Finish(req);
-        network_->SendPacket(luna::protocol::PacketType_MP_USERCONN_CHARACTERLIST_SYN, fbb.GetBufferPointer(), fbb.GetSize());
-        // ScreenManager will switch based on state change
     } else {
         state_->login_error = "Invalid credentials";
         sent_ = false;
@@ -121,6 +117,7 @@ void LoginScreen::Render(UIRenderer& ui) {
     }
     
     ui.DrawTextCentered(lh * 0.75f, 0xffffffff, "Press ENTER to Login");
+    ui.DrawTextCentered(lh * 0.80f, 0xffaaaaaa, "F2 = Offline Demo (no server)");
     if (!state_->login_error.empty())
         ui.DrawTextCentered(lh * 0.8f, 0xffff4444, "%s", state_->login_error.c_str());
 }
@@ -137,15 +134,28 @@ void LoginScreen::TexturesLoadOnce() {
 bool LoginScreen::HandleKey(int key, int scancode, int action, int mods) {
     if (action != 1) return false;
 
+    if (key == 290) { // F2 offline demo
+        ClientFlow::StartOffline(*state_);
+        return true;
+    }
+
     if (key == 257) { // Enter
         if (!sent_) {
+            if (!network_->IsConnected()) {
+                if (!network_->Connect("127.0.0.1", 8100)) {
+                    state_->login_error = "Agent server unavailable (try F2)";
+                    return true;
+                }
+                state_->current_state = ClientState::Connect;
+            }
             flatbuffers::FlatBufferBuilder fbb;
             const char* unames[] = {"admin", "test", "demo"};
-            std::vector<uint8_t> pass_hash = {0,0,0,0}; // Dummy hash for now
+            std::vector<uint8_t> pass_hash = {0,0,0,0};
             auto req = luna::protocol::CreateLoginRequestDirect(fbb, unames[state_->selected_account], &pass_hash);
             fbb.Finish(req);
             network_->SendPacket(luna::protocol::PacketType_MP_USERCONN_LOGIN_SYN, fbb.GetBufferPointer(), fbb.GetSize());
             sent_ = true;
+            state_->current_state = ClientState::Title;
         }
         return true;
     }

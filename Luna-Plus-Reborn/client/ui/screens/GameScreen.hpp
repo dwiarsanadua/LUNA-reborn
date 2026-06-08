@@ -53,7 +53,14 @@
 #include <gameobjects/FarmSystem.hpp>
 #include <gameobjects/Hero.hpp>
 #include <gameobjects/Monster.hpp>
+#include <gameobjects/NavMeshSystem.hpp>
 #include <gameobjects/ObjectBalloon.hpp>
+#include <ui/dialogs/CharMakeDlg.hpp>
+#include <ui/dialogs/WorldMapDlg.hpp>
+#include <ui/dialogs/MiniMapDlg.hpp>
+#include <ui/dialogs/HelperDlg.hpp>
+#include <ui/dialogs/FadeDlg.hpp>
+#include <ui/dialogs/PKManagerDlg.hpp>
 #include <engine/EngineMap.hpp>
 #include <engine/EngineSky.hpp>
 #include <effects/WeatherSystem.hpp>
@@ -83,6 +90,8 @@ public:
 private:
     void SpawnRandomMonster();
     void SpawnMonstersFromMap();
+    void InitializeWorld();
+    void ChangeMap(uint32_t map_id);
     void DoCombat(float dt);
     void DoLevelUp();
     void RenderUI(UIRenderer& ui);
@@ -98,6 +107,13 @@ private:
     // Game Objects
     Hero hero_;
     std::vector<Monster> monsters_;
+    NavMeshSystem navmesh_;
+    FadeDlg fade_dlg_;
+    MiniMapDlg minimap_dlg_;
+    HelperDlg helper_dlg_;
+    WorldMapDlg worldmap_dlg_;
+    PKManagerDlg pk_dlg_;
+    uint32_t pending_map_id_ = 0;
     
     ParticleSystem particleSys_;
     float prev_x_ = 0, prev_z_ = 0;

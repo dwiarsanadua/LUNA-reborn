@@ -1,5 +1,7 @@
 #include "CharSelectScreen.hpp"
+#include <ui/ClientFlow.hpp>
 #include <ui/GameState.hpp>
+#include <ui/WindowManager.hpp>
 #include <network/NetworkClient.hpp>
 #include <flatbuffers/flatbuffers.h>
 #include <Character_generated.h>
@@ -64,6 +66,7 @@ void CharSelectScreen::Render(UIRenderer& ui) {
     }
 
     ui.DrawTextCentered(600, 0xff888888, "Arrows: Select  Enter: Start  C: Create");
+    if (charmake_open_) charmake_dlg_.Render(ui);
 }
 
 bool CharSelectScreen::HandleKey(int key, int scancode, int action, int mods) {
@@ -72,20 +75,31 @@ bool CharSelectScreen::HandleKey(int key, int scancode, int action, int mods) {
     if (key == 257) { // Enter
         if (state_->selected_char < (int)state_->characters.size()) {
             auto& ch = state_->characters[state_->selected_char];
+            if (state_->offline_mode) {
+                ClientFlow::OnEnterWorldData(*state_, ch.map_id ? ch.map_id : 51, 0, 0, 0);
+                ClientFlow::BeginEnterGame(*state_);
+                return true;
+            }
             flatbuffers::FlatBufferBuilder fbb;
             auto req = luna::protocol::CreateEnterWorldRequestDirect(fbb, state_->session_token.c_str(), ch.id);
             fbb.Finish(req);
             network_->SendPacket(luna::protocol::PacketType_MP_USERCONN_GAMEIN_SYN, fbb.GetBufferPointer(), fbb.GetSize());
+            state_->current_state = ClientState::Loading;
             return true;
         }
     }
 
-    if (key == 67) { // C - Create
-        std::string name = "Player" + std::to_string(rand() % 1000);
-        flatbuffers::FlatBufferBuilder fbb;
-        auto req = luna::protocol::CreateCreateCharacterRequestDirect(fbb, state_->session_token.c_str(), name.c_str(), 0, 0, 0, 0, 0);
-        fbb.Finish(req);
-        network_->SendPacket(luna::protocol::PacketType_MP_USERCONN_CHARACTER_MAKE_SYN, fbb.GetBufferPointer(), fbb.GetSize());
+    if (key == 67) { // C - Character creation
+        if (state_->offline_mode) {
+            charmake_open_ = true;
+            charmake_dlg_.Open(nullptr);
+        } else {
+            std::string name = "Player" + std::to_string(rand() % 1000);
+            flatbuffers::FlatBufferBuilder fbb;
+            auto req = luna::protocol::CreateCreateCharacterRequestDirect(fbb, state_->session_token.c_str(), name.c_str(), 0, 0, 0, 0, 0);
+            fbb.Finish(req);
+            network_->SendPacket(luna::protocol::PacketType_MP_USERCONN_CHARACTER_MAKE_SYN, fbb.GetBufferPointer(), fbb.GetSize());
+        }
         return true;
     }
 

@@ -33,6 +33,7 @@
 #include <config/ConfigManager.hpp>
 #include <config/Paths.hpp>
 #include <engine/gx_render/VFS.h>
+#include <ui/ClientFlow.hpp>
 #include <config/KeyBindings.hpp>
 #include <ui/skin/UiSkinManager.hpp>
 #include <ui/UiFunctionRegistry.hpp>
@@ -246,6 +247,7 @@ int main() {
     gameScreen->SetUI(&ui);
     gameScreen->SetGameDataDB(&gamedb);
     screenManager.Register("game", std::move(gameScreen));
+    ClientFlow::Init(&screenManager, &map);
 
     // 12. Enter Login Screen
     screenManager.SwitchTo("login");
@@ -268,15 +270,10 @@ int main() {
         spdlog::debug("Packet Received: type=0x{:04X} ({} bytes)", type, payload.size());
 
         client_dispatcher.Dispatch(0, type, payload);
+        ClientFlow::OnPacket(type, payload, g_state, g_network);
         screenManager.HandlePacket(type, payload);
-
-        if (type == luna::protocol::PacketType_MP_USERCONN_LOGIN_ACK && g_state.current_state == ClientState::Title) {
-            g_state.current_state = ClientState::CharSelect;
-            screenManager.SwitchTo("loading");
-        }
     });
     g_state.current_state = ClientState::Title;
-    screenManager.SwitchTo("login");
 
     auto* window = device.GetWindow();
     InputSystem input_sys;
@@ -325,8 +322,16 @@ int main() {
 
     input_sys.SetMouseCallback([&](const MouseEvent& e) {
         if (e.button == 0 && e.action == 1) {
-            g_state.player_x = (float)(e.x - 640) / 12.0f;
-            g_state.player_z = (float)(e.y - 360) / 12.0f;
+            float wx = (float)(e.x - 640) / 12.0f;
+            float wz = (float)(e.y - 360) / 12.0f;
+            if (screenManager.CurrentName() == "game") {
+                g_state.waypoint_x = wx;
+                g_state.waypoint_z = wz;
+                g_state.has_waypoint = true;
+            } else {
+                g_state.player_x = wx;
+                g_state.player_z = wz;
+            }
         }
         if (e.button == 1 && e.action == 1) { g_dragging = true; g_last_mx = e.x; g_last_my = e.y; }
         if (e.button == 1 && e.action == 0) g_dragging = false;
@@ -369,6 +374,8 @@ int main() {
         g_network.ProcessEvents();
 
         // --- GAME STATE UPDATE BEFORE RENDER ---
+        ClientFlow::Update(g_state, dt);
+        CharRenderer_SetFrameDelta(dt);
         screenManager.Update(dt);
         sky.Update(dt);
         if (g_audio) g_audio->Update();
