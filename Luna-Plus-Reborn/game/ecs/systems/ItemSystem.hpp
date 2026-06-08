@@ -10,4 +10,5 @@ public:
     bool DropItem(entt::registry& reg, entt::entity player, size_t slot_index, uint16_t count);
     bool EnchantItem(entt::registry& reg, entt::entity player, size_t slot_index);
     bool ComposeItem(entt::registry& reg, entt::entity player, uint32_t recipe_id);
+    bool UpgradeItem(entt::registry& reg, entt::entity player, int inventory_slot);
 };

@@ -6,6 +6,8 @@
 #include <spdlog/spdlog.h>
 #include <random>
 
+static std::mt19937 item_rng(std::random_device{}());
+
 bool ItemSystem::UseItem(entt::registry& reg, entt::entity player, size_t slot_index) {
     if (!reg.valid(player)) return false;
     auto& inv = reg.get<Inventory>(player);
@@ -91,16 +93,62 @@ bool ItemSystem::DropItem(entt::registry& reg, entt::entity player, size_t slot_
     return true;
 }
 
+bool ItemSystem::UpgradeItem(entt::registry& reg, entt::entity player, int inventory_slot) {
+    if (!reg.valid(player)) return false;
+    auto& inv = reg.get<Inventory>(player);
+    auto* slot = inv.Get(static_cast<size_t>(inventory_slot));
+    if (!slot || slot->item_id == 0) return false;
+
+    static const float upgrade_rates[10] = {
+        0.95f, 0.85f, 0.70f, 0.55f, 0.40f,
+        0.30f, 0.20f, 0.12f, 0.07f, 0.03f
+    };
+
+    int cur = slot->enchant;
+    if (cur >= 10) {
+        spdlog::info("Item already max upgrade (+{})", cur);
+        return false;
+    }
+
+    uint32_t cost = 500 + cur * 300;
+    if (inv.gold < cost) {
+        spdlog::info("Not enough gold (need {}, have {})", cost, inv.gold);
+        return false;
+    }
+    inv.gold -= cost;
+
+    bool success = std::uniform_real_distribution<float>(0, 1)(item_rng) < upgrade_rates[cur];
+    if (success) {
+        slot->enchant++;
+        spdlog::info("Upgrade success! Item is now +{}", slot->enchant);
+
+        if (slot->enchant == 7) {
+            spdlog::info("Item glows with power! +7 effect activated");
+        } else if (slot->enchant == 10) {
+            spdlog::info("MAX upgrade! Item stats are maximized, name color changed");
+        }
+    } else {
+        if (cur >= 6) {
+            slot->item_id = 0;
+            slot->enchant = 0;
+            slot->count = 0;
+            spdlog::info("Upgrade failed! Item destroyed");
+        } else {
+            if (slot->enchant > 0) slot->enchant--;
+            spdlog::info("Upgrade failed! Downgraded to +{}", slot->enchant);
+        }
+    }
+    return success;
+}
+
 bool ItemSystem::EnchantItem(entt::registry& reg, entt::entity player, size_t slot_index) {
     if (!reg.valid(player)) return false;
     auto& inv = reg.get<Inventory>(player);
     auto* slot = inv.Get(slot_index);
     if (!slot || slot->item_id == 0) return false;
     if (slot->enchant >= 15) { spdlog::info("Item already max enchant"); return false; }
-    // Success probability: 100% → 50% as enchant level increases
-    static std::mt19937 rng(std::random_device{}());
     float prob = 1.0f - slot->enchant * 0.05f;
-    bool success = std::uniform_real_distribution<float>(0, 1)(rng) < prob;
+    bool success = std::uniform_real_distribution<float>(0, 1)(item_rng) < prob;
     uint32_t cost = 100 + slot->enchant * 50;
     if (inv.gold < cost) { spdlog::info("Not enough gold"); return false; }
     inv.gold -= cost;
