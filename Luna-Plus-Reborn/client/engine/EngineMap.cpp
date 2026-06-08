@@ -108,11 +108,31 @@ bool EngineMap::Load(const std::string& map_id) {
 
 void EngineMap::InitBGMMap() {
     bgm_map_ = {
-        {"1", "BGM_Title"}, {"2", "BGM_AlkerPlains"}, {"51", "BGM_AlkerPlains"},
-        {"52", "BGM_BlueMoon"}, {"53", "BGM_AruaCity"}, {"54", "BGM_SnowyMountain"},
-        {"61", "BGM_Desert"}, {"62", "BGM_Forest"}, {"71", "BGM_Dungeon"},
-        {"72", "BGM_Boss"}, {"81", "BGM_Seaside"}, {"82", "BGM_Island"},
-        {"91", "BGM_Castle"}, {"99", "BGM_Event"},
+        {"01", "BGM_Login"}, {"01_loginpage_01", "BGM_Login"},
+        {"13", "13_Moon_Blind_Swamp"}, {"14", "14_Red_Orc_Outpost"},
+        {"15", "15_Moon_Blind_Forest"}, {"16", "16_17_Haunted_Mine"},
+        {"17", "16_17_Haunted_Mine"}, {"19", "19_The_Gate_Of_Alker"},
+        {"20", "20_Alker_Harbor"}, {"21", "21_Ruins_Of_Draconian"},
+        {"22", "22_Zakandia"}, {"23", "23_Tarintus"},
+        {"25", "25_MontBlanc_Port"}, {"26", "26_Dried_Gazell_Fall"},
+        {"27", "27_Zakandia_Outpost"}, {"28", "28_The_Dark_Portal"},
+        {"29", "29_Distorted_Crevice"}, {"31", "31_The_Way_To_The_Howling_Ravine"},
+        {"32", "32_Howling_Ravine"}, {"33", "33_34_Howling_Cave"},
+        {"34", "33_34_Howling_Cave"}, {"41", "41_Ghost_Tree_Swamp"},
+        {"42", "42_Lair_Of_Kierra"}, {"51", "02_03_Alker_Plains"},
+        {"52", "52_The_Town_Of_Nera_Castle"}, {"53", "53_The_Great_Garden"},
+        {"54", "54_The_Knights_Grave"}, {"55", "55_Harbor_Of_Nera"},
+        {"56", "56_Temple_Of_Greed"}, {"57", "57_Broken_Shipwrecked"},
+        {"60", "60_The_Tower_Of_Wizardly_Low"}, {"63", "63_The_Death_Tower"},
+        {"64", "64_The_Spirit_Forest"}, {"65", "65_crystal_empire"},
+        {"71", "71_Sahel_Zone"}, {"72", "72_Mirage_In_The_Parasus"},
+        {"73", "73_Ruins_Of_Ancient_Elpis"}, {"74", "74_Dragonians_Tomb1"},
+        {"75", "75_Dragonians_Tomb2"}, {"81", "81_83_Siege_Castle"},
+        {"82", "82_The_Culvert"}, {"83", "81_83_Siege_Castle"},
+        {"84", "84_Advanced_Dungeon"}, {"91", "91_92_93_Challenge_Zone"},
+        {"92", "91_92_93_Challenge_Zone"}, {"93", "91_92_93_Challenge_Zone"},
+        {"96", "96_Desolated_Gorge"}, {"97", "97_Challenge_Zone"},
+        {"99", "99_Alker_Residence"},
     };
 }
 
