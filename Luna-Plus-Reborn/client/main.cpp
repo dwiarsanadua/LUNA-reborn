@@ -458,19 +458,25 @@ int main(int argc, char** argv) {
             ambient.Update(dt, g_state.map_id ? g_state.map_id : 51, sky.GetTimeOfDay(),
                            g_state.player_x, 0, g_state.player_z);
             sky.Render(ui, view, proj);
+            
+            // Render world
             gfx.Render(&terrain, &props, nullptr, view, proj, sky.GetLightDirection());
             gfx.RenderCharacters(time, view, proj);
-            gfx.RenderUI(ui);
+            
+            // Render UI — dalam block yang sama dengan world, agar view order konsisten
+            ui.BeginFrame();
+            screenManager.Render(ui, view, proj);
+            
+            if (frame % 30 == 0) fps = 1.0f / dt;
+            if (screenManager.CurrentName() == "game") {
+                char fps_buf[32]; snprintf(fps_buf, sizeof(fps_buf), "FPS: %.0f", fps);
+                ui.DrawText(1200, 2, 0xff888888, "%s", fps_buf);
+            }
+            
+            // Flush batch SEBELUM EndFrame — pastikan draw calls di-submit
+            // sebelum bgfx::frame() dipanggil
+            ui.FlushBatch();
         }
-        ui.BeginFrame();
-        screenManager.Render(ui, view, proj);
-
-        if (frame % 30 == 0) fps = 1.0f / dt;
-        if (screenManager.CurrentName() == "game") {
-            char fps_buf[32]; snprintf(fps_buf, sizeof(fps_buf), "FPS: %.0f", fps);
-            ui.DrawText(1200, 2, 0xff888888, "%s", fps_buf);
-        }
-        ui.FlushBatch();
 
         if (Keyboard::IsActionPressed("screenshot")) {
             char path[256];
