@@ -1,6 +1,7 @@
 #include "Monster.hpp"
 #include <rendering/UIRenderer.hpp>
 #include <rendering/CharacterRenderer.hpp>
+#include <engine/physics/PhysicsWorld.h>
 #include <cstdlib>
 #include <cmath>
 #include <cstdio>
@@ -91,13 +92,22 @@ void Monster::Update(float dt, float player_x, float player_z) {
     UpdateBossPhases();
 }
 
+static bool HasLineOfSight(PhysicsWorld* pw, float from_x, float from_y, float from_z,
+                            float to_x, float to_y, float to_z) {
+    if (!pw) return true;
+    glm::vec3 from(from_x, from_y + 1.0f, from_z);
+    glm::vec3 to(to_x, to_y + 1.0f, to_z);
+    glm::vec3 hit;
+    return !pw->RayCast(from, to, hit);
+}
+
 void Monster::UpdateAI(float dt, float px, float pz) {
     float dist = GetDistance(px, pz);
     
     switch (state_) {
     case MonsterState::Idle:
-        // Check aggro
-        if (dist < aggro_range_) {
+        // Check aggro (with line-of-sight)
+        if (dist < aggro_range_ && HasLineOfSight(physics_world_, x_, y_, z_, px, 0, pz)) {
             state_ = MonsterState::Aggro;
             target_id_ = 0; // Player
         }
@@ -121,8 +131,11 @@ void Monster::UpdateAI(float dt, float px, float pz) {
         } else {
             state_ = MonsterState::Idle;
         }}
-        // Check aggro during patrol
-        if (dist < aggro_range_) { state_ = MonsterState::Aggro; target_id_ = 0; }
+        // Check aggro during patrol (with line-of-sight)
+        if (dist < aggro_range_ && HasLineOfSight(physics_world_, x_, y_, z_, px, 0, pz)) {
+            state_ = MonsterState::Aggro;
+            target_id_ = 0;
+        }
         break;
         
     case MonsterState::Aggro:
@@ -139,6 +152,10 @@ void Monster::UpdateAI(float dt, float px, float pz) {
         attack_timer_ -= dt;
         if (dist > attack_range_ + 1.0f) { state_ = MonsterState::Chase; break; }
         if (dist > chase_range_) { state_ = MonsterState::Return; break; }
+        if (!HasLineOfSight(physics_world_, x_, y_, z_, px, 0, pz)) {
+            state_ = MonsterState::Chase;
+            break;
+        }
         if (attack_timer_ <= 0) {
             attack_timer_ = attack_cooldown_;
             // Deal damage to target (handled by GameScreen combat)

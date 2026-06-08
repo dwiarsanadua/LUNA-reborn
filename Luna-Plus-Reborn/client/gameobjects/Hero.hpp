@@ -7,6 +7,7 @@
 class UIRenderer;
 struct GameState;
 class AudioManager;
+class PhysicsWorld;
 
 enum class HeroState {
     Idle, Walk, Run, Attack, Skill, Casting, Hit, Stun, Knockback, Die, Sit, Revive
@@ -15,7 +16,7 @@ enum class HeroState {
 class Hero {
 public:
     Hero() = default;
-    void Init(GameState* state, AudioManager* audio);
+    void Init(GameState* state, AudioManager* audio, PhysicsWorld* physics = nullptr);
     void Update(float dt);
     void Render(UIRenderer& ui);
     void UpdateEquipment();
@@ -83,6 +84,8 @@ private:
     
     GameState* game_state_ = nullptr;
     AudioManager* audio_ = nullptr;
+    PhysicsWorld* physics_world_ = nullptr;
+    int physics_char_id_ = -1;
     
     void ProcessStateTransitions(float dt);
 };

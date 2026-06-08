@@ -42,6 +42,11 @@ target_link_libraries(game_core PUBLIC
     libuv::uv
 )
 
+target_link_libraries(game_core PRIVATE
+    gx_geom
+    gx_physics
+)
+
 file(GLOB FBS_FILES ${CMAKE_CURRENT_SOURCE_DIR}/network/protocol/*.fbs)
 if(FBS_FILES)
     set(FBS_GENERATED_DIR ${CMAKE_CURRENT_BINARY_DIR}/fbs)

@@ -6,6 +6,7 @@
 #include <functional>
 
 class UIRenderer;
+class PhysicsWorld;
 
 enum class MonsterState {
     Idle, Patrol, Aggro, Chase, Attack, Hit, Flee, Die, Respawn, Return
@@ -75,6 +76,9 @@ public:
     float GetFleeRange() const { return flee_range_; }
     void SetFleeRange(float r) { flee_range_ = r; }
 
+    // Physics integration
+    void SetPhysicsWorld(PhysicsWorld* pw) { physics_world_ = pw; }
+
 private:
     uint32_t id_ = 0;
     std::string name_;
@@ -107,6 +111,9 @@ private:
     struct ThreatEntry { uint32_t id; int damage; };
     std::vector<ThreatEntry> threat_table_;
     
+    // Physics
+    PhysicsWorld* physics_world_ = nullptr;
+
     // Boss phases
     std::vector<BossPhase> phases_;
     int current_phase_ = 0;

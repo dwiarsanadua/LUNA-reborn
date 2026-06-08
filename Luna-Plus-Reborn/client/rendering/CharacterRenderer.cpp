@@ -1,46 +1,50 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include "CharacterRenderer.hpp"
-#include "AnmParser.h"
 #include <engine/gx_render/RenderDevice.h>
+#include <engine/gx_geom/Model.h>
+#include <engine/gx_geom/MeshObject.h>
+#include <engine/gx_geom/Skeleton.h>
+#include <engine/gx_geom/AnimationSystem.h>
 #include <bgfx/bgfx.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/quaternion.hpp>
-#include <glm/gtx/quaternion.hpp>
 #include <spdlog/spdlog.h>
 #include <unordered_map>
 #include <vector>
 #include <fstream>
-
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
+#include <algorithm>
 
 static constexpr int MAX_BONES = 64;
 static uint16_t g_fb_width = 1280;
 static uint16_t g_fb_height = 720;
 
-struct SkinnedVertex {
-    float x, y, z;
-    float nx, ny, nz;
-    uint32_t color;
-    float u, v;
-    uint8_t bone_indices[4] = {0,0,0,0};
-    float bone_weights[4] = {0,0,0,0};
-};
-
-struct BoneInfo {
-    std::string name;
-    int parent = -1;
-    glm::mat4 bind_matrix{1.0f};
-};
+// Map CharAnim to animation clip name
+static const char* AnimNameForCharAnim(CharAnim anim) {
+    switch (anim) {
+    case CHAR_IDLE:   return "idle";
+    case CHAR_WALK:   return "walk";
+    case CHAR_RUN:    return "run";
+    case CHAR_ATTACK: return "attack";
+    case CHAR_DIE:    return "die";
+    default:          return "idle";
+    }
+}
 
 struct LoadedModel {
-    bgfx::VertexBufferHandle vb = BGFX_INVALID_HANDLE;
-    bgfx::IndexBufferHandle ib = BGFX_INVALID_HANDLE;
-    bgfx::TextureHandle tex = BGFX_INVALID_HANDLE;
-    std::vector<BoneInfo> bones;
+    Model model;
+    std::vector<MeshObject> meshes;
+    Skeleton skeleton;
+    std::vector<glm::mat4> bind_pose; // local-space bind pose
+};
+
+struct AnimationState {
+    AnimationSystem anim_sys;
+    std::unordered_map<std::string, AnimClip> clips;
+    CharAnim current_anim = CHAR_IDLE;
+    CharAnim target_anim = CHAR_IDLE;
+    bool needs_transition = false;
 };
 
 struct RenderInstance {
@@ -61,6 +65,7 @@ struct RenderInstance {
 };
 
 static std::unordered_map<std::string, LoadedModel> g_models;
+static std::unordered_map<std::string, AnimationState> g_anim_states;
 static std::unordered_map<uint32_t, RenderInstance> g_instances;
 static bgfx::ProgramHandle g_prog = BGFX_INVALID_HANDLE;
 static bgfx::UniformHandle g_tex = BGFX_INVALID_HANDLE;
@@ -68,23 +73,6 @@ static bgfx::UniformHandle g_bones_uniform = BGFX_INVALID_HANDLE;
 static bgfx::UniformHandle g_light_dir = BGFX_INVALID_HANDLE;
 static bgfx::UniformHandle g_u_color = BGFX_INVALID_HANDLE;
 static bgfx::TextureHandle g_white = BGFX_INVALID_HANDLE;
-static bgfx::VertexLayout s_layout;
-static bool s_layout_init = false;
-
-static bgfx::VertexLayout getSkinnedLayout() {
-    if (!s_layout_init) {
-        s_layout.begin()
-            .add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
-            .add(bgfx::Attrib::Normal,   3, bgfx::AttribType::Float)
-            .add(bgfx::Attrib::Color0,   4, bgfx::AttribType::Uint8, true)
-            .add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
-            .add(bgfx::Attrib::Indices,  4, bgfx::AttribType::Uint8)
-            .add(bgfx::Attrib::Weight,   4, bgfx::AttribType::Float)
-            .end();
-        s_layout_init = true;
-    }
-    return s_layout;
-}
 
 static const bgfx::Memory* loadShader(const char* path) {
     std::string search[] = { "build/bin/" + std::string(path), std::string(path), "assets/" + std::string(path) };
@@ -120,49 +108,69 @@ void CharRenderer_SetFBSize(uint16_t w, uint16_t h) {
 
 uint32_t CharRenderer_LoadModel(const std::string& path) {
     if (g_models.count(path)) return 1;
-    Assimp::Importer importer;
-    const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_LimitBoneWeights);
-    if (!scene || !scene->mNumMeshes) return 0;
-    
-    auto* mesh = scene->mMeshes[0];
-    LoadedModel result;
-    std::vector<SkinnedVertex> verts(mesh->mNumVertices);
-    for (uint32_t i = 0; i < mesh->mNumVertices; i++) {
-        verts[i].x = mesh->mVertices[i].x * 0.03f;
-        verts[i].y = mesh->mVertices[i].y * 0.03f;
-        verts[i].z = mesh->mVertices[i].z * 0.03f;
-        if (mesh->mNormals) { verts[i].nx = mesh->mNormals[i].x; verts[i].ny = mesh->mNormals[i].y; verts[i].nz = mesh->mNormals[i].z; }
-        verts[i].color = 0xffffffff;
-        verts[i].u = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][i].x : 0;
-        verts[i].v = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][i].y : 0;
+
+    LoadedModel lm;
+    if (!lm.model.LoadFromGLB(path)) {
+        spdlog::error("CharRenderer: failed to load model {}", path);
+        return 0;
     }
 
-    if (mesh->HasBones()) {
-        for (uint32_t b = 0; b < mesh->mNumBones; b++) {
-            for (uint32_t w = 0; w < mesh->mBones[b]->mNumWeights; w++) {
-                uint32_t vid = mesh->mBones[b]->mWeights[w].mVertexId;
-                float weight = mesh->mBones[b]->mWeights[w].mWeight;
-                for (int k = 0; k < 4; k++) {
-                    if (verts[vid].bone_weights[k] == 0) {
-                        verts[vid].bone_indices[k] = (uint8_t)b;
-                        verts[vid].bone_weights[k] = weight;
-                        break;
-                    }
-                }
+    // Create MeshObject for each mesh part
+    const auto& parts = lm.model.GetMeshes();
+    lm.meshes.resize(parts.size());
+    for (size_t i = 0; i < parts.size(); i++) {
+        if (!lm.meshes[i].UploadToGPU(parts[i])) {
+            spdlog::error("CharRenderer: failed to upload mesh '{}' to GPU", parts[i].name);
+            return 0;
+        }
+    }
+
+    // Build skeleton from model bones
+    if (lm.model.HasBones()) {
+        lm.skeleton.BuildFromModel(lm.model);
+
+        // Build local-space bind pose from inverse bind matrices
+        const auto& inv_bind = lm.skeleton.GetInverseBindMatrices();
+        lm.bind_pose.resize(inv_bind.size());
+        for (size_t i = 0; i < inv_bind.size(); i++) {
+            lm.bind_pose[i] = glm::inverse(inv_bind[i]);
+        }
+    }
+
+    g_models[path] = std::move(lm);
+
+    // Auto-load animation clips
+    AnimationState as;
+    std::string base_path = path.substr(0, path.find_last_of('.'));
+    const char* clip_names[] = {"idle", "walk", "run", "attack", "die"};
+    for (auto* name : clip_names) {
+        std::string json_path = base_path + "_" + name + ".anm.json";
+        AnimClip clip;
+        if (as.anim_sys.LoadFromJson(json_path, clip)) {
+            clip.name = name;
+            clip.loop = (std::string(name) != "die");
+            as.clips[name] = std::move(clip);
+            spdlog::debug("CharRenderer: loaded anim clip '{}' from {}", name, json_path);
+        } else {
+            // Fallback to .anm binary
+            std::string anm_path = base_path + "_" + name + ".anm";
+            if (as.anim_sys.LoadFromAnm(anm_path, clip)) {
+                clip.name = name;
+                clip.loop = (std::string(name) != "die");
+                as.clips[name] = std::move(clip);
+                spdlog::debug("CharRenderer: loaded anim clip '{}' from {}", name, anm_path);
             }
         }
     }
 
-    std::vector<uint16_t> indices;
-    for (uint32_t i = 0; i < mesh->mNumFaces; i++) {
-        indices.push_back((uint16_t)mesh->mFaces[i].mIndices[0]);
-        indices.push_back((uint16_t)mesh->mFaces[i].mIndices[1]);
-        indices.push_back((uint16_t)mesh->mFaces[i].mIndices[2]);
+    // Start with idle
+    auto it = as.clips.find("idle");
+    if (it != as.clips.end()) {
+        as.anim_sys.Play(&it->second, true, 0.0f);
     }
+    as.current_anim = CHAR_IDLE;
+    g_anim_states[path] = std::move(as);
 
-    result.vb = bgfx::createVertexBuffer(bgfx::copy(verts.data(), (uint32_t)(verts.size()*sizeof(SkinnedVertex))), getSkinnedLayout());
-    result.ib = bgfx::createIndexBuffer(bgfx::copy(indices.data(), (uint32_t)(indices.size()*sizeof(uint16_t))));
-    g_models[path] = result;
     return 1;
 }
 
@@ -178,22 +186,51 @@ void CharRenderer_Spawn(uint32_t id, const std::string& model, float x, float y,
 void CharRenderer_Remove(uint32_t id) { g_instances.erase(id); }
 
 void CharRenderer_Move(uint32_t id, float x, float y, float z, bool moving, CharAnim anim) {
-    if (g_instances.count(id)) {
-        auto& inst = g_instances[id];
-        inst.pos = {x, y, z};
-        inst.moving = moving;
-        inst.anim = anim;
+    auto it = g_instances.find(id);
+    if (it == g_instances.end()) return;
+    auto& inst = it->second;
+    inst.pos = {x, y, z};
+    inst.moving = moving;
+
+    // Handle animation state transitions
+    auto anim_it = g_anim_states.find(inst.model_key);
+    if (anim_it == g_anim_states.end()) return;
+    auto& as = anim_it->second;
+
+    CharAnim desired = anim;
+    if (desired == CHAR_IDLE && moving) desired = CHAR_WALK;
+
+    if (desired != as.current_anim) {
+        auto clip_it = as.clips.find(AnimNameForCharAnim(desired));
+        if (clip_it != as.clips.end()) {
+            as.anim_sys.BlendTo(&clip_it->second, 0.2f);
+            as.current_anim = desired;
+        }
     }
 }
 
 void CharRenderer_Attach(uint32_t id, const std::string& model, const std::string& bone) {
-    if (g_instances.count(id)) {
-        CharRenderer_LoadModel(model);
-        RenderInstance::Attachment att;
-        att.model_key = model;
-        att.bone_name = bone;
-        g_instances[id].attachments.push_back(att);
+    auto it = g_instances.find(id);
+    if (it == g_instances.end()) return;
+    CharRenderer_LoadModel(model);
+    RenderInstance::Attachment att;
+    att.model_key = model;
+    att.bone_name = bone;
+
+    // Resolve bone index
+    auto mit = g_models.find(it->second.model_key);
+    if (mit != g_models.end()) {
+        att.bone_index = mit->second.skeleton.GetBoneIndex(bone);
     }
+    it->second.attachments.push_back(att);
+}
+
+void CharRenderer_Detach(uint32_t id, const std::string& bone) {
+    auto it = g_instances.find(id);
+    if (it == g_instances.end()) return;
+    auto& atts = it->second.attachments;
+    atts.erase(std::remove_if(atts.begin(), atts.end(),
+        [&bone](const RenderInstance::Attachment& a) { return a.bone_name == bone; }), atts.end());
 }
 
 void CharRenderer_Render(const glm::mat4& view, const glm::mat4& proj, float time, const EnvData& env) {
@@ -208,26 +245,70 @@ void CharRenderer_Render(const glm::mat4& view, const glm::mat4& proj, float tim
     bgfx::setUniform(g_u_color, white);
 
     for (auto& [id, inst] : g_instances) {
-        auto it = g_models.find(inst.model_key);
-        if (it == g_models.end()) continue;
-        auto& model = it->second;
+        auto mit = g_models.find(inst.model_key);
+        if (mit == g_models.end()) continue;
+        auto& lm = mit->second;
 
+        auto ait = g_anim_states.find(inst.model_key);
+        AnimationState* as = (ait != g_anim_states.end()) ? &ait->second : nullptr;
+
+        // Update animation
+        if (as) {
+            as->anim_sys.Update(0.016f);
+        }
+
+        // Compute skinning matrices
+        glm::mat4 bone_matrices[MAX_BONES];
+        std::fill_n(bone_matrices, MAX_BONES, glm::mat4(1.0f));
+
+        if (as && lm.model.HasBones()) {
+            // Get blended pose from animation system
+            std::vector<glm::mat4> blended_pose(lm.bind_pose.size(), glm::mat4(1.0f));
+            as->anim_sys.GetBlendedPose(lm.bind_pose, blended_pose.data(), blended_pose.size());
+
+            // Compute world-space final pose
+            std::vector<glm::mat4> world_pose;
+            lm.skeleton.ComputeFinalPose(blended_pose, world_pose);
+
+            // Convert to skinning matrices: pose * inverse_bind
+            const auto& inv_bind = lm.skeleton.GetInverseBindMatrices();
+            size_t count = std::min(world_pose.size(), (size_t)MAX_BONES);
+            for (size_t i = 0; i < count; i++) {
+                bone_matrices[i] = world_pose[i] * inv_bind[i];
+            }
+        }
+
+        bgfx::setUniform(g_bones_uniform, bone_matrices, MAX_BONES);
+
+        // Render all meshes
         float mtx[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, inst.pos.x, inst.pos.y, inst.pos.z, 1};
         bgfx::setTransform(mtx);
-        bgfx::setVertexBuffer(0, model.vb);
-        bgfx::setIndexBuffer(model.ib);
-        bgfx::setState(BGFX_STATE_DEFAULT | BGFX_STATE_WRITE_Z);
-        bgfx::submit(vid, g_prog);
 
-        for (auto& att : inst.attachments) {
-            auto ait = g_models.find(att.model_key);
-            if (ait == g_models.end()) continue;
-            auto& amodel = ait->second;
-            bgfx::setTransform(mtx);
-            bgfx::setVertexBuffer(0, amodel.vb);
-            bgfx::setIndexBuffer(amodel.ib);
+        for (auto& mesh_obj : lm.meshes) {
+            mesh_obj.Render(0);
             bgfx::setState(BGFX_STATE_DEFAULT | BGFX_STATE_WRITE_Z);
+            bgfx::setTexture(0, g_tex, g_white);
             bgfx::submit(vid, g_prog);
+        }
+
+        // Render attachments
+        for (auto& att : inst.attachments) {
+            auto amit = g_models.find(att.model_key);
+            if (amit == g_models.end()) continue;
+            auto& alm = amit->second;
+
+            // Apply attachment bone transform if index is valid
+            if (att.bone_index >= 0 && att.bone_index < MAX_BONES) {
+                glm::mat4 att_mtx = glm::make_mat4(mtx) * bone_matrices[att.bone_index];
+                bgfx::setTransform(glm::value_ptr(att_mtx));
+            }
+
+            for (auto& att_mesh : alm.meshes) {
+                att_mesh.Render(0);
+                bgfx::setState(BGFX_STATE_DEFAULT | BGFX_STATE_WRITE_Z);
+                bgfx::setTexture(0, g_tex, g_white);
+                bgfx::submit(vid, g_prog);
+            }
         }
     }
 }
@@ -240,11 +321,8 @@ void CharRenderer_Shutdown() {
     static bool is_shutdown = false;
     if (is_shutdown) return;
     is_shutdown = true;
-    for (auto& [path, model] : g_models) {
-        if (bgfx::isValid(model.vb)) bgfx::destroy(model.vb);
-        if (bgfx::isValid(model.ib)) bgfx::destroy(model.ib);
-    }
     g_models.clear();
+    g_anim_states.clear();
     if (bgfx::isValid(g_prog)) bgfx::destroy(g_prog);
     if (bgfx::isValid(g_tex)) bgfx::destroy(g_tex);
     if (bgfx::isValid(g_bones_uniform)) bgfx::destroy(g_bones_uniform);
@@ -252,5 +330,3 @@ void CharRenderer_Shutdown() {
     if (bgfx::isValid(g_u_color)) bgfx::destroy(g_u_color);
     if (bgfx::isValid(g_white)) bgfx::destroy(g_white);
 }
-
-void CharRenderer_Detach(uint32_t id, const std::string& bone) {}

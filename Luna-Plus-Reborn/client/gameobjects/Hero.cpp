@@ -5,6 +5,7 @@
 #include <audio/AudioManager.hpp>
 #include <game/data/ItemModelTable.hpp>
 #include <game/ecs/components/Equipment.hpp>
+#include <engine/physics/PhysicsWorld.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -37,9 +38,10 @@ void Hero::UpdateEquipment() {
     }
 }
 
-void Hero::Init(GameState* state, AudioManager* audio) {
+void Hero::Init(GameState* state, AudioManager* audio, PhysicsWorld* physics) {
     game_state_ = state;
     audio_ = audio;
+    physics_world_ = physics;
     if (state) {
         name_ = state->name;
         level_ = state->level;
@@ -54,13 +56,21 @@ void Hero::Init(GameState* state, AudioManager* audio) {
     prev_state_ = HeroState::Idle;
     state_timer_ = 0;
     state_duration_ = 0;
+
+    // Create physics character
+    if (physics_world_) {
+        physics_char_id_ = physics_world_->CreateCharacter(glm::vec3(x_, y_, z_), 0.4f, 1.8f);
+    }
     
-    UpdateEquipment(); // Force visual update for demo
+    UpdateEquipment();
 }
 
 void Hero::SetPosition(float x, float y, float z) {
     x_ = x; y_ = y; z_ = z;
     CharRenderer_Move(0, x_, y_, z_, moving_);
+    if (physics_world_ && physics_char_id_ >= 0) {
+        physics_world_->SetCharacterPosition(physics_char_id_, glm::vec3(x_, y_, z_));
+    }
 }
 
 void Hero::Move(float dx, float dz, float dt) {
@@ -221,6 +231,16 @@ void Hero::Update(float dt) {
     moving_ = (fabs(x_ - prev_x_) > 0.01f || fabs(z_ - prev_z_) > 0.01f) 
               && state_ == HeroState::Walk;
     prev_x_ = x_; prev_z_ = z_;
+
+    // Apply gravity: stick to terrain height
+    if (physics_world_) {
+        float terrain_y = physics_world_->GetTerrainHeight(x_, z_);
+        y_ = terrain_y + 1.0f;
+        if (physics_char_id_ >= 0) {
+            physics_world_->SetCharacterPosition(physics_char_id_, glm::vec3(x_, y_, z_));
+        }
+    }
+
     CharRenderer_Move(0, x_, y_, z_, moving_);
     
     if (game_state_) {

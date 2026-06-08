@@ -116,6 +116,8 @@ target_include_directories(LunaPlusClient PRIVATE
 target_link_libraries(LunaPlusClient PRIVATE
     game_core
     gx_render
+    gx_geom
+    gx_physics
     soundlib
     glfw
     bgfx::bgfx
