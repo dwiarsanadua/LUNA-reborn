@@ -1,5 +1,5 @@
 --[[
-  Quest 401: Quest 401
+  Quest 401: [Quest] The Cursed Dead
   Level Required: 59
   NPC Start: 90, NPC Complete: 90
   Prerequisites: [400]
@@ -10,7 +10,7 @@ local fsm = require('fsm_engine')
 
 local quest_401 = fsm:new({
     id = 401,
-    name = "Quest 401",
+    name = "[Quest] The Cursed Dead",
     level_required = 59,
     npc_start = 90,
     npc_complete = 90,

@@ -16579,8 +16579,8 @@
     },
     {
       "id": 401,
-      "name": "Quest 401",
-      "description": "d #TITLE [Quest] The Cursed Dead",
+      "name": "[Quest] The Cursed Dead",
+      "description": "",
       "level_required": 59,
       "npc_start_id": 90,
       "npc_complete_id": 90,
@@ -16603,7 +16603,7 @@
         "gold": 19000,
         "items": []
       },
-      "dialog_start": "d #TITLE [Quest] The Cursed Dead",
+      "dialog_start": "",
       "dialog_progress": "Defeat 70 Damned Ghouls in Ghost Tree Swamp.",
       "dialog_complete": "Inform Adrian in Ghost Tree Swamp of your success.",
       "npc_start_name": "Guild",

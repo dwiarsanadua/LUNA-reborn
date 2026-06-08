@@ -169,6 +169,21 @@ def find_nodes(roots: list[dict], kind: str) -> list[dict]:
     return result
 
 
+def _extract_title(toks: list[str]) -> str:
+    for i, tok in enumerate(toks):
+        if tok == "#TITLE":
+            return " ".join(toks[i + 1:])
+    return ""
+
+
+def _extract_desc_text(toks: list[str]) -> str:
+    text = " ".join(toks)
+    text = text.replace("{", "").replace("}", "").strip()
+    if text in ("#DESC", "#TITLE"):
+        return ""
+    return text
+
+
 def parse_strings(content: str) -> dict[tuple[int, int], dict]:
     roots = parse_blocks(content)
     result = {}
@@ -186,21 +201,22 @@ def parse_strings(content: str) -> dict[tuple[int, int], dict]:
         for toks in node["directives"]:
             if not toks:
                 continue
-            if toks[0] == "#TITLE":
-                title = " ".join(toks[1:])
-            elif toks[0] == "#DESC":
-                pass
-            else:
-                text = " ".join(toks).replace("{", "").replace("}", "").strip()
-                if text:
-                    desc_parts.append(text)
+            t = _extract_title(toks)
+            if t:
+                title = t
+                continue
+            if toks[0] == "#DESC":
+                continue
+            text = _extract_desc_text(toks)
+            if text:
+                desc_parts.append(text)
 
         for child in node["children"]:
             if child["kind"] == "#TITLE":
                 title = " ".join(child["params"])
             elif child["kind"] == "#DESC":
                 for ctoks in child.get("directives", []):
-                    text = " ".join(ctoks).replace("{", "").replace("}", "").strip()
+                    text = _extract_desc_text(ctoks)
                     if text:
                         desc_parts.append(text)
 
