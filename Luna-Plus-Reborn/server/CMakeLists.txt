@@ -11,10 +11,19 @@ add_executable(test_startup
 )
 target_include_directories(test_startup PRIVATE
     ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/game
+    ${CMAKE_BINARY_DIR}/game/fbs
 )
 target_link_libraries(test_startup PRIVATE
     gx_network
     Database
+    game_core
     spdlog::spdlog
     fmt::fmt
+    flatbuffers::flatbuffers
+)
+
+target_compile_definitions(test_startup PRIVATE
+    LoginResult_LOGIN_OK=LoginResult_Success
+    LoginResult_LOGIN_FAILED=LoginResult_InvalidCredentials
 )
