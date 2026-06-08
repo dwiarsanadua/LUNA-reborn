@@ -163,7 +163,7 @@ struct BuffSkill {
     uint32_t icon_id;
 };
 
-struct SkillTreeEntry {
+struct SkillTreeDBEntry {
     uint32_t entry_id;
     uint16_t class_id;
     uint16_t tree_level;
@@ -262,6 +262,9 @@ public:
     void LoadItemTemplates();
     void LoadMapData();
 
+    // Initialize: load all JSON templates from a directory
+    void Initialize(const std::string& json_dir = "assets/data/");
+
     // JSON-based loaders (from assets/data/*.json exported by data_parser.py)
     void LoadItemTemplates(const std::string& json_path);
     void LoadMonsterTemplates(const std::string& json_path);
@@ -294,7 +297,7 @@ public:
     std::vector<QuestCondition> GetQuestConditions(uint32_t quest_id) const;
     std::vector<MapWarp> GetMapWarps(uint32_t map_id) const;
     std::vector<MonsterSpawn> GetMonsterSpawns(uint32_t map_id) const;
-    std::vector<SkillTreeEntry> GetSkillTree(uint16_t class_id) const;
+    std::vector<SkillTreeDBEntry> GetSkillTree(uint16_t class_id) const;
 
     // JSON template accessors
     const ItemTemplate* GetItemTemplate(uint32_t id) const;
@@ -321,8 +324,8 @@ private:
     std::unordered_map<uint32_t, std::vector<QuestCondition>> quest_conditions_;
     std::unordered_map<uint32_t, std::vector<MapWarp>> map_warps_;
     std::unordered_map<uint32_t, std::vector<MonsterSpawn>> monster_spawns_;
-    std::unordered_map<uint32_t, std::vector<SkillTreeEntry>> skill_trees_;
-    std::unordered_map<uint16_t, std::vector<SkillTreeEntry>> skill_trees_by_class_;
+    std::unordered_map<uint32_t, std::vector<SkillTreeDBEntry>> skill_trees_;
+    std::unordered_map<uint16_t, std::vector<SkillTreeDBEntry>> skill_trees_by_class_;
     std::vector<MapData> map_data_;
     std::vector<MapBoundary> map_boundaries_;
 

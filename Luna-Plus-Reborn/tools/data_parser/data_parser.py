@@ -263,15 +263,17 @@ def create_legacy_db(src_path: Path, dst_path: Path):
     """)
     rows = src.execute("SELECT * FROM game_monsterlist").fetchall()
     for r in rows:
+        lvl_raw = float(col(r, 32, 0))
+        lvl = int(round(lvl_raw)) if lvl_raw else 0
         dst.execute("""INSERT INTO monster_templates
-            (id,name,model_file,level,hp,attack,defense,speed,exp_reward,
+            (id,name,model_file,level,hp,mp,attack,defense,speed,exp_reward,
              gold_min,gold_max,element_type,ai_type,aggro_range,size_scale,monster_type)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (col(r,0), col(r,1), col(r,3), col(r,11), col(r,8),
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (col(r,0), col(r,1), col(r,3), lvl, col(r,11), 0,
              col(r,12), col(r,13), float(col(r,17,1.0)),
              int(float(col(r,14,0))), col(r,20), col(r,21),
              col(r,10), col(r,18), col(r,19),
-             float(col(r,16,1.0)), col(r,18)))
+             float(col(r,16,1.0)), 0))
     print(f"  [LEGACY] monster_templates: {len(rows)} rows")
 
     # monster_drops (inline from monsterlist col 62-124)

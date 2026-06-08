@@ -742,7 +742,7 @@ void GameDataDB::LoadSkillData() {
     if (st) {
         int tree_count = 0;
         while (sqlite3_step(st) == SQLITE_ROW) {
-            SkillTreeEntry e{};
+            SkillTreeDBEntry e{};
             e.entry_id = static_cast<uint32_t>(tree_count + 1);
             e.class_id = Col<uint16_t>(st, 0);
             e.tree_level = Col<uint16_t>(st, 1);
@@ -879,6 +879,18 @@ void GameDataDB::LoadMapData() {
 
     spdlog::info("LoadMapData: {} maps, {} warps, {} boundaries loaded",
         map_data_.size(), map_warps_.size(), map_boundaries_.size());
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Initialize  — loads all JSON templates
+// ═══════════════════════════════════════════════════════════════════════
+
+void GameDataDB::Initialize(const std::string& json_dir) {
+    LoadItemTemplates(json_dir + "items.json");
+    LoadMonsterTemplates(json_dir + "monsters.json");
+    LoadSkillTemplates(json_dir + "skills.json");
+    LoadQuestTemplates(json_dir + "quests.json");
+    LoadNPCTemplates(json_dir + "npcs.json");
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1211,7 +1223,7 @@ std::vector<MonsterSpawn> GameDataDB::GetMonsterSpawns(uint32_t map_id) const {
     return it != monster_spawns_.end() ? it->second : std::vector<MonsterSpawn>{};
 }
 
-std::vector<SkillTreeEntry> GameDataDB::GetSkillTree(uint16_t class_id) const {
+std::vector<SkillTreeDBEntry> GameDataDB::GetSkillTree(uint16_t class_id) const {
     auto it = skill_trees_by_class_.find(class_id);
-    return it != skill_trees_by_class_.end() ? it->second : std::vector<SkillTreeEntry>{};
+    return it != skill_trees_by_class_.end() ? it->second : std::vector<SkillTreeDBEntry>{};
 }
