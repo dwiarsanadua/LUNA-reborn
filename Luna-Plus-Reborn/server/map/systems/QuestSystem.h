@@ -25,6 +25,8 @@ struct QuestTemplate {
     bool is_repeatable = false;
 };
 
+#define GAMEDATADB_QUEST_TEMPLATE_DEFINED
+
 class QuestSystem {
 public:
     QuestSystem();

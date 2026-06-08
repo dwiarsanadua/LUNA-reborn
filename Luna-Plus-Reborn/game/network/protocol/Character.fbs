@@ -4,13 +4,15 @@ include "PacketType.fbs";
 namespace luna.protocol;
 
 table CharacterInfo {
-    character_id: uint32;
+    id: uint32;
     name: string;
     level: uint16;
     class: uint16;
     gender: uint8;
     map_id: uint16;
     position: Vec3;
+    hp: uint32;
+    max_hp: uint32;
 }
 
 table CharacterListRequest {
@@ -35,6 +37,15 @@ table CreateCharacterRequest {
 table CreateCharacterResponse {
     result: byte;
     character: CharacterInfo;
+}
+
+table DeleteCharacterRequest {
+    session_token: string;
+    character_id: uint32;
+}
+
+table DeleteCharacterResponse {
+    result: byte;
 }
 
 table EnterWorldRequest {

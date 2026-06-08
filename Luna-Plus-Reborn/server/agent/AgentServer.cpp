@@ -201,15 +201,15 @@ LoginResult AgentServer::HandleLogin(const std::string& username, const std::str
     return result;
 }
 
-std::vector<CharacterInfo> AgentServer::HandleCharacterList(const std::string& session_token) {
+std::vector<CharData> AgentServer::HandleCharacterList(const std::string& session_token) {
     int account_id = ValidateSession(session_token);
     if (account_id < 0) return {};
     auto rows = db_->Query(
         "SELECT id, name, level, class_id, gender, map_id, pos_x, pos_y, pos_z, hp, max_hp "
         "FROM characters WHERE account_id=" + std::to_string(account_id));
-    std::vector<CharacterInfo> chars;
+    std::vector<CharData> chars;
     for (auto& row : rows) {
-        CharacterInfo ci;
+        CharData ci;
         ci.id = std::stoi(row[0]);
         ci.name = row[1];
         ci.level = std::stoi(row[2]);

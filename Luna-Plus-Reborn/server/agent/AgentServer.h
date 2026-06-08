@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <chrono>
 
-struct CharacterInfo {
+struct CharData {
     int id;
     std::string name;
     int level;
@@ -39,7 +39,7 @@ public:
     void Update();
 
     LoginResult HandleLogin(const std::string& username, const std::string& password);
-    std::vector<CharacterInfo> HandleCharacterList(const std::string& session_token);
+    std::vector<CharData> HandleCharacterList(const std::string& session_token);
     bool HandleCreateCharacter(const std::string& session_token, const std::string& name,
                                int class_id, const std::string& appearance);
     bool HandleDeleteCharacter(const std::string& session_token, int char_id);
