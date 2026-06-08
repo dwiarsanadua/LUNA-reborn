@@ -44,6 +44,7 @@
 #include <spdlog/spdlog.h>
 #include <csignal>
 #include <chrono>
+#include <thread>
 #include <flatbuffers/flatbuffers.h>
 #include <Chat_generated.h>
 #include <bgfx/bgfx.h>
@@ -92,9 +93,11 @@ int main(int argc, char** argv) {
 
     // 3. RenderDevice (initializes VFS from executable location first)
     RenderDeviceConfig config{};
-    config.width = 1280; config.height = 720;
+    config.width = ConfigManager::GetInt("video.width", 1920);
+    config.height = ConfigManager::GetInt("video.height", 1080);
     config.title = "LUNA Plus Reborn";
-    config.vsync = false;
+    config.vsync = ConfigManager::GetVSync();
+    const int fps_limit = ConfigManager::GetFPSLimit();
     RenderDevice device;
     if (!device.Init(config)) return 1;
     Paths::Init();
@@ -393,11 +396,14 @@ int main(int argc, char** argv) {
     auto last_time = clock::now();
     int frame = 0;
     float fps = 0, time = 0;
+    const float target_frame = fps_limit > 0 ? (1.0f / static_cast<float>(fps_limit)) : 0.0f;
 
     while (!device.ShouldClose() && g_running) {
-        auto now = clock::now();
-        float dt = std::chrono::duration<float>(now - last_time).count();
-        last_time = now; time += dt; frame++;
+        auto frame_start = clock::now();
+        float dt = std::chrono::duration<float>(frame_start - last_time).count();
+        last_time = frame_start;
+        if (target_frame > 0.0f && dt > target_frame * 4.0f) dt = target_frame;
+        time += dt; frame++;
 
         device.BeginFrame();
 
@@ -467,6 +473,15 @@ int main(int argc, char** argv) {
         ScreenshotCapture::Poll();
 
         device.EndFrame();
+
+        if (target_frame > 0.0f) {
+            const auto frame_end = clock::now();
+            const float elapsed = std::chrono::duration<float>(frame_end - frame_start).count();
+            if (elapsed < target_frame) {
+                const auto sleep_ms = static_cast<int>((target_frame - elapsed) * 1000.0f);
+                if (sleep_ms > 0) std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+            }
+        }
     }
 
     // Save game state on exit

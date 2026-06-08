@@ -233,6 +233,41 @@ def check_phase6_server() -> dict:
     return {"issues": issues, "status": "ok" if not issues else "error"}
 
 
+def check_phase7_distribution() -> dict:
+    reborn = Path(__file__).resolve().parents[2]
+    issues = []
+
+    for rel in (
+        "third_party/bsdiff/bspatch.c",
+        "third_party/bsdiff/bspatch.h",
+        "client/network/Launcher.cpp",
+        "tools/installer/windows/LunaPlusReborn.nsi",
+        "tools/installer/package_release.sh",
+        "tools/asset_pipeline/generate_parity_checklist.py",
+        "tools/asset_pipeline/bootstrap_phase7.py",
+        "tools/asset_pipeline/test_bspatch.py",
+        "docs/PARITY_CHECKLIST.md",
+    ):
+        if not (reborn / rel).is_file():
+            issues.append(f"Phase7: missing {rel}")
+
+    cfg = (reborn / "client" / "config" / "ConfigManager.cpp").read_text()
+    if "video.width\", 1920" not in cfg:
+        issues.append("Phase7: default resolution should be 1920x1080")
+    if "video.fps_limit\", 60" not in cfg:
+        issues.append("Phase7: default fps_limit should be 60")
+
+    main_cpp = (reborn / "client" / "main.cpp").read_text()
+    if "GetFPSLimit()" not in main_cpp or "target_frame" not in main_cpp:
+        issues.append("Phase7: client main loop missing FPS limiter")
+
+    launcher = (reborn / "client" / "network" / "Launcher.cpp").read_text()
+    if "bspatch_file" not in launcher:
+        issues.append("Phase7: Launcher must use real bspatch_file()")
+
+    return {"issues": issues, "status": "ok" if not issues else "error"}
+
+
 def validate_assets_report() -> dict:
     report = {
         'timestamp': datetime.now().isoformat(),
@@ -279,6 +314,9 @@ def validate_assets_report() -> dict:
     phase6 = check_phase6_server()
     issues.extend(phase6["issues"])
     report['phase6'] = phase6
+    phase7 = check_phase7_distribution()
+    issues.extend(phase7["issues"])
+    report['phase7'] = phase7
     report['issues'] = issues
     return report
 
@@ -289,7 +327,18 @@ def main():
     parser.add_argument('--phase4', action='store_true', help='Enforce Phase 4 UI gates only')
     parser.add_argument('--phase5', action='store_true', help='Enforce Phase 5 server gates only')
     parser.add_argument('--phase6', action='store_true', help='Enforce Phase 6 server gates only')
+    parser.add_argument('--phase7', action='store_true', help='Enforce Phase 7 distribution gates only')
     args = parser.parse_args()
+
+    if args.phase7:
+        phase7 = check_phase7_distribution()
+        print("Phase 7 distribution validation:")
+        if phase7['issues']:
+            for issue in phase7['issues']:
+                print(f"  ! {issue}")
+            return 1
+        print("  OK")
+        return 0
 
     if args.phase6:
         phase6 = check_phase6_server()

@@ -1,4 +1,5 @@
 #include "Launcher.hpp"
+#include "bspatch.h"
 #include <fstream>
 #include <sstream>
 #include <cstdio>
@@ -282,79 +283,11 @@ bool Launcher::RestoreBackup(const std::string& path) {
 }
 
 bool Launcher::ApplyBsdiffPatch(const std::string& old_file, const std::string& patch_file, const std::string& new_file) {
-    // bsdiff/bspatch algorithm implementation — simplified
-    // In production, link against libbspatch or use a proper bsdiff library
-    std::ifstream old_f(old_file, std::ios::binary | std::ios::ate);
-    std::ifstream patch_f(patch_file, std::ios::binary | std::ios::ate);
-    if (!old_f || !patch_f) return false;
-
-    size_t old_size = (size_t)old_f.tellg();
-    size_t patch_size = (size_t)patch_f.tellg();
-    old_f.seekg(0);
-    patch_f.seekg(0);
-
-    std::vector<uint8_t> old_data(old_size);
-    std::vector<uint8_t> patch_data(patch_size);
-    old_f.read((char*)old_data.data(), old_size);
-    patch_f.read((char*)patch_data.data(), patch_size);
-
-    // Minimal bsdiff control data reader — applies patch to produce new file
-    // This is a placeholder for actual bsdiff integration
-    std::vector<uint8_t> new_data;
-    if (patch_size < 32) return false;
-
-    // Parse bsdiff header
-    // Magic: "BSDIFF40"
-    if (std::memcmp(patch_data.data(), "BSDIFF40", 8) != 0) return false;
-
-    // Read new file size from header (offset 8, 8 bytes, little-endian)
-    int64_t new_size = 0;
-    for (int i = 0; i < 8; i++)
-        new_size |= (int64_t)patch_data[8 + i] << (i * 8);
-
-    new_data.resize((size_t)new_size);
-
-    // Simple patch: copy old data, apply control sequences
-    // For real bsdiff, use the bspatch algorithm from bsdiff.c
-    size_t old_pos = 0, new_pos = 0;
-    size_t ctrl_pos = 32; // after header
-
-    while (new_pos < (size_t)new_size && ctrl_pos + 24 <= patch_size) {
-        // Read control triplet (each 8 bytes, little-endian)
-        auto read64 = [&](size_t off) -> int64_t {
-            int64_t v = 0;
-            for (int i = 0; i < 8; i++)
-                v |= (int64_t)patch_data[off + i] << (i * 8);
-            return v;
-        };
-
-        int64_t diff_len = read64(ctrl_pos);
-        int64_t extra_len = read64(ctrl_pos + 8);
-        int64_t seek_offset = read64(ctrl_pos + 16);
-        ctrl_pos += 24;
-
-        // Apply diff data
-        for (int64_t i = 0; i < diff_len && new_pos < (size_t)new_size; i++) {
-            uint8_t diff_byte = (ctrl_pos < patch_size) ? patch_data[ctrl_pos++] : 0;
-            uint8_t old_byte = (old_pos < old_size) ? old_data[old_pos++] : 0;
-            new_data[new_pos++] = old_byte + diff_byte;
-        }
-
-        // Copy extra data
-        for (int64_t i = 0; i < extra_len && new_pos < (size_t)new_size; i++) {
-            new_data[new_pos++] = (ctrl_pos < patch_size) ? patch_data[ctrl_pos++] : 0;
-        }
-
-        // Seek in old data
-        old_pos = (size_t)((int64_t)old_pos + seek_offset);
+    if (bspatch_file(old_file.c_str(), new_file.c_str(), patch_file.c_str()) != 0) {
+        spdlog::error("Launcher: bspatch failed ({} + {} -> {})", old_file, patch_file, new_file);
+        return false;
     }
-
-    // Write new file
-    std::ofstream new_f(new_file, std::ios::binary);
-    if (!new_f) return false;
-    new_f.write((char*)new_data.data(), new_data.size());
-
-    spdlog::info("Launcher: bsdiff patch applied ({} -> {} bytes)", old_size, new_size);
+    spdlog::info("Launcher: bsdiff patch applied -> {}", new_file);
     return true;
 }
 

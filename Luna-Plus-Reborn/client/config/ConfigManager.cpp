@@ -21,11 +21,11 @@ void ConfigManager::Shutdown() {
 
 void ConfigManager::LoadDefaults() {
     // Video
-    SetInt("video.width", 1280);
-    SetInt("video.height", 720);
+    SetInt("video.width", 1920);
+    SetInt("video.height", 1080);
     SetBool("video.fullscreen", false);
     SetBool("video.vsync", true);
-    SetInt("video.fps_limit", 0);
+    SetInt("video.fps_limit", 60);
 
     // Audio
     SetFloat("audio.master_volume", 1.0f);

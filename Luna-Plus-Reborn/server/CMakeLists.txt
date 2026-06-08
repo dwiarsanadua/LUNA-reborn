@@ -101,3 +101,8 @@ target_link_libraries(test_phase6 PRIVATE
 target_compile_definitions(test_phase6 PRIVATE
     GAME_DATA_PATH="${CMAKE_SOURCE_DIR}/assets/data/game_data.db"
 )
+
+add_executable(test_phase7 test_phase7.cpp)
+target_include_directories(test_phase7 PRIVATE
+    ${CMAKE_SOURCE_DIR}
+)

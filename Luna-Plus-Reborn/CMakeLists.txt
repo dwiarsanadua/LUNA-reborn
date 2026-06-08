@@ -11,7 +11,7 @@ endif()
 
 project(LunaPlusReborn
     VERSION 1.0.0
-    LANGUAGES CXX
+    LANGUAGES C CXX
     DESCRIPTION "LUNA Online Plus - Reborn"
 )
 
@@ -40,6 +40,15 @@ find_package(Freetype REQUIRED)
 find_package(EnTT REQUIRED)
 find_package(flatbuffers REQUIRED)
 find_package(assimp REQUIRED)
+find_package(BZip2 REQUIRED)
+
+add_library(luna_bspatch STATIC
+    third_party/bsdiff/bspatch.c
+)
+target_include_directories(luna_bspatch PUBLIC
+    ${CMAKE_SOURCE_DIR}/third_party/bsdiff
+)
+target_link_libraries(luna_bspatch PUBLIC BZip2::BZip2)
 
 # Asio networking library
 find_path(ASIO_INCLUDE_DIR asio.hpp PATHS /opt/homebrew/include /usr/local/include /usr/include)

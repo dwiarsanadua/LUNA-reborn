@@ -132,6 +132,7 @@ target_include_directories(LunaPlusClient PRIVATE
     ${CMAKE_SOURCE_DIR}/game
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include/external
+    ${CMAKE_SOURCE_DIR}/third_party/bsdiff
     ${CMAKE_BINARY_DIR}/game/fbs
 )
 
@@ -150,6 +151,8 @@ target_link_libraries(LunaPlusClient PRIVATE
     flatbuffers::flatbuffers
     assimp::assimp
     SQLite::SQLite3
+    BZip2::BZip2
+    luna_bspatch
 )
 
 if(APPLE)
