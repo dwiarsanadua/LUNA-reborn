@@ -63,7 +63,7 @@ def main():
     parser.add_argument('--file', type=str, help='Single file to convert')
     args = parser.parse_args()
 
-    src_base = Path(args.input) if args.input else Path("/Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/textures")
+    src_base = Path(args.input) if args.input else Path("/Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets")
     dst_base = Path(args.output) if args.output else Path("/Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/assets/textures")
 
     if args.file:

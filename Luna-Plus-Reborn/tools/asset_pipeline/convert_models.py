@@ -28,6 +28,7 @@ SOURCE_DIRS = {
     'effect': SRC_BASE / 'effect',
     'farm': SRC_BASE / 'farm',
     'housing': SRC_BASE / 'housing',
+    'map': SRC_BASE / 'map',
 }
 
 def convert_mod(input_path: str, output_dir: str) -> tuple:

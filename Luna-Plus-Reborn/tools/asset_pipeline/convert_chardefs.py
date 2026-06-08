@@ -15,7 +15,7 @@ from pathlib import Path
 SRC_BASE = Path("/Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/unpacked")
 DST_BASE = Path("/Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/assets/characters")
 
-SOURCE_CATEGORIES = ['character', 'monster', 'npc', 'effect']
+SOURCE_CATEGORIES = ['character', 'monster', 'npc', 'effect', 'farm', 'housing', 'image', 'map', 'npcImage']
 
 def parse_chx(input_path: str) -> dict:
     """Parse a .chx character definition file into a dict."""
