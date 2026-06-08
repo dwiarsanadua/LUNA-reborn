@@ -56,6 +56,7 @@ void Hero::Init(GameState* state, AudioManager* audio, PhysicsWorld* physics) {
     prev_state_ = HeroState::Idle;
     state_timer_ = 0;
     state_duration_ = 0;
+    pk_flagged_ = false;
 
     // Create physics character
     if (physics_world_) {
@@ -270,6 +271,11 @@ void Hero::Render(UIRenderer& ui) {
             "Hit", "Stun", "Knockback", "Die", "Sit", "Revive"
         };
         ui.DrawText(hx + 140, hy + 6, 0xff88ff88, "[%s]", state_names[(int)state_]);
+
+        // PK Flag indicator
+        if (pk_flagged_) {
+            ui.DrawText(hx + 85, hy + 75, 0xffff4444, "PK FLAGGED");
+        }
         
         float hp_pct = (float)hp_ / std::max(1, max_hp_);
         float mp_pct = (float)mp_ / std::max(1, max_mp_);
@@ -305,6 +311,10 @@ void Hero::Render(UIRenderer& ui) {
             "Hit", "Stun", "Knockback", "Die", "Sit", "Revive"
         };
         ui.DrawText(hx + 120, hy, 0xff88ff88, "[%s]", state_names[(int)state_]);
+
+        if (pk_flagged_) {
+            ui.DrawText(hx + 170, hy, 0xffff4444, "[PK]");
+        }
         
         float hp_pct = (float)hp_ / std::max(1, max_hp_);
         float mp_pct = (float)mp_ / std::max(1, max_mp_);

@@ -34,6 +34,19 @@ struct MouseEvent {
     bool double_click = false;
 };
 
+struct GamepadState {
+    bool connected = false;
+    float left_x = 0, left_y = 0;
+    float right_x = 0, right_y = 0;
+    float lt = 0, rt = 0;
+    bool a = false, b = false, x = false, y = false;
+    bool lb = false, rb = false;
+    bool back = false, start = false;
+    bool dpad_up = false, dpad_down = false, dpad_left = false, dpad_right = false;
+    bool guide = false;
+    int joystick_id = -1;
+};
+
 class InputSystem {
 public:
     void Init(GLFWwindow* window);
@@ -63,6 +76,18 @@ public:
     double GetMouseDeltaY() const { return mouse_dy_; }
     float GetScrollDelta() const { return scroll_; }
 
+    // Gamepad state
+    const GamepadState& GetGamepadState() const { return gamepad_; }
+    bool IsGamepadButtonDown(int btn) const;
+    bool IsGamepadButtonPressed(int btn) const;
+    float GetGamepadAxis(int axis) const;
+    void SetGamepadEnabled(bool e) { gamepad_enabled_ = e; }
+    bool IsGamepadEnabled() const { return gamepad_enabled_; }
+
+    // Camera orbit from right stick (per frame)
+    float GetCameraYawDelta() const { return camera_yaw_delta_; }
+    float GetCameraPitchDelta() const { return camera_pitch_delta_; }
+
     // Events
     using KeyCallback = std::function<void(const KeyEvent&)>;
     using MouseCallback = std::function<void(const MouseEvent&)>;
@@ -81,6 +106,8 @@ public:
 private:
     void UpdateKeyState(int key, int action);
     void CheckDoubleClick(int button);
+    void PollGamepad();
+    void MapGamepadToKeys();
 
     static InputSystem* instance_;
 
@@ -102,6 +129,17 @@ private:
     double last_click_pos_[8][2] = {};
     bool double_click_[8] = {};
     float scroll_ = 0;
+
+    // Gamepad state
+    GamepadState gamepad_;
+    GamepadState gamepad_prev_;
+    bool gamepad_enabled_ = true;
+    bool gamepad_mapped_ = false;
+    static constexpr float DEAD_ZONE = 0.2f;
+
+    // Camera orbit from right stick
+    float camera_yaw_delta_ = 0;
+    float camera_pitch_delta_ = 0;
 
     // Timers
     float dt_ = 0;

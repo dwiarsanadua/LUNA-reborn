@@ -8,6 +8,7 @@ class UIRenderer;
 struct GameState;
 class AudioManager;
 class PhysicsWorld;
+class PKManagerDlg;
 
 enum class HeroState {
     Idle, Walk, Run, Attack, Skill, Casting, Hit, Stun, Knockback, Die, Sit, Revive
@@ -52,9 +53,16 @@ public:
     int GetEXP() const { return exp_; }
     int GetExpNext() const { return exp_next_; }
     int GetGold() const { return gold_; }
+    int GetAttack() const { return attack_; }
+    int GetDefense() const { return defense_; }
     void AddGold(int g) { gold_ += g; }
     void AddEXP(int e) { exp_ += e; }
     const std::string& GetName() const { return name_; }
+
+    // PK Integration
+    void SetPKManager(PKManagerDlg* mgr) { pk_mgr_ = mgr; }
+    bool IsPKFlagged() const { return pk_flagged_; }
+    void SetPKFlagged(bool f) { pk_flagged_ = f; }
 
 private:
     float x_ = 0, y_ = 3, z_ = 0;
@@ -86,6 +94,10 @@ private:
     AudioManager* audio_ = nullptr;
     PhysicsWorld* physics_world_ = nullptr;
     int physics_char_id_ = -1;
+    
+    // PK state
+    PKManagerDlg* pk_mgr_ = nullptr;
+    bool pk_flagged_ = false;
     
     void ProcessStateTransitions(float dt);
 };

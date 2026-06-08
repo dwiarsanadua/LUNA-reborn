@@ -3,6 +3,7 @@
 #include <spdlog/spdlog.h>
 #include <unordered_map>
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 
 AudioManager::AudioManager() { sound_lib_ = new CSoundLib(); }
@@ -32,6 +33,7 @@ void AudioManager::Shutdown() {
         delete sound_lib_;
         sound_lib_ = nullptr;
     }
+    active_sounds_.clear();
 }
 
 void AudioManager::PlayBGM(const std::string& map_id) {
@@ -85,9 +87,69 @@ void AudioManager::PlaySFXByCategory(Category cat, const std::string& name) {
     }
 }
 
-void AudioManager::Play3D(const std::string& name, float x, float y, float z) {
-    // Basic 3D audio — for now just standard SFX
+void AudioManager::PlaySFXInst(const std::string& name, float x, float y, float z) {
+    // Immediate SFX at a world position (non-spatial)
     PlaySFX(name);
+}
+
+int AudioManager::Play3D(const std::string& name, float x, float y, float z) {
+    std::string path = ASSETS_PATH + std::string("audio/SFX/") + name;
+    int lib_id = sound_lib_->LoadSFX(path.c_str());
+    if (lib_id < 0) return -1;
+
+    SoundInstance inst;
+    inst.handle = next_sound_handle_++;
+    inst.sound_lib_id = lib_id;
+    inst.position = glm::vec3(x, y, z);
+    inst.is_3d = true;
+    inst.active = true;
+
+    int vol = CalculateAttenuation(inst);
+    sound_lib_->PlaySFX(lib_id, vol);
+
+    active_sounds_[inst.handle] = inst;
+    return inst.handle;
+}
+
+void AudioManager::SetSoundPosition(int handle, float x, float y, float z) {
+    auto it = active_sounds_.find(handle);
+    if (it == active_sounds_.end()) return;
+    auto& snd = it->second;
+    snd.velocity = glm::vec3(x, y, z) - snd.position;
+    snd.position = glm::vec3(x, y, z);
+
+    if (snd.is_3d && sound_lib_) {
+        int vol = CalculateAttenuation(snd);
+        sound_lib_->SetSFXVolume(snd.sound_lib_id, vol);
+    }
+}
+
+void AudioManager::SetListenerPosition(float x, float y, float z) {
+    prev_listener_pos_ = listener_pos_;
+    listener_pos_ = glm::vec3(x, y, z);
+    listener_vel_ = listener_pos_ - prev_listener_pos_;
+}
+
+void AudioManager::SetListenerOrientation(const glm::vec3& forward, const glm::vec3& up) {
+    listener_forward_ = glm::normalize(forward);
+    listener_up_ = glm::normalize(up);
+}
+
+void AudioManager::StopSound(int handle) {
+    auto it = active_sounds_.find(handle);
+    if (it == active_sounds_.end()) return;
+    if (sound_lib_) {
+        sound_lib_->StopSFX(it->second.sound_lib_id);
+    }
+    active_sounds_.erase(it);
+}
+
+void AudioManager::SetDistanceModel(int model) {
+    distance_model_ = model;
+}
+
+void AudioManager::SetDopplerFactor(float factor) {
+    doppler_factor_ = std::max(0.0f, factor);
 }
 
 void AudioManager::SetMasterVolume(float vol) {
@@ -104,7 +166,55 @@ void AudioManager::SetSFXVolume(float vol) {
 }
 
 void AudioManager::Update() {
-    // No-op for now, miniaudio handles threads
+    if (!sound_lib_) return;
+
+    // Update 3D sound volumes based on listener position
+    for (auto& [handle, snd] : active_sounds_) {
+        if (!snd.active) continue;
+        if (!snd.is_3d) continue;
+
+        int vol = CalculateAttenuation(snd);
+        sound_lib_->SetSFXVolume(snd.sound_lib_id, vol);
+
+        // Doppler shift: adjust pitch based on relative velocity
+        glm::vec3 rel_vel = snd.velocity - listener_vel_;
+        float dist = glm::distance(listener_pos_, snd.position);
+        if (dist > 0.01f) {
+            float approach = glm::dot(rel_vel, glm::normalize(listener_pos_ - snd.position));
+            float doppler_pitch = 1.0f + doppler_factor_ * approach / 343.0f;
+            doppler_pitch = std::max(0.5f, std::min(2.0f, doppler_pitch));
+            sound_lib_->SetSFXPitch(snd.sound_lib_id, doppler_pitch);
+        }
+    }
+
+    // Clean up finished sounds (if sound lib supports query)
+    std::vector<int> to_remove;
+    for (auto& [handle, snd] : active_sounds_) {
+        // Check if sound has finished playing
+        if (!sound_lib_->IsSFXPlaying(snd.sound_lib_id)) {
+            to_remove.push_back(handle);
+        }
+    }
+    for (int h : to_remove) active_sounds_.erase(h);
+}
+
+int AudioManager::CalculateAttenuation(const SoundInstance& snd) const {
+    float dist = glm::distance(listener_pos_, snd.position);
+    float vol = 1.0f;
+
+    if (distance_model_ == 0) {
+        // Linear attenuation
+        if (dist <= snd.reference_distance) {
+            vol = 1.0f;
+        } else if (dist >= snd.max_distance) {
+            vol = 0.0f;
+        } else {
+            vol = 1.0f - (dist - snd.reference_distance) / (snd.max_distance - snd.reference_distance);
+        }
+    }
+    // Clamp and convert to 0-100 scale for sound lib
+    vol = std::max(0.0f, std::min(1.0f, vol));
+    return (int)(vol * 100);
 }
 
 void AudioManager::ScanAudioDirectory() {
