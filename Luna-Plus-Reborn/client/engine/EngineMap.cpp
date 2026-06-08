@@ -3,6 +3,10 @@
 #include <sstream>
 #include <algorithm>
 #include <spdlog/spdlog.h>
+#include <audio/AudioManager.hpp>
+#include <game/ecs/systems/GameDataDB.hpp>
+#include <game/ecs/systems/SpawnSystem.hpp>
+#include <entt/entt.hpp>
 
 bool EngineMap::Load(const std::string& map_id) {
     current_map_ = map_id;
@@ -39,11 +43,68 @@ bool EngineMap::Load(const std::string& map_id) {
         parseVec4("fog_color", env_.fog_color);
     }
 
+    // Play BGM for this map with crossfade
+    if (audio_) {
+        std::string bgm = GetBGMForMap(map_id);
+        audio_->SmoothBGMTransition(bgm, 1.0f);
+    }
+
+    // Spawn monsters and NPCs from GameDataDB
+    if (spawn_sys_ && registry_) {
+        try {
+            uint32_t id = static_cast<uint32_t>(std::stoul(map_id));
+            // Use external DB if provided, otherwise open internally
+            GameDataDB* db = gamedb_;
+            GameDataDB local_db;
+            if (!db) {
+                if (local_db.Open("data/game_data.db")) {
+                    local_db.LoadMonsterTemplates();
+                    local_db.LoadNPCTemplates();
+                    local_db.LoadMapData();
+                    db = &local_db;
+                }
+            }
+            if (db) {
+                auto spawns = db->GetMonsterSpawns(id);
+                for (const auto& s : spawns) {
+                    for (uint16_t i = 0; i < s.count; ++i) {
+                        float ox = (static_cast<float>(rand() % 200) - 100.0f) * s.spawn_radius / 100.0f;
+                        float oz = (static_cast<float>(rand() % 200) - 100.0f) * s.spawn_radius / 100.0f;
+                        spawn_sys_->SpawnMonster(*registry_, s.monster_id, glm::vec3(ox, 0.0f, oz), 1);
+                    }
+                }
+                auto npcs = db->GetNPCPositions(id);
+                for (const auto& npc : npcs) {
+                    spdlog::info("EngineMap: placing NPC '{}' at ({}, {}, {})", npc.name, npc.pos_x, npc.pos_y, npc.pos_z);
+                }
+            }
+        } catch (...) {
+            spdlog::warn("EngineMap: invalid map_id for DB spawn: {}", map_id);
+        }
+    }
+
     loaded_ = true;
     return true;
 }
 
+void EngineMap::InitBGMMap() {
+    bgm_map_ = {
+        {"1", "BGM_Title"}, {"2", "BGM_AlkerPlains"}, {"51", "BGM_AlkerPlains"},
+        {"52", "BGM_BlueMoon"}, {"53", "BGM_AruaCity"}, {"54", "BGM_SnowyMountain"},
+        {"61", "BGM_Desert"}, {"62", "BGM_Forest"}, {"71", "BGM_Dungeon"},
+        {"72", "BGM_Boss"}, {"81", "BGM_Seaside"}, {"82", "BGM_Island"},
+        {"91", "BGM_Castle"}, {"99", "BGM_Event"},
+    };
+}
+
+std::string EngineMap::GetBGMForMap(const std::string& map_id) const {
+    auto it = bgm_map_.find(map_id);
+    if (it != bgm_map_.end()) return it->second;
+    return "BGM_Map" + map_id;
+}
+
 void EngineMap::Unload() {
+    if (audio_) audio_->StopBGM();
     loaded_ = false;
     current_map_.clear();
 }
@@ -87,16 +148,24 @@ void EngineMap::LoadSceneObjects(const std::string& json_path) {
         std::transform(modLower.begin(), modLower.end(), modLower.begin(), ::tolower);
         size_t dot = modLower.find_last_of('.');
         if (dot != std::string::npos) modLower = modLower.substr(0, dot);
-        std::string fname = "assets/models/" + modLower + ".glb";
-        std::ifstream test(fname);
-        if (!test.good()) {
-            fname = "assets/models/" + modLower + ".obj";
-            test.open(fname);
-        }
-        if (test.good()) {
-            test.close();
-            float avgScale = (sx + sy + sz) / 3.0f * 0.005f;
-            props_->LoadObj(fname, {px * 0.0001f, py * 0.0001f, pz * 0.0001f}, avgScale);
+
+        // Try .glb first, then .obj, then .MOD with fresh ifstream each time
+        auto tryLoad = [&](const std::string& ext) -> bool {
+            std::string fname = "assets/models/" + modLower + ext;
+            std::ifstream test(fname);
+            if (test.good()) {
+                test.close();
+                int mesh_idx = props_->LoadObj(fname);
+                if (mesh_idx >= 0) {
+                    float avgScale = (sx + sy + sz) / 3.0f * 0.005f;
+                    props_->AddInstance(mesh_idx, {px * 0.0001f, py * 0.0001f, pz * 0.0001f}, avgScale);
+                }
+                return true;
+            }
+            return false;
+        };
+
+        if (tryLoad(".glb") || tryLoad(".obj") || tryLoad(".mod")) {
             loaded++;
         } else {
             skipped_no_obj++;
@@ -121,8 +190,16 @@ void EngineMap::LoadFarmProps(const std::string& farm_dir) {
     for (auto& p : props) {
         std::string path = farm_dir + "/" + std::string(p.file);
         std::ifstream test(path + ".glb");
-        if (test.good()) { test.close(); props_->LoadObj(path + ".glb", {p.x, 0, p.z}, p.scale); }
-        else { props_->LoadObj(path + ".obj", {p.x, 0, p.z}, p.scale); }
+        int mesh_idx = -1;
+        if (test.good()) {
+            test.close();
+            mesh_idx = props_->LoadObj(path + ".glb");
+        } else {
+            mesh_idx = props_->LoadObj(path + ".obj");
+        }
+        if (mesh_idx >= 0) {
+            props_->AddInstance(mesh_idx, {p.x, 0, p.z}, p.scale);
+        }
     }
     spdlog::info("EngineMap: loaded {} farm props", (int)(sizeof(props)/sizeof(props[0])));
 }

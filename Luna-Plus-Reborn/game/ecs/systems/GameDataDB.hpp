@@ -220,6 +220,8 @@ struct SkillTemplate {
     uint32_t effect_id = 0;
 };
 
+#ifndef GAMEDATADB_QUEST_TEMPLATE_DEFINED
+#define GAMEDATADB_QUEST_TEMPLATE_DEFINED
 struct QuestTemplate {
     uint32_t id = 0;
     std::string name;
@@ -232,6 +234,7 @@ struct QuestTemplate {
     std::string dialog_progress;
     std::string dialog_complete;
 };
+#endif
 
 struct NPCData {
     uint32_t id = 0;

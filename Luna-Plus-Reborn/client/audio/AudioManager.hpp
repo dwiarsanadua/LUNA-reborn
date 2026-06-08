@@ -25,6 +25,8 @@ public:
 
     void PlayBGM(const std::string& map_id);
     void StopBGM();
+    std::string GetBGMForMap(int map_id) const;
+    void SmoothBGMTransition(const std::string& new_bgm, float duration = 1.0f);
     void PlaySFX(const std::string& name);
     void PlaySFXByCategory(Category cat, const std::string& name);
     void PlaySFXInst(const std::string& name, float x, float y, float z);
@@ -79,4 +81,17 @@ private:
     std::unordered_map<int, SoundInstance> active_sounds_;
 
     int CalculateAttenuation(const SoundInstance& snd) const;
+
+    // Crossfade state
+    struct CrossfadeState {
+        bool active = false;
+        float duration = 1.0f;
+        float elapsed = 0.0f;
+        int prev_bgm_id = -1;
+        int new_bgm_id = -1;
+        float prev_vol = 0.0f;
+        float new_vol = 0.0f;
+    };
+    CrossfadeState crossfade_;
+    std::unordered_map<int, std::string> bgm_map_;
 };

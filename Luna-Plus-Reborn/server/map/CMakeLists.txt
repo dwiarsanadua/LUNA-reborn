@@ -22,6 +22,7 @@ target_link_libraries(MapServer PRIVATE
     Database
     game_core
     EnTT::EnTT
+    flatbuffers::flatbuffers
     spdlog::spdlog
     fmt::fmt
     glm::glm

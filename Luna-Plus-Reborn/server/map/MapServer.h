@@ -67,6 +67,9 @@ public:
     void DespawnPlayer(int entity_id);
     void SpawnMonster(int template_id, const glm::vec3& pos);
     void DespawnMonster(int entity_id);
+    void SendNPCList(int player_entity_id);
+    bool CheckEncounterTrigger(float player_x, float player_z);
+    void SavePlayerPosition(int entity_id, float x, float y, float z);
 
     CombatSystem& GetCombatSystem();
     AISystem& GetAISystem();

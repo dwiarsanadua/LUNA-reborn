@@ -6,6 +6,8 @@
 #include "systems/MovementSystem.h"
 #include "systems/ItemSystem.h"
 #include "systems/QuestSystem.h"
+#include "systems/SpawnSystem.hpp"
+#include <sqlite3.h>
 #include <ecs/components/Inventory.hpp>
 #include <ecs/components/CharacterStats.hpp>
 #include <ecs/components/Tag.hpp>
@@ -15,6 +17,8 @@
 #include <chrono>
 #include <thread>
 #include <random>
+#include <sstream>
+#include <filesystem>
 
 static std::mt19937 s_dungeon_rng(std::random_device{}());
 
@@ -75,6 +79,49 @@ bool MapServer::Initialize(int map_id, uint16_t port) {
     network_->SetReceiveCallback([this](const uint8_t* data, size_t size) {
         spdlog::debug("MapServer: packet received size={}", size);
     });
+
+    // Load monster spawns from game_data.db using direct SQL
+    {
+        sqlite3* gamedb = nullptr;
+        if (sqlite3_open("data/game_data.db", &gamedb) == SQLITE_OK) {
+            SpawnSystem spawn_sys;
+            // Query monster spawns for this map
+            const char* spawn_sql = "SELECT col_0000, col_0001, col_0002, col_0003, col_0004, col_0005 FROM game_monsterlist WHERE col_0002=?";
+            sqlite3_stmt* stmt = nullptr;
+            if (sqlite3_prepare_v2(gamedb, spawn_sql, -1, &stmt, nullptr) == SQLITE_OK) {
+                sqlite3_bind_int(stmt, 1, map_id);
+                int spawn_count = 0;
+                while (sqlite3_step(stmt) == SQLITE_ROW) {
+                    int monster_id = sqlite3_column_int(stmt, 1);
+                    int count = sqlite3_column_int(stmt, 3);
+                    float radius = static_cast<float>(sqlite3_column_double(stmt, 5));
+                    for (int i = 0; i < count; ++i) {
+                        float ox = (static_cast<float>(rand() % 200) - 100.0f) * radius / 100.0f;
+                        float oz = (static_cast<float>(rand() % 200) - 100.0f) * radius / 100.0f;
+                        spawn_sys.SpawnMonster(*registry_, static_cast<uint32_t>(monster_id),
+                                               glm::vec3(ox, 0.0f, oz), 1);
+                        spawn_count++;
+                    }
+                }
+                sqlite3_finalize(stmt);
+                spdlog::info("MapServer: spawned {} monsters for map {}", spawn_count, map_id);
+            }
+            // Query NPC positions
+            const char* npc_sql = "SELECT col_0000, col_0001, col_0002, col_0003, col_0004, col_0005 FROM game_npc WHERE col_0002=?";
+            if (sqlite3_prepare_v2(gamedb, npc_sql, -1, &stmt, nullptr) == SQLITE_OK) {
+                sqlite3_bind_int(stmt, 1, map_id);
+                int npc_count = 0;
+                while (sqlite3_step(stmt) == SQLITE_ROW) {
+                    npc_count++;
+                }
+                sqlite3_finalize(stmt);
+                spdlog::info("MapServer: loaded {} NPCs for map {}", npc_count, map_id);
+            }
+            sqlite3_close(gamedb);
+        } else {
+            spdlog::warn("MapServer: no game_data.db, continuing without spawns");
+        }
+    }
 
     running_ = true;
     spdlog::info("MapServer: map {} initialized on port {}", map_id, port);
@@ -181,6 +228,81 @@ void MapServer::DespawnMonster(int entity_id) {
     for (auto entity : view) {
         if (static_cast<int>(entity) == entity_id) {
             registry_->destroy(entity);
+            return;
+        }
+    }
+}
+
+void MapServer::SendNPCList(int player_entity_id) {
+    sqlite3* gamedb = nullptr;
+    if (sqlite3_open("data/game_data.db", &gamedb) != SQLITE_OK) return;
+    const char* npc_sql = "SELECT col_0000, col_0001, col_0003, col_0004, col_0005, col_0006 FROM game_npc WHERE col_0002=?";
+    sqlite3_stmt* stmt = nullptr;
+    if (sqlite3_prepare_v2(gamedb, npc_sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, map_id_);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            int npc_id = sqlite3_column_int(stmt, 0);
+            const char* name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            float x = static_cast<float>(sqlite3_column_double(stmt, 3));
+            float y = static_cast<float>(sqlite3_column_double(stmt, 4));
+            float z = static_cast<float>(sqlite3_column_double(stmt, 5));
+            spdlog::info("MapServer: sending NPC '{}' (id={}) to player {} at ({},{},{})",
+                         name ? name : "?", npc_id, player_entity_id, x, y, z);
+        }
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(gamedb);
+}
+
+bool MapServer::CheckEncounterTrigger(float player_x, float player_z) {
+    sqlite3* gamedb = nullptr;
+    if (sqlite3_open("data/game_data.db", &gamedb) != SQLITE_OK) return false;
+    const char* spawn_sql = "SELECT col_0000, col_0001, col_0002, col_0003, col_0004, col_0005 FROM game_monsterlist WHERE col_0002=?";
+    sqlite3_stmt* stmt = nullptr;
+    bool triggered = false;
+    if (sqlite3_prepare_v2(gamedb, spawn_sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, map_id_);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            float radius = static_cast<float>(sqlite3_column_double(stmt, 5));
+            float dist = std::sqrt(player_x * player_x + player_z * player_z);
+            if (dist < radius) {
+                int monster_id = sqlite3_column_int(stmt, 1);
+                spdlog::info("MapServer: encounter triggered (monster {} within radius {})",
+                             monster_id, radius);
+                triggered = true;
+                break;
+            }
+        }
+        sqlite3_finalize(stmt);
+    }
+    sqlite3_close(gamedb);
+    return triggered;
+}
+
+void MapServer::SavePlayerPosition(int entity_id, float x, float y, float z) {
+    auto view = registry_->view<PlayerData>();
+    for (auto entity : view) {
+        auto& pd = view.get<PlayerData>(entity);
+        if (pd.id == entity_id) {
+            pd.pos_x = x;
+            pd.pos_y = y;
+            pd.pos_z = z;
+            std::string sql = "INSERT OR REPLACE INTO player_saves "
+                "(entity_id, account_id, name, level, class_id, map_id, pos_x, pos_y, pos_z, hp, max_hp) VALUES ("
+                + std::to_string(pd.id) + ","
+                + std::to_string(pd.id) + ",'"
+                + pd.name + "',"
+                + std::to_string(pd.level) + ","
+                + std::to_string(pd.class_id) + ","
+                + std::to_string(map_id_) + ","
+                + std::to_string(x) + ","
+                + std::to_string(y) + ","
+                + std::to_string(z) + ","
+                + std::to_string(pd.hp) + ","
+                + std::to_string(pd.max_hp) + ")";
+            db_->Execute(sql);
+            spdlog::info("MapServer: saved position for player {} at ({},{},{})",
+                         entity_id, x, y, z);
             return;
         }
     }

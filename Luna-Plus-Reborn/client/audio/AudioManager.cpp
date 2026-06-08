@@ -6,6 +6,14 @@
 #include <cmath>
 #include <filesystem>
 
+static const std::unordered_map<int, std::string> s_default_bgm_map = {
+    {1, "BGM_Title"}, {2, "BGM_AlkerPlains"}, {51, "BGM_AlkerPlains"},
+    {52, "BGM_BlueMoon"}, {53, "BGM_AruaCity"}, {54, "BGM_SnowyMountain"},
+    {61, "BGM_Desert"}, {62, "BGM_Forest"}, {71, "BGM_Dungeon"},
+    {72, "BGM_Boss"}, {81, "BGM_Seaside"}, {82, "BGM_Island"},
+    {91, "BGM_Castle"}, {99, "BGM_Event"},
+};
+
 AudioManager::AudioManager() { sound_lib_ = new CSoundLib(); }
 
 AudioManager::~AudioManager() { 
@@ -37,17 +45,23 @@ void AudioManager::Shutdown() {
 }
 
 void AudioManager::PlayBGM(const std::string& map_id) {
+    std::string path = ASSETS_PATH + std::string("audio/BGM/") + map_id + ".mp3";
+    if (!std::filesystem::exists(path)) {
+        spdlog::warn("BGM: file not found, skipping: {}", path);
+        return;
+    }
     if (current_bgm_id_ != -1) {
         sound_lib_->StopBGM(current_bgm_id_);
         current_bgm_id_ = -1;
     }
-    std::string path = ASSETS_PATH + std::string("audio/BGM/") + map_id + ".mp3";
     int id = sound_lib_->OpenBGM(path.c_str());
     if (id >= 0) {
         sound_lib_->PlayBGM(id, true);
         current_bgm_id_ = id;
         current_bgm_ = map_id;
         spdlog::info("BGM: playing {} (id={})", map_id, id);
+    } else {
+        spdlog::warn("BGM: failed to open {}", path);
     }
 }
 
@@ -55,6 +69,48 @@ void AudioManager::StopBGM() {
     if (current_bgm_id_ != -1) {
         sound_lib_->StopBGM(current_bgm_id_);
         current_bgm_id_ = -1;
+    }
+    current_bgm_.clear();
+    crossfade_.active = false;
+}
+
+std::string AudioManager::GetBGMForMap(int map_id) const {
+    auto it = s_default_bgm_map.find(map_id);
+    if (it != s_default_bgm_map.end()) return it->second;
+    return "BGM_Map" + std::to_string(map_id);
+}
+
+void AudioManager::SmoothBGMTransition(const std::string& new_bgm, float duration) {
+    if (new_bgm == current_bgm_) return;
+    if (!sound_lib_) return;
+
+    std::string path = ASSETS_PATH + std::string("audio/BGM/") + new_bgm + ".mp3";
+    if (!std::filesystem::exists(path)) {
+        spdlog::warn("BGM: transition file not found: {}", path);
+        return;
+    }
+
+    int new_id = sound_lib_->OpenBGM(path.c_str());
+    if (new_id < 0) {
+        spdlog::warn("BGM: failed to open {} for transition", path);
+        return;
+    }
+
+    if (current_bgm_id_ != -1) {
+        crossfade_.active = true;
+        crossfade_.duration = duration;
+        crossfade_.elapsed = 0.0f;
+        crossfade_.prev_bgm_id = current_bgm_id_;
+        crossfade_.new_bgm_id = new_id;
+        crossfade_.prev_vol = 1.0f;
+        crossfade_.new_vol = 0.0f;
+        sound_lib_->PlayBGM(new_id, true);
+        sound_lib_->SetBGMVolume(new_id, 0);
+    } else {
+        sound_lib_->PlayBGM(new_id, true);
+        current_bgm_id_ = new_id;
+        current_bgm_ = new_bgm;
+        spdlog::info("BGM: playing {} (id={})", new_bgm, new_id);
     }
 }
 
@@ -167,6 +223,23 @@ void AudioManager::SetSFXVolume(float vol) {
 
 void AudioManager::Update() {
     if (!sound_lib_) return;
+
+    // Handle BGM crossfade
+    if (crossfade_.active) {
+        crossfade_.elapsed += 1.0f / 60.0f; // approximate frame step
+        float t = std::min(crossfade_.elapsed / crossfade_.duration, 1.0f);
+        float prev_vol = static_cast<int>((1.0f - t) * 100);
+        float new_vol = static_cast<int>(t * 100);
+        sound_lib_->SetBGMVolume(crossfade_.prev_bgm_id, std::max(0, static_cast<int>(prev_vol)));
+        sound_lib_->SetBGMVolume(crossfade_.new_bgm_id, static_cast<int>(new_vol));
+        if (t >= 1.0f) {
+            sound_lib_->StopBGM(crossfade_.prev_bgm_id);
+            current_bgm_id_ = crossfade_.new_bgm_id;
+            current_bgm_ = "";
+            crossfade_.active = false;
+            spdlog::info("BGM: crossfade complete, new id={}", current_bgm_id_);
+        }
+    }
 
     // Update 3D sound volumes based on listener position
     for (auto& [handle, snd] : active_sounds_) {

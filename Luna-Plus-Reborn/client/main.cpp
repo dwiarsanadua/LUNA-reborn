@@ -2,11 +2,13 @@
 #include <engine/GraphicEngine.hpp>
 #include <engine/EngineCamera.hpp>
 #include <engine/EngineMap.hpp>
+#include <engine/EngineSky.hpp>
 #include <network/NetworkClient.hpp>
 #include <audio/AudioManager.hpp>
 #include <rendering/UIRenderer.hpp>
 #include <rendering/ParticleRenderer.hpp>
 #include <ecs/systems/ParticleSystem.hpp>
+#include <ecs/systems/SpawnSystem.hpp>
 #include <ui/GameState.hpp>
 #include <ui/ScreenManager.hpp>
 #include <ui/screens/LoginScreen.hpp>
@@ -57,10 +59,14 @@ UIRenderer* g_ui = nullptr;
 int main() {
     srand((unsigned int)time(nullptr));
     mkdir("logs", 0777);
+
+    // 1. ConfigManager / Logger
     Luna::InitLog("client", "client.log");
     spdlog::info("LUNA Plus Reborn — v1.1.0");
-    Localization::Init();
     ConfigManager::Init();
+
+    // 2. Input systems (before audio)
+    Localization::Init();
     Keyboard::Init();
     Mouse::Init();
     MouseCursor::Init();
@@ -78,29 +84,44 @@ int main() {
 
     signal(SIGINT, signal_handler); signal(SIGTERM, signal_handler);
 
+    // 3. AudioManager (before render device so BGM can start early)
+    AudioManager audio;
+    g_audio = &audio;
+    if (!audio.Initialize()) {
+        spdlog::warn("AudioManager: init failed, continuing without audio");
+    }
+
+    // 4. RenderDevice
     RenderDeviceConfig config{};
     config.width = 1280; config.height = 720;
     config.title = "LUNA Plus Reborn";
     config.vsync = false;
-
     RenderDevice device;
     if (!device.Init(config)) return 1;
-    
     spdlog::info("Window Size: {}x{} | Framebuffer: {}x{}", config.width, config.height, device.GetWidth(), device.GetHeight());
 
-    // Engine initialization
+    // 5. SceneRenderer (via GraphicEngine)
     GraphicEngine gfx; gfx.Init();
     gfx.GetScene()->width = (float)device.GetWidth();
     gfx.GetScene()->height = (float)device.GetHeight();
     EngineCamera cam; cam.Init(config.width, config.height);
-    
+
+    // 6. TerrainRenderer / PropRenderer
     TerrainRenderer terrain;
     PropRenderer props; props.Init();
     props.width = (float)device.GetWidth();
     props.height = (float)device.GetHeight();
+
+    // 7. EngineMap (with Audio and DB integration)
+    SpawnSystem spawn_sys;
+    entt::registry registry;
     EngineMap map;
     map.SetTerrain(&terrain);
     map.SetProps(&props);
+    map.SetAudio(&audio);
+    map.SetSpawnSystem(&spawn_sys);
+    map.SetRegistry(&registry);
+    // GameDataDB initialized with EngineMap internally (avoids struct conflicts)
     // Initial map load from state
     if (g_state.map_id != 0) {
         map.Load(std::to_string(g_state.map_id));
@@ -109,9 +130,15 @@ int main() {
     }
     map.LoadFarmProps("assets/models/farm");
 
+    // 8. EngineSky
+    EngineSky sky;
+    sky.Init();
+
+    // 9. CharacterRenderer
     CharRenderer_Init();
     CharRenderer_SetFBSize((uint16_t)device.GetWidth(), (uint16_t)device.GetHeight());
 
+    // 10. UIRenderer
     UIRenderer ui; ui.Init();
     g_ui = &ui;
     ui.width = (float)device.GetWidth();
@@ -127,9 +154,6 @@ int main() {
     gfx.GetScene()->height = (float)device.GetHeight();
     ParticleRenderer particles; particles.Init();
 
-    AudioManager audio;
-    g_audio = &audio;
-    audio.Initialize();
     audio.PlayBGM("BGM_Login");
 
     AmbientSystem ambient;
@@ -189,6 +213,7 @@ int main() {
     screenManager.Register("game", std::move(gameScreen));
 
     screenManager.SwitchTo("login");
+
     static Luna::PacketDispatcher client_dispatcher;
 
     // --- Register Client Handlers ---
