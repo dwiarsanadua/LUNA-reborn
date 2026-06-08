@@ -66,8 +66,8 @@ void SecondarySystem::Init(Database* db, int map_id) {
     next_house_id_ = 1;
     next_furniture_id_ = 1;
     house_templates_.push_back({0, "Cozy Cottage", 10000, 16, 51});
-    house_templates_.push_back({1, "Town House", 25000, 24, 51});
-    house_templates_.push_back({2, "Grand Villa", 50000, 32, 51});
+    house_templates_.push_back({1, "Town House", 25000, 24, 13});
+    house_templates_.push_back({2, "Grand Villa", 50000, 32, 20});
     furniture_catalog_.push_back({9001, "Wooden Table", "Tables"});
     furniture_catalog_.push_back({9002, "Comfy Chair", "Seating"});
     furniture_catalog_.push_back({9003, "Lamp", "Lighting"});

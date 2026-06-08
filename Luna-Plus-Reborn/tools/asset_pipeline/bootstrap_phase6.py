@@ -38,8 +38,8 @@ SHOP_SEED = [
 
 HOUSE_TEMPLATE_SEED = [
     (0, "Cozy Cottage", 10000, 16, 51),
-    (1, "Town House", 25000, 24, 51),
-    (2, "Grand Villa", 50000, 32, 51),
+    (1, "Town House", 25000, 24, 13),
+    (2, "Grand Villa", 50000, 32, 20),
 ]
 
 FURNITURE_CATALOG_SEED = [
@@ -135,10 +135,14 @@ def main() -> int:
     seed_phase6(conn.cursor())
     fish = conn.execute("SELECT COUNT(*) FROM phase6_fish_types").fetchone()[0]
     shop = conn.execute("SELECT COUNT(*) FROM phase6_shop_items").fetchone()[0]
+    houses = conn.execute("SELECT COUNT(*) FROM phase6_house_templates").fetchone()[0]
+    tours = conn.execute("SELECT COUNT(*) FROM phase6_tournaments").fetchone()[0]
     conn.commit()
     conn.close()
     print(f"  phase6_fish_types: {fish}")
     print(f"  phase6_shop_items: {shop}")
+    print(f"  phase6_house_templates: {houses}")
+    print(f"  phase6_tournaments: {tours}")
     print("Phase 6 bootstrap OK")
     return 0
 
