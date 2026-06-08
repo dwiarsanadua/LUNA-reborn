@@ -970,29 +970,29 @@ Jalankan perintah berikut di terminal untuk mendapatkan status terkini:
 cd /Users/macbookair/PRIBADI/luna-plus-master
 
 echo "=== VERIFIKASI ASSET ==="
-echo "Textures : Old $(find Luna-Plus-Old/LEGACY_ASSETS -name '*.dds' -o -name '*.tif' -o -name '*.tga' 2>/dev/null | wc -l) → Reborn $(find Luna-Plus-Reborn/assets/textures/ -type f 2>/dev/null | wc -l)"
-echo "Models   : Old $(find Luna-Plus-Old/LEGACY_ASSETS -name '*.mod' 2>/dev/null | wc -l) → Reborn $(find Luna-Plus-Reborn/assets/models/ -type f 2>/dev/null | wc -l)"
-echo "Anims    : Old $(find Luna-Plus-Old/LEGACY_ASSETS -name '*.anm' 2>/dev/null | wc -l) → Reborn $(find Luna-Plus-Reborn/assets/animations/ -type f 2>/dev/null | wc -l)"
-echo "Audio    : Old $(find Luna-Plus-Old/LEGACY_ASSETS -name '*.wav' -o -name '*.mp3' 2>/dev/null | wc -l) → Reborn $(find Luna-Plus-Reborn/assets/audio/ -type f 2>/dev/null | wc -l)"
-echo "Heightmap: Old $(find Luna-Plus-Old/LEGACY_ASSETS -name '*.hfl' 2>/dev/null | wc -l) → Reborn $(find Luna-Plus-Reborn/assets/maps/ -name '*.hgt' 2>/dev/null | wc -l)"
-echo "CharDefs : Old $(find Luna-Plus-Old/LEGACY_ASSETS -name '*.chx' 2>/dev/null | wc -l) → Reborn $(find Luna-Plus-Reborn/assets/characters/ -type f 2>/dev/null | wc -l)"
+echo "Textures : Old $(find Luna-Plus-Old/LEGACY_ASSETS \( -name '*.dds' -o -name '*.tif' -o -name '*.tga' -o -name '*.png' \) 2>/dev/null | wc -l) → Reborn $(find Luna-Plus-Reborn/assets -name '*.png' 2>/dev/null | wc -l)"
+echo "Models   : Old $(find Luna-Plus-Old/LEGACY_ASSETS -name '*.mod' 2>/dev/null | wc -l) → Reborn $(find Luna-Plus-Reborn/assets/models -name '*.glb' 2>/dev/null | wc -l)"
+echo "Anims    : Old $(find Luna-Plus-Old/LEGACY_ASSETS -name '*.anm' 2>/dev/null | wc -l) → Reborn $(find Luna-Plus-Reborn/assets/animations -type f 2>/dev/null | wc -l)"
+echo "Audio    : Old $(find Luna-Plus-Old/LEGACY_ASSETS \( -name '*.wav' -o -name '*.mp3' \) 2>/dev/null | wc -l) → Reborn $(find Luna-Plus-Reborn/assets/audio -type f 2>/dev/null | wc -l)"
+echo "Heightmap: Old $(find Luna-Plus-Old/LEGACY_ASSETS -name '*.hfl' 2>/dev/null | wc -l) → Reborn $(find Luna-Plus-Reborn/assets/maps -name '*.hgt' 2>/dev/null | wc -l)"
+echo "CharDefs : Old $(find Luna-Plus-Old/LEGACY_ASSETS -name '*.chx' 2>/dev/null | wc -l) → Reborn $(find Luna-Plus-Reborn/assets/characters -type f 2>/dev/null | wc -l)"
 ```
-
-Output langsung menunjukkan berapa file yang sudah dan belum di-convert.
 
 ### 9.4 Prioritas Konversi
 
 | Prioritas | Asset | Jumlah Tertinggal | Estimasi Waktu | Tools |
 |-----------|-------|-------------------|----------------|-------|
-| 🔴 **Tertinggi** | Textures (.dds/.tif/.tga → .png) | ~19.875 | 3-4 jam | `tools/asset_pipeline/convert_textures.py` |
-| 🔴 **Tinggi** | Models (.mod → .glb) | ~8.000 | 2-3 jam | `tools/asset_pipeline/convert_models.py` |
-| 🟡 **Sedang** | Heightmaps (.hfl → .hgt) | 17 | 10 menit | `tools/asset_pipeline/convert_heightmaps.py` |
+| 🟡 **Sedang** | Textures (Remaining PNGs) | ~8.476 | 1 jam | Manual sync/cleanup |
+| ✅ **Selesai** | Models (.mod → .glb) | 0 | — | — |
+| ✅ **Selesai** | Heightmaps (.hfl → .hgt) | 0 | — | — |
 
-Semua pipeline tools sudah siap di `Luna-Plus-Reborn/tools/asset_pipeline/`. Cukup jalankan:
-```bash
-cd Luna-Plus-Reborn/tools/asset_pipeline
-python3 run.py --textures    # batch convert 19.875 textures
-python3 run.py --models      # batch convert 8.000 models
+---
+
+*Document generated from deep codebase audit. Updated: June 2026.*
+*Total Old source: ~7.798 file .cpp/.h, ~2.922.486 baris kode*
+*Total Old asset: ~2,16 GB packed, ~20.276 tekstur, ~10.573 model, ~7.105 animasi, ~1.542 karakter*
+*Asset verification data is real-time and can be re-generated via commands in Section 9.3*
+tch convert 8.000 models
 python3 run.py --heightmaps  # batch convert 17 heightmaps
 ```
 
@@ -1002,3 +1002,4 @@ python3 run.py --heightmaps  # batch convert 17 heightmaps
 *Total Old source: ~7.798 file .cpp/.h, ~2.922.486 baris kode*
 *Total Old asset: ~2,16 GB packed, ~20.276 tekstur, ~10.573 model, ~7.105 animasi, ~1.542 karakter*
 *Asset verification data is real-time and can be re-generated via commands in Section 9.3*
+set verification data is real-time and can be re-generated via commands in Section 9.3*

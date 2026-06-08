@@ -15,6 +15,7 @@
 #include <vector>
 #include <fstream>
 #include <algorithm>
+#include <engine/gx_render/VFS.h>
 
 static constexpr int MAX_BONES = 64;
 static uint16_t g_fb_width = 1280;
@@ -75,7 +76,7 @@ static bgfx::UniformHandle g_u_color = BGFX_INVALID_HANDLE;
 static bgfx::TextureHandle g_white = BGFX_INVALID_HANDLE;
 
 static const bgfx::Memory* loadShader(const char* path) {
-    std::string search[] = { "build/bin/" + std::string(path), std::string(path), "assets/" + std::string(path) };
+    std::string search[] = { "build/bin/" + std::string(path), std::string(path), VFS::Resolve("assets/" + std::string(path)) };
     for (auto& p : search) {
         std::ifstream file(p, std::ios::binary | std::ios::ate);
         if (file) {

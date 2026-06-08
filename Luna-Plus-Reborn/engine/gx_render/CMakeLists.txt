@@ -1,4 +1,5 @@
 add_library(gx_render STATIC
+    VFS.cpp
     RenderDevice.cpp
     Texture.cpp
     TextureManager.cpp

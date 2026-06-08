@@ -7,6 +7,7 @@
 #include <fstream>
 #include <spdlog/spdlog.h>
 #include <stb_image.h>
+#include <engine/gx_render/VFS.h>
 
 static const bgfx::Memory* loadShader(const char* path) {
     std::ifstream file(path, std::ios::binary | std::ios::ate);
@@ -32,12 +33,12 @@ void EngineSky::Init() {
     }
 
     // Load sky texture — try multiple possible paths
-    sky_tex_ = LoadSkyTexture("assets/textures/unpacked/map/01_human_sky.png");
-    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture("assets/textures/unpacked/map/60_sky.png"); }
-    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture("assets_converted/mod_objs/01_human_sky.png"); }
-    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture("assets_converted/mod_objs/60_sky.png"); }
-    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture("assets/textures/01_human_sky.png"); }
-    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture("assets/textures/60_sky.png"); }
+    sky_tex_ = LoadSkyTexture(VFS::Resolve("assets/textures/unpacked/map/01_human_sky.png"));
+    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture(VFS::Resolve("assets/textures/unpacked/map/60_sky.png")); }
+    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture(VFS::Resolve("assets_converted/mod_objs/01_human_sky.png")); }
+    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture(VFS::Resolve("assets_converted/mod_objs/60_sky.png")); }
+    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture(VFS::Resolve("assets/textures/01_human_sky.png")); }
+    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture(VFS::Resolve("assets/textures/60_sky.png")); }
 
     BuildDomeMesh();
 }

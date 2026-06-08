@@ -9,6 +9,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <stb_image.h>
+#include <engine/gx_render/VFS.h>
 
 static const bgfx::Memory* loadShader(const char* path) {
     std::string searchPaths[] = {
@@ -16,7 +17,7 @@ static const bgfx::Memory* loadShader(const char* path) {
         std::string("bin/") + path,
         path,
         std::string("../") + path,
-        std::string("assets/") + path
+        VFS::Resolve(std::string("assets/") + path)
     };
 
     for (const auto& p : searchPaths) {
@@ -45,7 +46,7 @@ bgfx::TextureHandle PropRenderer::LoadTextureForMesh(const std::string& base_nam
     if (it != tex_cache_.end()) return it->second;
 
     std::string variations[] = { base_name, base_name + ".png", base_name + ".dds" };
-    std::string base_paths[] = { "assets/textures/unpacked/map/", "assets/textures/unpacked/farm/", "assets/textures/unpacked/character/", "assets/textures/unpacked/monster/", "assets/textures/unpacked/npc/", "assets/textures/unpacked/", "assets/textures/", "assets_converted/mod_objs/", "assets/unpacked/image/" };
+    std::string base_paths[] = { VFS::Resolve("assets/textures/unpacked/map/"), VFS::Resolve("assets/textures/unpacked/farm/"), VFS::Resolve("assets/textures/unpacked/character/"), VFS::Resolve("assets/textures/unpacked/monster/"), VFS::Resolve("assets/textures/unpacked/npc/"), VFS::Resolve("assets/textures/unpacked/"), VFS::Resolve("assets/textures/"), VFS::Resolve("assets_converted/mod_objs/"), VFS::Resolve("assets/unpacked/image/") };
 
     for (auto& base_path : base_paths) {
         for (auto& v : variations) {

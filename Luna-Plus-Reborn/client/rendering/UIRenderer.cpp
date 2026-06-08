@@ -9,6 +9,7 @@
 #include <set>
 
 #include <stb_image.h>
+#include <engine/gx_render/VFS.h>
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #include <stb_truetype.h>
@@ -34,7 +35,7 @@ static bgfx::VertexLayout getLayout() {
 }
 
 static const bgfx::Memory* loadShader(const char* path) {
-    std::string searchPaths[] = { "build/bin/" + std::string(path), std::string(path), "assets/" + std::string(path) };
+    std::string searchPaths[] = { "build/bin/" + std::string(path), std::string(path), VFS::Resolve("assets/" + std::string(path)) };
     for (const auto& p : searchPaths) {
         std::ifstream file(p, std::ios::binary | std::ios::ate);
         if (file) {
@@ -279,7 +280,7 @@ void UIRenderer::Init() {
 }
 
 void UIRenderer::CreateFont() {
-    std::string fontPath = "assets/interface/Windows/2002_EYA.ttf"; std::ifstream f(fontPath, std::ios::binary);
+    std::string fontPath = VFS::Resolve("assets/interface/Windows/2002_EYA.ttf"); std::ifstream f(fontPath, std::ios::binary);
     if (!f) return; std::vector<unsigned char> data((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
     stbtt_fontinfo info; if (!stbtt_InitFont(&info, data.data(), 0)) return;
     std::vector<unsigned char> atlas(512 * 128, 0); stbtt_bakedchar chardata[96];
@@ -319,9 +320,9 @@ TextureInfo UIRenderer::LoadTexture(const std::string& name, const std::string& 
     // Queue for atlas packing
     std::string search[] = {
         path,
-        "assets/textures/ui/" + path,
-        "assets/textures/" + path,
-        "assets/textures/unpacked/map/" + path
+        VFS::Resolve("assets/textures/ui/" + path),
+        VFS::Resolve("assets/textures/" + path),
+        VFS::Resolve("assets/textures/unpacked/map/" + path)
     };
 
     for (auto& p : search) {

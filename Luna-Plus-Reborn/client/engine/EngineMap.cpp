@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <spdlog/spdlog.h>
+#include <engine/gx_render/VFS.h>
 #include <audio/AudioManager.hpp>
 #include <game/ecs/systems/GameDataDB.hpp>
 #include <game/ecs/systems/SpawnSystem.hpp>
@@ -15,13 +16,13 @@ bool EngineMap::Load(const std::string& map_id) {
     if (!terrain_ || !props_) { spdlog::error("EngineMap: terrain/props not set"); return false; }
     InitBGMMap();
     
-    std::string hgt_path = "assets/maps/" + map_id + ".hgt";
+    std::string hgt_path = VFS::Resolve("assets/maps/" + map_id + ".hgt");
     if (!terrain_->LoadFromHGT(hgt_path.c_str(), 0.04f)) {  // tile=400, object_factor=0.0001, 400*0.0001=0.04
         terrain_->Init(100, 12.0f);
         spdlog::info("EngineMap: procedural terrain for map {}", map_id);
     }
     
-    std::string json_path = "assets/maps/" + map_id + ".json";
+    std::string json_path = VFS::Resolve("assets/maps/" + map_id + ".json");
     LoadSceneObjects(json_path);
     
     // Parse environment data from JSON
@@ -54,7 +55,7 @@ bool EngineMap::Load(const std::string& map_id) {
 
     // Load JSON-based spawn data and spawn monsters for this map
     if (spawn_sys_) {
-        spawn_sys_->LoadSpawnData("assets/data/monsters.json");
+        spawn_sys_->LoadSpawnData(VFS::Resolve("assets/data/monsters.json").c_str());
         try {
             int mid = std::stoi(map_id);
             spawn_sys_->SpawnMonstersForMap(*registry_, mid);
@@ -71,7 +72,7 @@ bool EngineMap::Load(const std::string& map_id) {
             GameDataDB* db = gamedb_;
             GameDataDB local_db;
             if (!db) {
-                if (local_db.Open("assets/data/game_data.db")) {
+                if (local_db.Open(VFS::Resolve("assets/data/game_data.db").c_str())) {
                     local_db.LoadMonsterTemplates();
                     local_db.LoadNPCTemplates();
                     local_db.LoadMapData();
@@ -191,7 +192,7 @@ void EngineMap::LoadSceneObjects(const std::string& json_path) {
 
         // Try .glb first, then .obj, then .mod
         auto tryLoad = [&](const std::string& ext) -> bool {
-            std::string fname = "assets/models/" + modLower + ext;
+            std::string fname = VFS::Resolve("assets/models/" + modLower + ext);
             std::ifstream test(fname);
             if (test.good()) {
                 test.close();
@@ -218,7 +219,7 @@ void EngineMap::LoadSceneObjects(const std::string& json_path) {
                 if (suffix.size() == 1 && suffix[0] >= '0' && suffix[0] <= '9')
                     chr_name = chr_name.substr(0, us);
             }
-            std::string chr_path = "assets/characters/" + chr_name + ".json";
+            std::string chr_path = VFS::Resolve("assets/characters/" + chr_name + ".json");
             std::ifstream cf(chr_path);
             if (!cf.good()) return false;
             std::string json((std::istreambuf_iterator<char>(cf)), {});
@@ -233,9 +234,9 @@ void EngineMap::LoadSceneObjects(const std::string& json_path) {
             std::string model_file = (slash != std::string::npos) ? model_path.substr(slash + 1) : model_path;
             auto dot2 = model_file.find_last_of('.');
             if (dot2 != std::string::npos) model_file = model_file.substr(0, dot2);
-            std::string fname = "assets/models/" + model_file + ".glb";
+            std::string fname = VFS::Resolve("assets/models/" + model_file + ".glb");
             std::ifstream mtest(fname);
-            if (!mtest.good()) { fname = "assets/models/" + model_file + ".obj"; mtest.open(fname); }
+            if (!mtest.good()) { fname = VFS::Resolve("assets/models/" + model_file + ".obj"); mtest.open(fname); }
             if (!mtest.good()) return false;
             mtest.close();
             int mesh_idx = props_->LoadObj(fname);

@@ -1,5 +1,6 @@
 #pragma once
 #include <rendering/UIRenderer.hpp>
+#include <engine/gx_render/VFS.h>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -16,8 +17,8 @@ struct UISkinPart {
 
 class UiSkinManager {
 public:
-    static void Init(const std::string& ui_texture_path = "assets/textures/ui/",
-                     const std::string& interface_path = "assets/interface/");
+    static void Init(const std::string& ui_texture_path = VFS::Resolve("assets/textures/ui/"),
+                     const std::string& interface_path = VFS::Resolve("assets/interface/"));
     static void Shutdown();
 
     // Load a single UI texture by name

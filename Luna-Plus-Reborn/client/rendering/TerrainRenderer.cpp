@@ -11,6 +11,7 @@
 #include <cstring>
 
 #include <stb_image.h>
+#include <engine/gx_render/VFS.h>
 
 static const bgfx::Memory* loadShader(const char* path) {
     std::string searchPaths[] = {
@@ -18,7 +19,7 @@ static const bgfx::Memory* loadShader(const char* path) {
         std::string("bin/") + path,
         path,
         std::string("../") + path,
-        std::string("assets/") + path
+        VFS::Resolve(std::string("assets/") + path)
     };
 
     for (const auto& p : searchPaths) {
@@ -106,10 +107,10 @@ static uint32_t HeightColor(float h, float hmin, float hmax) {
 bgfx::TextureHandle TerrainRenderer::LoadTileTexture(const std::string& name, int index) {
     (void)index;
     std::string paths[] = {
-        "assets/textures/unpacked/map/" + name,
-        "assets/textures/unpacked/farm/" + name,
-        "assets/textures/" + name,
-        "assets_converted/mod_objs/" + name,
+        VFS::Resolve("assets/textures/unpacked/map/" + name),
+        VFS::Resolve("assets/textures/unpacked/farm/" + name),
+        VFS::Resolve("assets/textures/" + name),
+        VFS::Resolve("assets_converted/mod_objs/" + name),
     };
     for (auto& p : paths) {
         int w, h, n;

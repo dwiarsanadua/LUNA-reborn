@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstring>
 #include <glm/gtc/type_ptr.hpp>
+#include <engine/gx_render/VFS.h>
 
 static const bgfx::Memory* loadShader(const char* path) {
     std::string searchPaths[] = {
@@ -11,7 +12,7 @@ static const bgfx::Memory* loadShader(const char* path) {
         std::string("bin/") + path,
         path,
         std::string("../") + path,
-        std::string("assets/") + path
+        VFS::Resolve(std::string("assets/") + path)
     };
 
     for (const auto& p : searchPaths) {
