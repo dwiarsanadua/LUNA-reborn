@@ -1,9 +1,11 @@
 #define GLFW_EXPOSE_NATIVE_COCOA
 #include "RenderDevice.h"
+#include "VFS.h"
 #include <GLFW/glfw3native.h>
 #include <spdlog/spdlog.h>
 #include <thread>
 #include <chrono>
+#include <mach-o/dyld.h>
 
 bool RenderDevice::Init(const RenderDeviceConfig& config) {
     if (!glfwInit()) {
@@ -29,6 +31,17 @@ bool RenderDevice::Init(const RenderDeviceConfig& config) {
     glfwShowWindow(window_);
     glfwFocusWindow(window_);
     for(int i=0; i<10; i++) { glfwPollEvents(); std::this_thread::sleep_for(std::chrono::milliseconds(10)); }
+
+    // Init VFS base path from executable location (macOS)
+    {
+        char exe_path[1024];
+        uint32_t size = sizeof(exe_path);
+        _NSGetExecutablePath(exe_path, &size);
+        std::string ep(exe_path);
+        auto pos = ep.find_last_of('/');
+        std::string dir = (pos != std::string::npos) ? ep.substr(0, pos + 1) : "./";
+        VFS::Init(dir + "../../");
+    }
 
     int fb_width, fb_height;
     glfwGetFramebufferSize(window_, &fb_width, &fb_height);
@@ -59,7 +72,7 @@ bool RenderDevice::Init(const RenderDeviceConfig& config) {
     bgfx::setDebug(BGFX_DEBUG_TEXT | BGFX_DEBUG_STATS);
     
     // Clear View 0 (Main) to dark gray
-    bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0xFF333333, 1.0f, 0);
+    bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,     0xFF6688AA, 1.0f, 0);
     bgfx::setViewRect(0, 0, 0, (uint16_t)width_, (uint16_t)height_);
 
     spdlog::info("RenderDevice: initialized. FB Size: {}x{}", width_, height_);
@@ -81,7 +94,7 @@ void RenderDevice::BeginFrame() {
     // View 0 is reserved for shadow pass (handled by SceneRenderer)
     bgfx::ViewId debugView = static_cast<bgfx::ViewId>(ViewId::Debug);
     bgfx::setViewRect(debugView, 0, 0, (uint16_t)width_, (uint16_t)height_);
-    bgfx::setViewClear(debugView, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0xFF333333, 1.0f, 0);
+    bgfx::setViewClear(debugView, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,     0xFF6688AA, 1.0f, 0);
     
     bgfx::dbgTextClear();
     bgfx::dbgTextPrintf(1, 1, 0x0f, "LUNA Plus Reborn - BGFX ACTIVE");

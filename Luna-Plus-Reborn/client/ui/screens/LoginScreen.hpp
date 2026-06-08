@@ -1,6 +1,7 @@
 #pragma once
 #include <ui/Screen.hpp>
 #include <ui/WindowManager.hpp>
+#include <rendering/SceneRenderer.hpp>
 
 class LoginScreen : public Screen {
 public:
@@ -12,8 +13,10 @@ public:
     bool HandleKey(int key, int scancode, int action, int mods) override;
     bool HandlePacket(uint16_t type, const std::vector<uint8_t>& payload) override;
     void SetSceneClearer(std::function<void(uint32_t)> f) { set_clear_color_ = f; }
+    void SetSceneRenderer(SceneRenderer* sr) { scene_renderer_ = sr; }
 private:
     WindowManager wm_;
     std::function<void(uint32_t)> set_clear_color_;
+    SceneRenderer* scene_renderer_ = nullptr;
     bool sent_ = false;
 };
