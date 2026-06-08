@@ -157,6 +157,7 @@ def check_phase6_server() -> dict:
         "game/network/protocol/Pet.fbs",
         "game/network/protocol/Fishing.fbs",
         "game/network/protocol/Secondary.fbs",
+        "game/network/protocol/Farm.fbs",
         "tools/asset_pipeline/bootstrap_phase6.py",
     ):
         if not (reborn / rel).is_file():
@@ -171,6 +172,8 @@ def check_phase6_server() -> dict:
         "MP_TOURNAMENT_LIST_SYN",
         "MP_HOUSING_INFO_SYN",
         "MP_CASHSHOP_LIST_SYN",
+        "MP_FARM_INFO_SYN",
+        "MP_FARM_ACTION_SYN",
     ):
         if token not in pkt:
             issues.append(f"Phase6: PacketType missing {token}")
@@ -183,7 +186,14 @@ def check_phase6_server() -> dict:
             "SELECT name FROM sqlite_master WHERE type='table'"
         ).fetchall()
         names = {row[0] for row in tables}
-        for needed in ("phase6_fish_types", "phase6_territories", "phase6_shop_items"):
+        for needed in (
+            "phase6_fish_types",
+            "phase6_territories",
+            "phase6_shop_items",
+            "player_family",
+            "player_pet",
+            "player_farm_plot",
+        ):
             if needed not in names:
                 issues.append(f"Phase6: luna_map.db missing {needed} (run bootstrap_phase6.py)")
         conn.close()

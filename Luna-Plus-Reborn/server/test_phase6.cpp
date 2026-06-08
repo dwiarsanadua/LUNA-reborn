@@ -24,6 +24,12 @@ int main() {
     }
     printf("OK: MapServer initialized with SecondarySystem\n");
 
+    if (!fs::exists("assets/data/luna_map.db")) {
+        printf("FAIL: missing luna_map.db after init\n");
+        server.Shutdown();
+        return 1;
+    }
+
     server.Shutdown();
     printf("=== Phase 6 test: PASS ===\n");
     return 0;

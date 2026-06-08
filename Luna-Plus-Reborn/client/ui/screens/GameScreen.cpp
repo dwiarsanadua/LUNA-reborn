@@ -1,4 +1,5 @@
 #include "GameScreen.hpp"
+#include <gameobjects/FarmSystem.hpp>
 #include <network/NetworkClient.hpp>
 #include <rendering/CharacterRenderer.hpp>
 #include <ecs/systems/GameDataDB.hpp>
@@ -31,6 +32,7 @@
 #include <Pet_generated.h>
 #include <Fishing_generated.h>
 #include <Secondary_generated.h>
+#include <Farm_generated.h>
 #include <PacketType_generated.h>
 #include <algorithm>
 #include <string>
@@ -411,6 +413,13 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         ApplyCashShopBuyResponse(resp);
         return true;
     }
+    case luna::protocol::PacketType_MP_FARM_INFO_ACK:
+    case luna::protocol::PacketType_MP_FARM_ACTION_ACK:
+    case luna::protocol::PacketType_MP_FARM_ACTION_NACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::FarmResponse>(payload.data());
+        ApplyFarmResponse(resp);
+        return true;
+    }
     default: return false;
     }
 }
@@ -508,6 +517,8 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
     }
     else if (key == 72) { // H key - Farm / Harvest
         state_->farm_open = !state_->farm_open;
+        if (state_->farm_open && !state_->offline_mode && network_ && network_->IsConnected())
+            RequestFarmInfo();
         if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_UI, "window_open1.wav");
     }
     else if (key == 79) { // O key - Options
@@ -866,39 +877,60 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
 
     // Farm actions (when farm panel is open)
     if (state_->farm_open) {
+        const bool online = !state_->offline_mode && network_ && network_->IsConnected();
         if (key >= 49 && key <= 57) { // Keys 1-9: plant seed in plot
             int plot_id = key - 49;
-            // Plant first available seed
             auto seeds = farm_.GetAllSeeds();
-            if (!seeds.empty()) {
-                if (farm_.Plant(plot_id, seeds[0].id)) {
+            if (online) {
+                SendFarmAction(1, static_cast<uint8_t>(plot_id), seeds.empty() ? 1 : seeds[0].id);
+            } else if (!seeds.empty()) {
+                if (farm_.Plant(plot_id, seeds[0].id))
                     state_->chat_messages.push_back("Planted " + seeds[0].name + "!");
-                } else {
+                else
                     state_->chat_messages.push_back("Cannot plant there.");
-                }
             }
         }
-        else if (key == 87) { // W key: water random plot
-            bool watered = false;
-            for (int i = 0; i < 9; i++) {
-                auto* plot = farm_.GetPlot(i);
-                if (plot && plot->seed_id > 0 && !plot->watered && !plot->harvested) {
-                    farm_.Water(i);
-                    state_->chat_messages.push_back("Watered plot " + std::to_string(i+1));
-                    watered = true; break;
+        else if (key == 87) { // W key: water
+            if (online) {
+                for (int i = 0; i < 9; i++) {
+                    const auto* plot = farm_.GetPlot(i);
+                    if (plot && plot->seed_id > 0 && !plot->watered && !plot->harvested) {
+                        SendFarmAction(2, static_cast<uint8_t>(i));
+                        break;
+                    }
                 }
+            } else {
+                bool watered = false;
+                for (int i = 0; i < 9; i++) {
+                    auto* plot = farm_.GetPlot(i);
+                    if (plot && plot->seed_id > 0 && !plot->watered && !plot->harvested) {
+                        farm_.Water(i);
+                        state_->chat_messages.push_back("Watered plot " + std::to_string(i+1));
+                        watered = true; break;
+                    }
+                }
+                if (!watered) state_->chat_messages.push_back("Nothing to water.");
             }
-            if (!watered) state_->chat_messages.push_back("Nothing to water.");
         }
         else if (key == 82) { // R key: harvest
-            for (int i = 0; i < 9; i++) {
-                auto* plot = farm_.GetPlot(i);
-                if (plot && plot->growth_stage >= plot->max_stages && !plot->harvested) {
-                    int item_id, count;
-                    if (farm_.Harvest(i, item_id, count)) {
-                        state_->gold += count * 10;
-                        state_->chat_messages.push_back("Harvested! Got " + std::to_string(count) + " items.");
+            if (online) {
+                for (int i = 0; i < 9; i++) {
+                    const auto* plot = farm_.GetPlot(i);
+                    if (plot && plot->growth_stage >= plot->max_stages && !plot->harvested) {
+                        SendFarmAction(3, static_cast<uint8_t>(i));
                         break;
+                    }
+                }
+            } else {
+                for (int i = 0; i < 9; i++) {
+                    auto* plot = farm_.GetPlot(i);
+                    if (plot && plot->growth_stage >= plot->max_stages && !plot->harvested) {
+                        int item_id, count;
+                        if (farm_.Harvest(i, item_id, count)) {
+                            state_->gold += count * 10;
+                            state_->chat_messages.push_back("Harvested! Got " + std::to_string(count) + " items.");
+                            break;
+                        }
                     }
                 }
             }
@@ -3084,5 +3116,73 @@ void GameScreen::ApplyCashShopBuyResponse(const luna::protocol::CashShopBuyRespo
         state_->chat_messages.push_back(msg.empty() ? "Purchase failed" : msg);
     }
     if (state_->cashshop_open) cash_shop_dlg_.UpdateFromState(state_);
+    if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
+}
+
+void GameScreen::RequestFarmInfo() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateFarmInfoRequest(fbb, GetSelectedCharId());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_FARM_INFO_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendFarmAction(uint8_t action, uint8_t plot_id, uint32_t seed_id) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateFarmActionRequest(
+        fbb, GetSelectedCharId(), action, plot_id, seed_id);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_FARM_ACTION_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SyncFarmFromNetwork() {
+    farm_.AllocatePlots(9);
+    for (int i = 0; i < 9; ++i) {
+        if (auto* plot = farm_.GetPlot(i)) {
+            *plot = FarmPlot{};
+            plot->id = i;
+        }
+    }
+    for (const auto& np : state_->network_farm_plots) {
+        if (np.plot_id >= 9) continue;
+        if (auto* plot = farm_.GetPlot(np.plot_id)) {
+            plot->id = np.plot_id;
+            plot->seed_id = static_cast<int>(np.seed_id);
+            plot->plant_name = np.plant_name;
+            plot->growth_stage = np.growth_stage;
+            plot->max_stages = np.max_stages;
+            plot->watered = np.watered;
+            plot->harvested = np.harvested;
+        }
+    }
+}
+
+void GameScreen::ApplyFarmResponse(const luna::protocol::FarmResponse* resp) {
+    if (!resp) return;
+    if (resp->message()) {
+        std::string msg = resp->message()->str();
+        if (!msg.empty()) state_->chat_messages.push_back(msg);
+    }
+    state_->network_farm_plots.clear();
+    if (resp->plots()) {
+        for (auto p : *resp->plots()) {
+            GameState::NetworkFarmPlot entry;
+            entry.plot_id = p->plot_id();
+            entry.seed_id = p->seed_id();
+            entry.plant_name = p->plant_name() ? p->plant_name()->str() : "";
+            entry.growth_stage = p->growth_stage();
+            entry.max_stages = p->max_stages();
+            entry.growth_pct = p->growth_pct();
+            entry.watered = p->watered();
+            entry.harvested = p->harvested();
+            state_->network_farm_plots.push_back(std::move(entry));
+        }
+    }
+    SyncFarmFromNetwork();
+    if (resp->result() == 0 && resp->harvest_count() > 0)
+        state_->chat_messages.push_back("Harvested x" + std::to_string(resp->harvest_count()));
     if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
 }

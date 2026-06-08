@@ -45,3 +45,43 @@ CREATE TABLE IF NOT EXISTS phase6_shop_items (
     price INTEGER DEFAULT 0,
     category TEXT DEFAULT 'Misc'
 );
+
+-- Phase 6 Slice 2: per-character persistence (MapServer runtime)
+
+CREATE TABLE IF NOT EXISTS player_family (
+    character_id INTEGER PRIMARY KEY,
+    name TEXT DEFAULT '',
+    relation INTEGER DEFAULT 1,
+    partner_id INTEGER DEFAULT 0,
+    partner_name TEXT DEFAULT '',
+    family_id INTEGER DEFAULT 0,
+    family_name TEXT DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS player_pet (
+    character_id INTEGER PRIMARY KEY,
+    pet_id INTEGER DEFAULT 1,
+    template_id INTEGER DEFAULT 1,
+    name TEXT DEFAULT 'Fluffy',
+    level INTEGER DEFAULT 1,
+    hp INTEGER DEFAULT 100,
+    max_hp INTEGER DEFAULT 100,
+    satiation INTEGER DEFAULT 100,
+    summoned INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS player_farm_plot (
+    character_id INTEGER NOT NULL,
+    plot_id INTEGER NOT NULL,
+    seed_id INTEGER DEFAULT 0,
+    plant_name TEXT DEFAULT '',
+    growth_stage INTEGER DEFAULT 0,
+    max_stages INTEGER DEFAULT 4,
+    growth_timer REAL DEFAULT 0,
+    growth_time REAL DEFAULT 60,
+    watered INTEGER DEFAULT 0,
+    harvested INTEGER DEFAULT 0,
+    PRIMARY KEY (character_id, plot_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_player_farm_char ON player_farm_plot(character_id);

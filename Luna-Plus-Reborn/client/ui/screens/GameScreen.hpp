@@ -28,6 +28,7 @@ struct TournamentRegisterResponse;
 struct HousingInfoResponse;
 struct CashShopListResponse;
 struct CashShopBuyResponse;
+struct FarmResponse;
 }
 
 struct EntityInterp {
@@ -208,6 +209,10 @@ private:
     void ApplyHousingInfoResponse(const luna::protocol::HousingInfoResponse* resp);
     void ApplyCashShopListResponse(const luna::protocol::CashShopListResponse* resp);
     void ApplyCashShopBuyResponse(const luna::protocol::CashShopBuyResponse* resp);
+    void RequestFarmInfo();
+    void SendFarmAction(uint8_t action, uint8_t plot_id, uint32_t seed_id = 1);
+    void ApplyFarmResponse(const luna::protocol::FarmResponse* resp);
+    void SyncFarmFromNetwork();
     void SyncFamilyFromNetwork();
     void SyncPetFromNetwork();
     uint32_t GetSelectedCharId() const;

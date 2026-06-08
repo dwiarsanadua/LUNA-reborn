@@ -44,6 +44,7 @@
 #include <Pet_generated.h>
 #include <Fishing_generated.h>
 #include <Secondary_generated.h>
+#include <Farm_generated.h>
 #include <ecs/components/AIComponent.hpp>
 #include <PacketType_generated.h>
 #include <spdlog/spdlog.h>
@@ -254,6 +255,7 @@ void MapServer::Update(float dt) {
     combat_->Update(*registry_, dt);
     skill_sys_.UpdateCooldowns(*registry_, dt);
     quest_->Update(*registry_, dt);
+    secondary_.Update(dt);
     BroadcastMonsterMovement(dt);
 
     if (player_joined_ && registry_->valid(player_entity_)) {
@@ -1059,6 +1061,16 @@ void MapServer::HandlePacket(uint16_t type, const uint8_t* payload, size_t len) 
         ctx.guild_id = has_guild_ ? guild_.guild_id : 0;
         ctx.guild_name = guild_.name;
         ctx.gold = &player_gold_;
+        ctx.grant_loot = [this](uint32_t item_id, uint16_t count) {
+            GrantLootToPlayer(item_id, count);
+        };
+        secondary_.HandlePacket(network_.get(), ctx, type, payload, len);
+        return;
+    }
+    if (type >= PacketType_MP_FARM_INFO_SYN && type <= PacketType_MP_FARM_ACTION_NACK) {
+        MapPlayerContext ctx;
+        ctx.character_id = static_cast<uint32_t>(connected_player_.id);
+        ctx.name = connected_player_.name;
         ctx.grant_loot = [this](uint32_t item_id, uint16_t count) {
             GrantLootToPlayer(item_id, count);
         };

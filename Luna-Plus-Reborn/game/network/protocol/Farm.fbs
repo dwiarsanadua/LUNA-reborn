@@ -1,0 +1,33 @@
+include "Types.fbs";
+
+namespace luna.protocol;
+
+table FarmPlotInfo {
+    plot_id: uint8;
+    seed_id: uint32;
+    plant_name: string;
+    growth_stage: uint8;
+    max_stages: uint8;
+    growth_pct: uint8;
+    watered: bool;
+    harvested: bool;
+}
+
+table FarmInfoRequest {
+    character_id: uint32;
+}
+
+table FarmActionRequest {
+    character_id: uint32;
+    action: uint8;
+    plot_id: uint8;
+    seed_id: uint32;
+}
+
+table FarmResponse {
+    result: uint8;
+    plots: [FarmPlotInfo];
+    harvest_item_id: uint32;
+    harvest_count: uint16;
+    message: string;
+}

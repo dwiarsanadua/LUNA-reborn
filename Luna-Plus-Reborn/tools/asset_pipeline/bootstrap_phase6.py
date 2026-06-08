@@ -63,6 +63,11 @@ def seed_phase6(cur: sqlite3.Cursor) -> None:
         "VALUES (1, 1, 1, 'Fluffy', 1, 100, 100)"
     )
     cur.execute(
+        "INSERT OR REPLACE INTO player_pet "
+        "(character_id, pet_id, template_id, name, level, hp, max_hp, satiation, summoned) "
+        "VALUES (1, 1, 1, 'Fluffy', 1, 100, 100, 100, 0)"
+    )
+    cur.execute(
         "INSERT OR IGNORE INTO TB_HOUSE "
         "(HouseIdx, CharacterIdx, MapIdx, PosX, PosY, HouseType, FurnitureCount) "
         "VALUES (1, 1, 51, 10.0, 0.0, 0, 0)"

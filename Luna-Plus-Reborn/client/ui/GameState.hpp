@@ -309,4 +309,16 @@ struct GameState {
         std::string category;
     };
     std::vector<NetworkCashShopItem> network_cashshop_items;
+
+    struct NetworkFarmPlot {
+        uint8_t plot_id = 0;
+        uint32_t seed_id = 0;
+        std::string plant_name;
+        uint8_t growth_stage = 0;
+        uint8_t max_stages = 4;
+        uint8_t growth_pct = 0;
+        bool watered = false;
+        bool harvested = false;
+    };
+    std::vector<NetworkFarmPlot> network_farm_plots;
 };
