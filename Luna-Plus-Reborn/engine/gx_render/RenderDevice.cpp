@@ -76,6 +76,7 @@ bool RenderDevice::Init(const RenderDeviceConfig& config) {
     bgfx::setViewRect(0, 0, 0, (uint16_t)width_, (uint16_t)height_);
 
     spdlog::info("RenderDevice: initialized. FB Size: {}x{}", width_, height_);
+    spdlog::info("RenderDevice: bgfx renderer = {}", bgfx::getRendererName(bgfx::getRendererType()));
     return true;
 }
 
@@ -90,11 +91,10 @@ void RenderDevice::Shutdown() {
 void RenderDevice::BeginFrame() {
     glfwPollEvents();
     
-    // Use view 6 (Debug) for screen clear and debug text
-    // View 0 is reserved for shadow pass (handled by SceneRenderer)
+    // View 6 (Debug): debug text overlay only — don't clear the screen underneath
     bgfx::ViewId debugView = static_cast<bgfx::ViewId>(ViewId::Debug);
     bgfx::setViewRect(debugView, 0, 0, (uint16_t)width_, (uint16_t)height_);
-    bgfx::setViewClear(debugView, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,     0xFF6688AA, 1.0f, 0);
+    bgfx::setViewClear(debugView, BGFX_CLEAR_NONE, 0, 1.0f, 0);
     
     bgfx::dbgTextClear();
     bgfx::dbgTextPrintf(1, 1, 0x0f, "LUNA Plus Reborn - BGFX ACTIVE");

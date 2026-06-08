@@ -32,7 +32,7 @@ public:
     float height = 720.0f;
 
 private:
-    bgfx::ViewId view_id_ = static_cast<bgfx::ViewId>(ViewId::Debug);
+    bgfx::ViewId view_id_ = static_cast<bgfx::ViewId>(ViewId::Scene);
     uint8_t shadow_view_id_ = static_cast<uint8_t>(ViewId::Shadow);
     uint32_t clear_color_ = 0x6688AAFF;
 

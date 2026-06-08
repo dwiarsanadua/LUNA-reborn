@@ -1,31 +1,23 @@
 # Luna-Plus-Reborn: Gap Analysis & Technical Fix Plan
 
-## 1. Gejala Masalah (Red Screen Issue)
-Berdasarkan screenshot dan audit kode, client saat ini mengalami "Red Screen" dengan statistik `Triangles: 0` dan `Draw Calls: 2`. Ini menunjukkan bahwa:
-*   **3D Rendering Skip:** Kode di `main.cpp` sengaja melewati rendering 3D (Terrain, Props, Characters) saat berada di `LoginScreen`.
-*   **UI Rendering Failure:** `UIRenderer` gagal merender background 2D, kemungkinan karena shader tidak kompatibel dengan Metal (macOS) atau aset `.png` tidak ditemukan di path yang benar.
-*   **Shader Mismatch:** File `.bin` di folder `shaders/` mungkin dikompilasi untuk renderer lain (seperti DX11), sehingga gagal di macOS.
+## 1. Gejala Masalah (Red & Magenta Screen)
+Berdasarkan screenshot terbaru (19:51), client mengalami perubahan gejala dari "Red Screen" (0 triangles) menjadi **"Magenta Screen"** (136 triangles, 72 draw calls).
+*   **Analisa Teknis:** Munculnya 136 triangles membuktikan bahwa sistem UI sudah berjalan dan mencoba mengirim data render ke GPU. Namun, warna magenta solid menunjukkan **Shader Mismatch/Failure**.
+*   **Akar Masalah:** File `.bin` di folder `shaders/` kemungkinan besar dikompilasi untuk Windows (DirectX) atau OpenGL, sehingga saat dijalankan di macOS (Metal), bgfx gagal menjalankan pipeline shader dan melakukan *fallback* ke warna magenta (warna standar "error" pada shader).
 
 ## 2. Gap Analysis (Old vs Reborn)
-
-| Kategori | Luna-Plus-Old (Legacy) | Luna-Plus-Reborn (Current) | Status Gap |
-| :--- | :--- | :--- | :--- |
-| **Login Flow** | 3D Scene (Map 51) dengan kamera panning. | Static 2D Background (saat ini gagal render). | 🔴 Kritis |
-| **Shader System** | Fixed-function / HLSL SM 1.0 (D3D9). | bgfx cross-platform (Metal/DX11/Vulkan). | 🟡 Menengah |
-| **Asset Loading** | Packed `.pak` (Virtual File System). | Unpacked files (Manual path search). | 🟡 Menengah |
-| **Update Loop** | Frame-independent logic dengan fixed tick. | Variable delta-time (butuh tuning konstanta). | 🟢 Ringan |
-| **UI Framework** | Data-driven via `.bin` text scripts. | Hardcoded C++ di `LoginScreen.cpp`. | 🔴 Kritis |
+... (tetap sama) ...
 
 ## 3. "PERFECT PLAN" — Langkah Perbaikan & Sinkronisasi
 
-### Tahap 1: Restorasi Rendering & Login Scene
-1.  **Enable 3D Login Background:** 
-    *   Modifikasi `main.cpp` agar tetap merender `gfx.Render` saat login.
-    *   Set kamera ke koordinat spesifik Alker Plains (Map 51) untuk mensimulasikan login screen original.
-2.  **Shader Recompilation:**
-    *   Gunakan `shaderc` dari bgfx untuk mengompilasi ulang `.sc` ke `.bin` spesifik Metal (macOS) dan DX11 (Windows).
-3.  **Path Normalization:**
-    *   Implementasi `VFS` atau `PathManager` agar client selalu menemukan folder `assets/` tanpa peduli di mana binary dijalankan.
+### Tahap 1: Restorasi Rendering (Fokus Metal macOS)
+1.  **Recompile Shaders for Metal:**
+    *   Wajib mengompilasi ulang `.sc` menjadi `.bin` menggunakan parameter `-p mtl` (Metal). 
+    *   File target: `vs_ui.bin`, `fs_ui.bin`, `vs_terrain.bin`, `fs_terrain.bin`.
+2.  **Verify UI Program Creation:**
+    *   Tambahkan log di `UIRenderer::Init()` untuk memastikan `bgfx::createProgram` tidak mengembalikan handle invalid.
+3.  **Enable 3D Login Background:** 
+    *   Modifikasi `main.cpp` agar tetap merender `gfx.Render` saat login (Map 51) agar tidak hanya layar 2D statis.
 
 ### Tahap 2: Sinkronisasi Logika (Behavioral Mapping)
 1.  **Movement & Physics:**

@@ -27,7 +27,8 @@ enum class ViewId : bgfx::ViewId {
     Particle  = 4,
     UI        = 5,
     Debug     = 6,
-    Count     = 7
+    Scene     = 7,
+    Count     = 8
 };
 
 class RenderDevice {
