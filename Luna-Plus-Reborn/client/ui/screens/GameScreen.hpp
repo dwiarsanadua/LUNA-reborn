@@ -1,6 +1,15 @@
 #pragma once
+#include <glm/glm.hpp>
+#include <unordered_map>
 
 namespace luna::protocol { struct AttackResult; }
+
+struct EntityInterp {
+    glm::vec3 from{0.0f};
+    glm::vec3 to{0.0f};
+    float t = 1.0f;
+    float duration = 0.12f;
+};
 #include <ui/Screen.hpp>
 #include <ui/WindowManager.hpp>
 #include <ui/dialogs/InventoryDialog.hpp>
@@ -98,6 +107,8 @@ private:
     void ApplySkillDamage(uint32_t skill_id);
     void ApplyNetworkAttackResult(const luna::protocol::AttackResult* result);
     void RemoveNetworkEntity(uint32_t entity_id);
+    void UpdateEntityInterpolation(float dt);
+    void BeginEntityInterpolation(uint32_t entity_id, float x, float y, float z);
     void SendMovementUpdate(float dt);
     void DoCombat(float dt);
     void DoLevelUp();
@@ -123,6 +134,7 @@ private:
     uint32_t pending_map_id_ = 0;
     float move_send_timer_ = 0.0f;
     bool skill_damage_applied_ = false;
+    std::unordered_map<uint32_t, EntityInterp> entity_interp_;
     
     ParticleSystem particleSys_;
     float prev_x_ = 0, prev_z_ = 0;

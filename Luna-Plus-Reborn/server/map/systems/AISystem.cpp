@@ -118,8 +118,9 @@ void AISystem::FindNearestTarget(entt::registry& registry, entt::entity entity, 
     }
 
     if (nearest != entt::null) {
-        ai.aggro_target = static_cast<uint32_t>(nearest);
-        ai.AddThreat(static_cast<uint32_t>(nearest), 1);
+        uint32_t pid = static_cast<uint32_t>(entt::to_entity(nearest));
+        ai.aggro_target = pid;
+        ai.AddThreat(pid, 1);
         ai.state = AIComponent::Chase;
         ai.state_timer = 0.0f;
         spdlog::debug("AI: entity {} aggro on player {}", static_cast<uint32_t>(entity),
@@ -130,18 +131,32 @@ void AISystem::FindNearestTarget(entt::registry& registry, entt::entity entity, 
 void AISystem::Patrol(entt::registry& registry, entt::entity entity,
                        AIComponent& ai, CharacterStats& stats, float dt) {
     ai.state_timer += dt;
-    if (ai.state_timer > 5.0f) {
-        ai.state = AIComponent::Idle;
+    auto* xform = registry.try_get<Transform>(entity);
+    if (!xform) return;
+
+    if (ai.patrol_points.empty() && ai.state_timer > 1.0f) {
+        glm::vec3 waypoint(
+            ai.spawn_position.x + static_cast<float>(ai_rng() % 20 - 10),
+            ai.spawn_position.y,
+            ai.spawn_position.z + static_cast<float>(ai_rng() % 20 - 10));
+        ai.patrol_points.push_back(waypoint);
         ai.state_timer = 0.0f;
     }
 
-    // Generate random waypoint within spawn radius
-    if (ai.patrol_points.empty() && ai.state_timer > 3.0f) {
-        glm::vec3 waypoint(
-            ai.spawn_position.x + static_cast<float>(ai_rng() % 30 - 15),
-            ai.spawn_position.y,
-            ai.spawn_position.z + static_cast<float>(ai_rng() % 30 - 15));
-        ai.patrol_points.push_back(waypoint);
+    if (!ai.patrol_points.empty()) {
+        glm::vec3 target = ai.patrol_points.front();
+        float dist = glm::distance(xform->position, target);
+        if (dist < 1.0f) {
+            ai.patrol_points.clear();
+            ai.state = AIComponent::Idle;
+            ai.state_timer = 0.0f;
+        } else {
+            glm::vec3 dir = glm::normalize(target - xform->position);
+            xform->position += dir * stats.move_speed * 0.6f * dt;
+        }
+    } else if (ai.state_timer > 5.0f) {
+        ai.state = AIComponent::Idle;
+        ai.state_timer = 0.0f;
     }
 }
 

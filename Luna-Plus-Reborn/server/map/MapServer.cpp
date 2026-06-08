@@ -20,6 +20,8 @@
 #include <Movement_generated.h>
 #include <Combat_generated.h>
 #include <Chat_generated.h>
+#include <Inventory_generated.h>
+#include <ecs/components/AIComponent.hpp>
 #include <PacketType_generated.h>
 #include <spdlog/spdlog.h>
 #include <glm/glm.hpp>
@@ -144,6 +146,7 @@ void MapServer::Update(float dt) {
     movement_->Update(*registry_, dt);
     ai_->Update(*registry_, dt);
     combat_->Update(*registry_, dt);
+    BroadcastMonsterMovement(dt);
 
     // Check encounter triggers for all moving players
     {
@@ -504,13 +507,50 @@ void MapServer::SendEntitySpawn(uint32_t entity_id, int8_t entity_type,
     network_->SendPacket(PacketType_MP_ENTITY_SPAWN, fbb.GetBufferPointer(), fbb.GetSize());
 }
 
-void MapServer::SendEntityTransform(uint32_t entity_id, float x, float y, float z) {
+void MapServer::SendEntityTransform(uint32_t entity_id, float x, float y, float z, const char* anim) {
     using namespace luna::protocol;
     flatbuffers::FlatBufferBuilder fbb;
     Vec3 pos{x, y, z};
-    auto trans = CreateEntityTransformDirect(fbb, entity_id, &pos, 0.0f, "walk", 1.0f, 0);
+    auto trans = CreateEntityTransformDirect(fbb, entity_id, &pos, 0.0f, anim, 1.0f, 0);
     fbb.Finish(trans);
     network_->SendPacket(PacketType_MP_ENTITY_TRANSFORM, fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void MapServer::BroadcastMonsterMovement(float dt) {
+    if (!player_joined_) return;
+
+    auto view = registry_->view<TagMonster, Transform>();
+    for (auto entity : view) {
+        uint32_t eid = static_cast<uint32_t>(entt::to_entity(entity));
+        auto& xform = view.get<Transform>(entity);
+        auto& net = monster_net_[eid];
+
+        if (!net.initialized) {
+            net.last_sent = xform.position;
+            net.initialized = true;
+            SendEntityTransform(eid, xform.position.x, xform.position.y, xform.position.z, "idle");
+            continue;
+        }
+
+        net.broadcast_timer += dt;
+        float moved = glm::distance(xform.position, net.last_sent);
+        if (net.broadcast_timer < monster_broadcast_interval_ && moved < 0.08f)
+            continue;
+
+        net.broadcast_timer = 0.0f;
+        net.last_sent = xform.position;
+        const char* anim = moved > 0.08f ? "walk" : "idle";
+        SendEntityTransform(eid, xform.position.x, xform.position.y, xform.position.z, anim);
+    }
+}
+
+void MapServer::GrantLootToPlayer(uint32_t item_id, uint16_t count) {
+    using namespace luna::protocol;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto upd = CreateInventoryUpdate(fbb, next_loot_slot_++, item_id, count);
+    fbb.Finish(upd);
+    network_->SendPacket(PacketType_MP_INVENTORY_UPDATE, fbb.GetBufferPointer(), fbb.GetSize());
+    spdlog::info("MapServer: loot item {} x{} -> player {}", item_id, count, connected_player_.id);
 }
 
 void MapServer::SendWorldSnapshot() {
@@ -566,6 +606,10 @@ void MapServer::HandlePacket(uint16_t type, const uint8_t* payload, size_t len) 
             connected_player_.pos_x = req->target_position()->x();
             connected_player_.pos_y = req->target_position()->y();
             connected_player_.pos_z = req->target_position()->z();
+            if (registry_->valid(player_entity_)) {
+                auto& px = registry_->get<Transform>(player_entity_);
+                px.position = glm::vec3(connected_player_.pos_x, connected_player_.pos_y, connected_player_.pos_z);
+            }
             SavePlayerPosition(connected_player_.id,
                 connected_player_.pos_x, connected_player_.pos_y, connected_player_.pos_z);
             SendEntityTransform(static_cast<uint32_t>(connected_player_.id),
@@ -633,6 +677,14 @@ void MapServer::HandleCombatAttack(uint16_t ack_type, const uint8_t* payload, si
     auto& atk = registry_->get<CharacterStats>(player_entity_);
     if (skill_id > 0 && atk.mp >= 10) atk.mp -= 10;
 
+    if (auto* ai = registry_->try_get<AIComponent>(target)) {
+        uint32_t pid = static_cast<uint32_t>(entt::to_entity(player_entity_));
+        ai->aggro_target = pid;
+        ai->AddThreat(pid, 50);
+        ai->state = AIComponent::Chase;
+        ai->state_timer = 0.0f;
+    }
+
     auto& def = registry_->get<CharacterStats>(target);
     int32_t hp_before = def.hp;
     combat_->HandleAttack(*registry_, player_entity_, target, skill_id);
@@ -652,6 +704,10 @@ void MapServer::HandleCombatAttack(uint16_t ack_type, const uint8_t* payload, si
     network_->SendPacket(ack_type, fbb.GetBufferPointer(), fbb.GetSize());
 
     if (def.hp <= 0) {
+        monster_net_.erase(target_id);
+        GrantLootToPlayer(21000001, static_cast<uint16_t>(1 + (target_id % 3)));
+        if ((target_id % 4) == 0)
+            GrantLootToPlayer(1001, 1);
         SendEntityDespawn(target_id, static_cast<int8_t>(DespawnReason_Death));
         if (registry_->all_of<SpawnInfo>(target)) {
             auto& spawn = registry_->get<SpawnInfo>(target);
@@ -660,7 +716,7 @@ void MapServer::HandleCombatAttack(uint16_t ack_type, const uint8_t* payload, si
         registry_->destroy(target);
         spdlog::info("MapServer: monster {} defeated by {}", target_id, connected_player_.id);
     } else {
-        SendEntityTransform(target_id, xform.position.x, xform.position.y, xform.position.z);
+        SendEntityTransform(target_id, xform.position.x, xform.position.y, xform.position.z, "hit");
     }
 }
 

@@ -2,6 +2,7 @@
 #include "../components/Transform.hpp"
 #include "../components/CharacterStats.hpp"
 #include "../components/SpawnInfo.hpp"
+#include "../components/AIComponent.hpp"
 #include "../components/Tag.hpp"
 #include <spdlog/spdlog.h>
 #include <fstream>
@@ -161,7 +162,13 @@ entt::entity SpawnSystem::SpawnSingle(entt::registry& registry, const SpawnPoint
     stats.hp = stats.max_hp;
     stats.physic_attack = 8 + stats.level * 2;
     stats.physic_defense = 3 + stats.level;
+    stats.move_speed = 3.5f;
     registry.emplace<TagMonster>(entity);
+    auto& ai = registry.emplace<AIComponent>(entity);
+    ai.spawn_position = xform.position;
+    ai.aggro_range = sp.aggro_range > 0.0f ? sp.aggro_range : 12.0f;
+    ai.attack_range = 2.5f;
+    ai.chase_range = 30.0f;
     auto& sinfo = registry.emplace<SpawnInfo>(entity);
     sinfo.spawn_rule_id = sp.id;
     sinfo.monster_id = sp.monster_id;

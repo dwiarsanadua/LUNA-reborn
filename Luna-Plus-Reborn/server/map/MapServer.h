@@ -117,7 +117,7 @@ private:
     void SendEntitySpawn(uint32_t entity_id, int8_t entity_type,
                          const std::string& model_id, const std::string& name,
                          uint16_t level, float x, float y, float z, float hp_pct);
-    void SendEntityTransform(uint32_t entity_id, float x, float y, float z);
+    void SendEntityTransform(uint32_t entity_id, float x, float y, float z, const char* anim = "walk");
 
     bool player_joined_ = false;
     PlayerData connected_player_{};
@@ -126,5 +126,16 @@ private:
     void SendEntityDespawn(uint32_t entity_id, int8_t reason);
     void HandleCombatAttack(uint16_t ack_type, const uint8_t* payload, size_t len);
     void HandleChat(const uint8_t* payload, size_t len);
+    void BroadcastMonsterMovement(float dt);
+    void GrantLootToPlayer(uint32_t item_id, uint16_t count);
     entt::entity FindMonsterEntity(uint32_t entity_id) const;
+
+    struct MonsterNetState {
+        float broadcast_timer = 0.0f;
+        glm::vec3 last_sent{0.0f};
+        bool initialized = false;
+    };
+    std::unordered_map<uint32_t, MonsterNetState> monster_net_;
+    float monster_broadcast_interval_ = 0.12f;
+    uint8_t next_loot_slot_ = 10;
 };

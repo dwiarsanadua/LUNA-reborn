@@ -277,6 +277,10 @@ int main() {
         spdlog::debug("Entity despawn (type=0x{:04X}, {} bytes)", type, payload.size());
     });
 
+    client_dispatcher.Register(luna::protocol::PacketType_MP_INVENTORY_UPDATE, [&](uint32_t, uint16_t type, const std::vector<uint8_t>& payload) {
+        spdlog::info("Inventory update (type=0x{:04X}, {} bytes)", type, payload.size());
+    });
+
     // Network packet handler
     g_network.SetPacketHandler([&](uint16_t type, const std::vector<uint8_t>& payload) {
         spdlog::debug("Packet Received: type=0x{:04X} ({} bytes)", type, payload.size());

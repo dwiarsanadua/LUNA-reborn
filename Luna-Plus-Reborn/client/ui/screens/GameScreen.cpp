@@ -88,6 +88,31 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
         return true;
     }
+    case luna::protocol::PacketType_MP_INVENTORY_UPDATE: {
+        auto upd = flatbuffers::GetRoot<luna::protocol::InventoryUpdate>(payload.data());
+        bool found = false;
+        for (auto& item : state_->inventory) {
+            if (item.slot == upd->slot_index()) {
+                item.id = upd->item_id();
+                item.count = upd->count();
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            InvItem item;
+            item.slot = upd->slot_index();
+            item.id = upd->item_id();
+            item.count = upd->count();
+            char buf[64];
+            snprintf(buf, sizeof(buf), "Item_%u", item.id);
+            item.name = buf;
+            state_->inventory.push_back(item);
+        }
+        state_->chat_messages.push_back("Loot received!");
+        if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
+        return true;
+    }
     case 0x060A: {
         auto inv = flatbuffers::GetRoot<luna::protocol::InventoryData>(payload.data());
         state_->inventory.clear();
@@ -151,12 +176,9 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         }
         for (auto& e : state_->entities) {
             if (e.id == eid) {
-                if (trans->position()) {
-                    e.x = trans->position()->x();
-                    e.y = trans->position()->y();
-                    e.z = trans->position()->z();
-                    CharRenderer_Move(e.id, e.x, e.y, e.z, true);
-                }
+                if (trans->position())
+                    BeginEntityInterpolation(eid, trans->position()->x(),
+                        trans->position()->y(), trans->position()->z());
                 break;
             }
         }
@@ -624,7 +646,44 @@ void GameScreen::CastHotbarSkill(int slot) {
     }
 }
 
+void GameScreen::BeginEntityInterpolation(uint32_t entity_id, float x, float y, float z) {
+    EntityInterp ip;
+    auto it = entity_interp_.find(entity_id);
+    if (it != entity_interp_.end() && it->second.t < 1.0f) {
+        glm::vec3 cur = it->second.from + (it->second.to - it->second.from) * it->second.t;
+        ip.from = cur;
+    } else {
+        for (auto& e : state_->entities) {
+            if (e.id == entity_id) {
+                ip.from = {e.x, e.y, e.z};
+                break;
+            }
+        }
+    }
+    ip.to = {x, y, z};
+    ip.t = 0.0f;
+    entity_interp_[entity_id] = ip;
+    for (auto& e : state_->entities) {
+        if (e.id == entity_id) {
+            e.x = x;
+            e.y = y;
+            e.z = z;
+            break;
+        }
+    }
+}
+
+void GameScreen::UpdateEntityInterpolation(float dt) {
+    for (auto& [id, ip] : entity_interp_) {
+        if (ip.t >= 1.0f) continue;
+        ip.t = std::min(1.0f, ip.t + dt / ip.duration);
+        glm::vec3 p = ip.from + (ip.to - ip.from) * ip.t;
+        CharRenderer_Move(id, p.x, p.y, p.z, true, CHAR_WALK);
+    }
+}
+
 void GameScreen::RemoveNetworkEntity(uint32_t entity_id) {
+    entity_interp_.erase(entity_id);
     CharRenderer_Remove(entity_id);
     state_->entities.erase(
         std::remove_if(state_->entities.begin(), state_->entities.end(),
@@ -806,6 +865,8 @@ void GameScreen::Update(float dt) {
     hero_.Update(dt);
     state_->player_y = hero_.GetY();
     SendMovementUpdate(dt);
+    if (!state_->offline_mode)
+        UpdateEntityInterpolation(dt);
 
     for (int i = 0; i < 10; ++i) {
         if (state_->hotbar_cooldowns[i] > 0.0f)
