@@ -1,4 +1,6 @@
 #pragma once
+
+namespace luna::protocol { struct AttackResult; }
 #include <ui/Screen.hpp>
 #include <ui/WindowManager.hpp>
 #include <ui/dialogs/InventoryDialog.hpp>
@@ -94,6 +96,8 @@ private:
     void ChangeMap(uint32_t map_id);
     void CastHotbarSkill(int slot);
     void ApplySkillDamage(uint32_t skill_id);
+    void ApplyNetworkAttackResult(const luna::protocol::AttackResult* result);
+    void RemoveNetworkEntity(uint32_t entity_id);
     void SendMovementUpdate(float dt);
     void DoCombat(float dt);
     void DoLevelUp();

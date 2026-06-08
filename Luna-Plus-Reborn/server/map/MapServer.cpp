@@ -18,6 +18,8 @@
 #include <Character_generated.h>
 #include <Entity_generated.h>
 #include <Movement_generated.h>
+#include <Combat_generated.h>
+#include <Chat_generated.h>
 #include <PacketType_generated.h>
 #include <spdlog/spdlog.h>
 #include <glm/glm.hpp>
@@ -219,8 +221,22 @@ void MapServer::Update(float dt) {
 }
 
 void MapServer::SpawnPlayer(int entity_id, const PlayerData& data) {
-    auto entity = registry_->create();
-    registry_->emplace<PlayerData>(entity, data);
+    if (registry_->valid(player_entity_)) {
+        registry_->destroy(player_entity_);
+    }
+    player_entity_ = registry_->create();
+    registry_->emplace<PlayerData>(player_entity_, data);
+    auto& xform = registry_->emplace<Transform>(player_entity_);
+    xform.position = glm::vec3(data.pos_x, data.pos_y, data.pos_z);
+    auto& stats = registry_->emplace<CharacterStats>(player_entity_);
+    stats.level = static_cast<uint16_t>(std::max(1, data.level));
+    stats.max_hp = data.max_hp > 0 ? data.max_hp : 500;
+    stats.hp = data.hp > 0 ? data.hp : stats.max_hp;
+    stats.mp = 100;
+    stats.max_mp = 100;
+    stats.physic_attack = 20.0f + data.level * 3.0f;
+    stats.physic_defense = 5.0f + data.level;
+    registry_->emplace<TagPlayer>(player_entity_);
     SendNPCList(entity_id);
     spdlog::info("MapServer: player {} spawned, NPC list sent", data.name);
 }
@@ -558,8 +574,107 @@ void MapServer::HandlePacket(uint16_t type, const uint8_t* payload, size_t len) 
         return;
     }
 
-    if (type == PacketType_MP_COMBAT_ATTACK_SYN) {
-        spdlog::debug("MapServer: combat attack from player {}", connected_player_.id);
+    if (type == PacketType_MP_COMBAT_ATTACK_SYN || type == PacketType_MP_SKILL_CAST_SYN) {
+        HandleCombatAttack(
+            type == PacketType_MP_SKILL_CAST_SYN ? PacketType_MP_SKILL_CAST_ACK : PacketType_MP_COMBAT_ATTACK_ACK,
+            payload, len);
         return;
     }
+
+    if (type == PacketType_MP_CHAT_ALL_SYN) {
+        HandleChat(payload, len);
+        return;
+    }
+}
+
+void MapServer::SendEntityDespawn(uint32_t entity_id, int8_t reason) {
+    using namespace luna::protocol;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto msg = CreateEntityDespawn(fbb, entity_id, static_cast<DespawnReason>(reason));
+    fbb.Finish(msg);
+    network_->SendPacket(PacketType_MP_ENTITY_DESPAWN, fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+entt::entity MapServer::FindMonsterEntity(uint32_t entity_id) const {
+    entt::entity e = static_cast<entt::entity>(entity_id);
+    if (registry_->valid(e) && registry_->all_of<TagMonster, CharacterStats>(e))
+        return e;
+    auto view = registry_->view<TagMonster, CharacterStats>();
+    for (auto entity : view) {
+        if (static_cast<uint32_t>(entt::to_entity(entity)) == entity_id)
+            return entity;
+    }
+    return entt::null;
+}
+
+void MapServer::HandleCombatAttack(uint16_t ack_type, const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!registry_->valid(player_entity_)) return;
+
+    auto req = flatbuffers::GetRoot<AttackRequest>(payload);
+    uint32_t target_id = req->target_id();
+    uint16_t skill_id = req->skill_id();
+
+    entt::entity target = FindMonsterEntity(target_id);
+    if (target == entt::null) {
+        auto view = registry_->view<TagMonster, Transform, CharacterStats>();
+        float best = 9999.0f;
+        for (auto entity : view) {
+            auto& xform = view.get<Transform>(entity);
+            float dx = xform.position.x - connected_player_.pos_x;
+            float dz = xform.position.z - connected_player_.pos_z;
+            float d = dx * dx + dz * dz;
+            if (d < best) { best = d; target = entity; target_id = static_cast<uint32_t>(entt::to_entity(entity)); }
+        }
+        if (best > 144.0f) return;
+    }
+
+    auto& atk = registry_->get<CharacterStats>(player_entity_);
+    if (skill_id > 0 && atk.mp >= 10) atk.mp -= 10;
+
+    auto& def = registry_->get<CharacterStats>(target);
+    int32_t hp_before = def.hp;
+    combat_->HandleAttack(*registry_, player_entity_, target, skill_id);
+    int32_t damage_dealt = std::max(0, hp_before - def.hp);
+
+    auto& xform = registry_->get<Transform>(target);
+    flatbuffers::FlatBufferBuilder fbb;
+    auto result = CreateAttackResult(fbb,
+        static_cast<uint32_t>(connected_player_.id),
+        target_id,
+        damage_dealt > 0 ? damage_dealt : 1,
+        skill_id > 0 ? DamageType_Skill : DamageType_Normal,
+        false, damage_dealt == 0,
+        def.hp,
+        0);
+    fbb.Finish(result);
+    network_->SendPacket(ack_type, fbb.GetBufferPointer(), fbb.GetSize());
+
+    if (def.hp <= 0) {
+        SendEntityDespawn(target_id, static_cast<int8_t>(DespawnReason_Death));
+        if (registry_->all_of<SpawnInfo>(target)) {
+            auto& spawn = registry_->get<SpawnInfo>(target);
+            spawn_sys_->RespawnMonster(*registry_, spawn.spawn_rule_id, spawn.respawn_time);
+        }
+        registry_->destroy(target);
+        spdlog::info("MapServer: monster {} defeated by {}", target_id, connected_player_.id);
+    } else {
+        SendEntityTransform(target_id, xform.position.x, xform.position.y, xform.position.z);
+    }
+}
+
+void MapServer::HandleChat(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    auto req = flatbuffers::GetRoot<ChatMessage>(payload);
+    flatbuffers::FlatBufferBuilder fbb;
+    auto msg = CreateChatMessageDirect(fbb,
+        static_cast<uint32_t>(connected_player_.id),
+        connected_player_.name.c_str(),
+        req->message() ? req->message()->c_str() : "",
+        ChatChannel_All,
+        0);
+    fbb.Finish(msg);
+    network_->SendPacket(PacketType_MP_CHAT_ALL_ACK, fbb.GetBufferPointer(), fbb.GetSize());
 }

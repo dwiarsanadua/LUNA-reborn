@@ -1,0 +1,19 @@
+include "Types.fbs";
+include "PacketType.fbs";
+include "Combat.fbs";
+
+namespace luna.protocol;
+
+table SkillCastRequest {
+    caster_id: uint32;
+    skill_id: uint16;
+    target_id: uint32;
+    position: Vec3;
+}
+
+table SkillCastResult {
+    caster_id: uint32;
+    skill_id: uint16;
+    hits: uint8;
+    results: [AttackResult];
+}

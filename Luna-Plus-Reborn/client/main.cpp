@@ -265,6 +265,18 @@ int main() {
         g_state.equipment_dirty = true;
     });
 
+    client_dispatcher.Register(luna::protocol::PacketType_MP_COMBAT_ATTACK_ACK, [&](uint32_t, uint16_t type, const std::vector<uint8_t>& payload) {
+        spdlog::debug("Combat ACK received (type=0x{:04X}, {} bytes)", type, payload.size());
+    });
+
+    client_dispatcher.Register(luna::protocol::PacketType_MP_SKILL_CAST_ACK, [&](uint32_t, uint16_t type, const std::vector<uint8_t>& payload) {
+        spdlog::debug("Skill ACK received (type=0x{:04X}, {} bytes)", type, payload.size());
+    });
+
+    client_dispatcher.Register(luna::protocol::PacketType_MP_ENTITY_DESPAWN, [&](uint32_t, uint16_t type, const std::vector<uint8_t>& payload) {
+        spdlog::debug("Entity despawn (type=0x{:04X}, {} bytes)", type, payload.size());
+    });
+
     // Network packet handler
     g_network.SetPacketHandler([&](uint16_t type, const std::vector<uint8_t>& payload) {
         spdlog::debug("Packet Received: type=0x{:04X} ({} bytes)", type, payload.size());

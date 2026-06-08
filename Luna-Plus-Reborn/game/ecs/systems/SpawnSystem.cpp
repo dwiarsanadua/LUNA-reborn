@@ -44,6 +44,10 @@ void SpawnSystem::SpawnMonster(entt::registry& registry, uint32_t monster_id,
     xform.position = pos;
     auto& stats = registry.emplace<CharacterStats>(entity);
     stats.level = level;
+    stats.max_hp = 50 + level * 10;
+    stats.hp = stats.max_hp;
+    stats.physic_attack = 8 + level * 2;
+    stats.physic_defense = 3 + level;
     registry.emplace<TagMonster>(entity);
 }
 
@@ -153,6 +157,10 @@ entt::entity SpawnSystem::SpawnSingle(entt::registry& registry, const SpawnPoint
     xform.position = glm::vec3(sp.x, sp.y, sp.z);
     auto& stats = registry.emplace<CharacterStats>(entity);
     stats.level = 1;
+    stats.max_hp = 50 + stats.level * 10;
+    stats.hp = stats.max_hp;
+    stats.physic_attack = 8 + stats.level * 2;
+    stats.physic_defense = 3 + stats.level;
     registry.emplace<TagMonster>(entity);
     auto& sinfo = registry.emplace<SpawnInfo>(entity);
     sinfo.spawn_rule_id = sp.id;

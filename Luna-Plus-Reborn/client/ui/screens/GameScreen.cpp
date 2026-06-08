@@ -78,6 +78,7 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
     switch (type) {
     case 0x0208:
         return true;
+    case luna::protocol::PacketType_MP_CHAT_ALL_ACK:
     case 0x0501: {
         auto msg = flatbuffers::GetRoot<luna::protocol::ChatMessage>(payload.data());
         std::string sender = msg->sender_name() ? msg->sender_name()->str() : "?";
@@ -101,8 +102,22 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         state_->gold = inv->gold();
         return true;
     }
+    case luna::protocol::PacketType_MP_ENTITY_DESPAWN: {
+        auto despawn = flatbuffers::GetRoot<luna::protocol::EntityDespawn>(payload.data());
+        RemoveNetworkEntity(despawn->entity_id());
+        return true;
+    }
+    case luna::protocol::PacketType_MP_COMBAT_ATTACK_ACK:
+    case luna::protocol::PacketType_MP_SKILL_CAST_ACK: {
+        auto result = flatbuffers::GetRoot<luna::protocol::AttackResult>(payload.data());
+        ApplyNetworkAttackResult(result);
+        return true;
+    }
     case luna::protocol::PacketType_MP_ENTITY_SPAWN: {
         auto spawn = flatbuffers::GetRoot<luna::protocol::EntitySpawn>(payload.data());
+        for (const auto& existing : state_->entities) {
+            if (existing.id == spawn->entity_id()) return true;
+        }
         RemoteEntity e;
         e.id = spawn->entity_id();
         e.name = spawn->name() ? spawn->name()->str() : "?";
@@ -604,13 +619,59 @@ void GameScreen::CastHotbarSkill(int slot) {
         luna::protocol::Vec3 pos{hero_.GetX(), hero_.GetY(), hero_.GetZ()};
         auto req = luna::protocol::CreateAttackRequest(fbb, hero_.GetTarget(), static_cast<uint16_t>(skill_id), &pos);
         fbb.Finish(req);
-        network_->SendPacket(luna::protocol::PacketType_MP_COMBAT_ATTACK_SYN,
+        network_->SendPacket(luna::protocol::PacketType_MP_SKILL_CAST_SYN,
             fbb.GetBufferPointer(), fbb.GetSize());
+    }
+}
+
+void GameScreen::RemoveNetworkEntity(uint32_t entity_id) {
+    CharRenderer_Remove(entity_id);
+    state_->entities.erase(
+        std::remove_if(state_->entities.begin(), state_->entities.end(),
+            [&](const RemoteEntity& e) { return e.id == entity_id; }),
+        state_->entities.end());
+    monsters_.erase(
+        std::remove_if(monsters_.begin(), monsters_.end(),
+            [&](const Monster& m) { return m.GetID() == entity_id; }),
+        monsters_.end());
+}
+
+void GameScreen::ApplyNetworkAttackResult(const luna::protocol::AttackResult* result) {
+    if (!result) return;
+    uint32_t target_id = result->target_id();
+    int dmg = result->damage();
+    bool miss = result->is_miss();
+
+    for (auto& m : monsters_) {
+        if (m.GetID() == target_id) {
+            if (!miss) {
+                m.TakeDamage(dmg);
+                effect_mgr_.SpawnDamageNumber(m.GetX(), m.GetY() + 1.5f, m.GetZ(), dmg,
+                    result->is_critical() ? DamageType::Crit : DamageType::Normal);
+            } else {
+                effect_mgr_.SpawnDamageNumber(m.GetX(), m.GetY() + 1.5f, m.GetZ(), 0, DamageType::Miss);
+            }
+            if (!m.IsAlive()) RemoveNetworkEntity(target_id);
+            return;
+        }
+    }
+    for (auto& e : state_->entities) {
+        if (e.id == target_id) {
+            e.hp_pct = result->target_hp_remaining() > 0
+                ? (int)(100.0f * result->target_hp_remaining() / std::max(1, result->target_hp_remaining() + dmg))
+                : 0;
+            if (result->target_hp_remaining() <= 0) RemoveNetworkEntity(target_id);
+            else if (!miss)
+                effect_mgr_.SpawnDamageNumber(e.x, e.y + 1.5f, e.z, dmg,
+                    result->is_critical() ? DamageType::Crit : DamageType::Normal);
+            return;
+        }
     }
 }
 
 void GameScreen::ApplySkillDamage(uint32_t skill_id) {
     if (!skill_id) return;
+    if (!state_->offline_mode) return;
     int base = 25 + hero_.GetLevel() * 3;
     float range = 6.0f;
     bool aoe = false;
@@ -751,9 +812,13 @@ void GameScreen::Update(float dt) {
             state_->hotbar_cooldowns[i] = std::max(0.0f, state_->hotbar_cooldowns[i] - dt);
     }
 
-    if (hero_.GetState() == HeroState::Skill && !skill_damage_applied_) {
-        ApplySkillDamage(state_->pending_skill_id);
-        skill_damage_applied_ = true;
+    if (state_->offline_mode) {
+        if (hero_.GetState() == HeroState::Skill && !skill_damage_applied_) {
+            ApplySkillDamage(state_->pending_skill_id);
+            skill_damage_applied_ = true;
+        } else if (hero_.GetState() != HeroState::Skill) {
+            skill_damage_applied_ = false;
+        }
     } else if (hero_.GetState() != HeroState::Skill) {
         skill_damage_applied_ = false;
     }

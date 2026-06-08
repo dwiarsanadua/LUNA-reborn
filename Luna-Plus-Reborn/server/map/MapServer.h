@@ -8,6 +8,8 @@
 #include <glm/glm.hpp>
 #include <entt/entt.hpp>
 
+// entt::entity used for connected player tracking
+
 class NetworkLayer;
 class Database;
 
@@ -119,4 +121,10 @@ private:
 
     bool player_joined_ = false;
     PlayerData connected_player_{};
+    entt::entity player_entity_ = entt::null;
+
+    void SendEntityDespawn(uint32_t entity_id, int8_t reason);
+    void HandleCombatAttack(uint16_t ack_type, const uint8_t* payload, size_t len);
+    void HandleChat(const uint8_t* payload, size_t len);
+    entt::entity FindMonsterEntity(uint32_t entity_id) const;
 };
