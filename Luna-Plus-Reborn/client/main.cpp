@@ -320,6 +320,14 @@ int main() {
         if (g_screen_mgr) g_screen_mgr->HandleKey(e.key, e.scancode, e.action, e.mods);
     });
 
+    input_sys.SetCharCallback([&](unsigned int codepoint) {
+        if (g_state.chat_open) {
+            if (codepoint >= 32 && codepoint <= 126) g_state.chat_input += static_cast<char>(codepoint);
+            return;
+        }
+        if (g_screen_mgr) g_screen_mgr->HandleChar(codepoint);
+    });
+
     input_sys.SetMouseCallback([&](const MouseEvent& e) {
         if (e.button == 0 && e.action == 1) {
             float wx = (float)(e.x - 640) / 12.0f;

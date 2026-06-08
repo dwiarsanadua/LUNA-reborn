@@ -90,15 +90,36 @@ bool CharSelectScreen::HandleKey(int key, int scancode, int action, int mods) {
     }
 
     if (key == 67) { // C - Character creation
-        if (state_->offline_mode) {
-            charmake_open_ = true;
-            charmake_dlg_.Open(nullptr);
-        } else {
-            std::string name = "Player" + std::to_string(rand() % 1000);
-            flatbuffers::FlatBufferBuilder fbb;
-            auto req = luna::protocol::CreateCreateCharacterRequestDirect(fbb, state_->session_token.c_str(), name.c_str(), 0, 0, 0, 0, 0);
-            fbb.Finish(req);
-            network_->SendPacket(luna::protocol::PacketType_MP_USERCONN_CHARACTER_MAKE_SYN, fbb.GetBufferPointer(), fbb.GetSize());
+        charmake_open_ = true;
+        charmake_dlg_.Open(nullptr);
+        state_->current_state = ClientState::CharMake;
+        return true;
+    }
+
+    if (charmake_open_ && charmake_dlg_.HandleKey(key, action)) {
+        if (!charmake_dlg_.IsOpen()) {
+            charmake_open_ = false;
+            state_->current_state = ClientState::CharSelect;
+            return true;
+        }
+        if (charmake_dlg_.IsComplete()) {
+            CharInfo created{};
+            if (charmake_dlg_.FinalizeInto(*state_, created)) {
+                state_->characters.push_back(created);
+                state_->selected_char = static_cast<int>(state_->characters.size()) - 1;
+                if (!state_->offline_mode && network_->IsConnected()) {
+                    flatbuffers::FlatBufferBuilder fbb;
+                    auto req = luna::protocol::CreateCreateCharacterRequestDirect(
+                        fbb, state_->session_token.c_str(), created.name.c_str(),
+                        state_->class_id, state_->race, 0, 0, 0);
+                    fbb.Finish(req);
+                    network_->SendPacket(luna::protocol::PacketType_MP_USERCONN_CHARACTER_MAKE_SYN,
+                        fbb.GetBufferPointer(), fbb.GetSize());
+                }
+            }
+            charmake_dlg_.Close();
+            charmake_open_ = false;
+            state_->current_state = ClientState::CharSelect;
         }
         return true;
     }
@@ -114,5 +135,10 @@ bool CharSelectScreen::HandleKey(int key, int scancode, int action, int mods) {
         return true;
     }
 
+    return false;
+}
+
+bool CharSelectScreen::HandleChar(unsigned int codepoint) {
+    if (charmake_open_) return charmake_dlg_.HandleChar(codepoint);
     return false;
 }

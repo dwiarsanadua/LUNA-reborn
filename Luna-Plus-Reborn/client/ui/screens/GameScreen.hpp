@@ -92,6 +92,9 @@ private:
     void SpawnMonstersFromMap();
     void InitializeWorld();
     void ChangeMap(uint32_t map_id);
+    void CastHotbarSkill(int slot);
+    void ApplySkillDamage(uint32_t skill_id);
+    void SendMovementUpdate(float dt);
     void DoCombat(float dt);
     void DoLevelUp();
     void RenderUI(UIRenderer& ui);
@@ -114,6 +117,8 @@ private:
     WorldMapDlg worldmap_dlg_;
     PKManagerDlg pk_dlg_;
     uint32_t pending_map_id_ = 0;
+    float move_send_timer_ = 0.0f;
+    bool skill_damage_applied_ = false;
     
     ParticleSystem particleSys_;
     float prev_x_ = 0, prev_z_ = 0;

@@ -507,7 +507,8 @@ void InputSystem::GlfwKeyCallback(GLFWwindow*, int key, int scancode, int action
 }
 
 void InputSystem::GlfwCharCallback(GLFWwindow*, unsigned int codepoint) {
-    (void)codepoint;
+    auto* sys = GetInstance();
+    if (sys && sys->char_cb_) sys->char_cb_(codepoint);
 }
 
 void InputSystem::GlfwMouseButtonCallback(GLFWwindow*, int button, int action, int mods) {

@@ -39,7 +39,8 @@ public:
     void Heal(int amount);
     void LevelUp();
     void Respawn();
-    void UseSkill(int skill_id);
+    bool UseSkill(int skill_id);
+    int GetCurrentSkillId() const { return current_skill_id_; }
     void SetState(HeroState s, float duration = 0);
     
     bool IsAlive() const { return hp_ > 0; }

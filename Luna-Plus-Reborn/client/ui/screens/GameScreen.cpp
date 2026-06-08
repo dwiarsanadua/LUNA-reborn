@@ -5,6 +5,7 @@
 #include <config/ModelResolver.hpp>
 #include <config/Paths.hpp>
 #include <engine/gx_render/VFS.h>
+#include <gameobjects/ClassAdvancement.hpp>
 #include <gameobjects/DurabilitySystem.hpp>
 #include <flatbuffers/flatbuffers.h>
 #include <Login_generated.h>
@@ -147,6 +148,8 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
     else if (key == 65 || key == 263) { hero_.ClearWaypoint(); state_->player_x -= speed; hero_.Move(-speed, 0); }
     else if (key == 68 || key == 262) { hero_.ClearWaypoint(); state_->player_x += speed; hero_.Move(speed, 0); }
     else if (key == 32) SpawnRandomMonster();
+    else if (key >= 49 && key <= 57) CastHotbarSkill(key - 49);
+    else if (key == 48) CastHotbarSkill(9);
     else if (key == 80) {
         if (pk_dlg_.IsOpen()) pk_dlg_.Close();
         else pk_dlg_.Open(&wm_);
@@ -558,9 +561,79 @@ void GameScreen::InitializeWorld() {
         state_->inventory.push_back({1001, "Iron Sword", 1, 0, 0});
         state_->inventory.push_back({21000001, "Health Potion", 5, 1, 0});
     }
+    if (state_->hotbar_skills[0] == 0) {
+        const uint32_t presets[][3] = {{1, 10, 11}, {1, 20, 21}, {1, 30, 31}, {1, 2, 3}};
+        int cid = std::min(3, std::max(0, state_->class_id));
+        state_->hotbar_skills[0] = presets[cid][0];
+        state_->hotbar_skills[1] = presets[cid][1];
+        state_->hotbar_skills[2] = presets[cid][2];
+    }
+    if (state_->learned_skills.empty()) {
+        state_->learned_skills.push_back(static_cast<int>(state_->hotbar_skills[0]));
+        if (state_->hotbar_skills[1]) state_->learned_skills.push_back(static_cast<int>(state_->hotbar_skills[1]));
+    }
     SpawnMonstersFromMap();
     fade_dlg_.FadeIn(0.8f);
     spdlog::info("GameScreen: world initialized on map {}", state_->map_id);
+}
+
+void GameScreen::CastHotbarSkill(int slot) {
+    if (slot < 0 || slot >= 10) return;
+    if (state_->hotbar_cooldowns[slot] > 0.0f) return;
+    uint32_t skill_id = state_->hotbar_skills[slot];
+    if (!skill_id) return;
+    if (!hero_.UseSkill(static_cast<int>(skill_id))) return;
+    state_->hotbar_cooldowns[slot] = 2.5f;
+    CharRenderer_Move(0, hero_.GetX(), hero_.GetY(), hero_.GetZ(), false, CHAR_ATTACK);
+}
+
+void GameScreen::ApplySkillDamage(uint32_t skill_id) {
+    if (!skill_id) return;
+    int base = 25 + hero_.GetLevel() * 3;
+    float range = 6.0f;
+    bool aoe = false;
+    auto skills = ClassAdvancement::GetSkillsForClass(state_->class_id);
+    for (const auto& sk : skills) {
+        if (static_cast<uint32_t>(sk.skill_id) == skill_id) {
+            base = 30 + sk.required_level * 5;
+            if (skill_id == 12 || skill_id == 30) aoe = true;
+            if (skill_id == 22) range = 12.0f;
+            break;
+        }
+    }
+    int hits = 0;
+    for (auto& m : monsters_) {
+        if (!m.IsAlive()) continue;
+        float dist = m.GetDistance(hero_.GetX(), hero_.GetZ());
+        if (dist > range) continue;
+        int dmg = base + (aoe ? 10 : 20);
+        m.TakeDamage(dmg);
+        effect_mgr_.SpawnDamageNumber(m.GetX(), m.GetY() + 1.5f, m.GetZ(), dmg, DamageType::Crit);
+        hits++;
+        if (!aoe) break;
+    }
+    if (hits > 0) {
+        effect_mgr_.SpawnCameraShake(5.0f, 0.2f);
+        state_->chat_messages.push_back("Skill hit " + std::to_string(hits) + " target(s)");
+    }
+    state_->pending_skill_id = 0;
+}
+
+void GameScreen::SendMovementUpdate(float dt) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    move_send_timer_ += dt;
+    if (move_send_timer_ < 0.12f) return;
+    move_send_timer_ = 0.0f;
+
+    flatbuffers::FlatBufferBuilder fbb;
+    luna::protocol::Vec3 dir{0, 0, 0};
+    luna::protocol::Vec3 pos{hero_.GetX(), hero_.GetY(), hero_.GetZ()};
+    auto req = luna::protocol::CreateMoveRequest(
+        fbb, &dir, &pos,
+        hero_.GetState() == HeroState::Run ? luna::protocol::MoveMode_Run : luna::protocol::MoveMode_Walk);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_MOVE_WALK,
+        fbb.GetBufferPointer(), fbb.GetSize());
 }
 
 void GameScreen::ChangeMap(uint32_t map_id) {
@@ -593,7 +666,10 @@ void GameScreen::Update(float dt) {
     if (state_->connecting) {
         state_->connecting = false;
         network_->Disconnect();
-        if (network_->Connect("127.0.0.1", 8300)) spdlog::info("Connected to MapServer");
+        uint32_t mid = state_->map_id ? state_->map_id : 51;
+        uint16_t map_port = static_cast<uint16_t>(8200 + mid);
+        if (network_->Connect("127.0.0.1", map_port))
+            spdlog::info("Connected to MapServer on port {} (map {})", map_port, mid);
         if (audio_) {
             switch (state_->map_id) {
                 case 13: audio_->PlayBGM("14_Red_Orc_Outpost"); break;
@@ -636,6 +712,19 @@ void GameScreen::Update(float dt) {
     }
     hero_.Update(dt);
     state_->player_y = hero_.GetY();
+    SendMovementUpdate(dt);
+
+    for (int i = 0; i < 10; ++i) {
+        if (state_->hotbar_cooldowns[i] > 0.0f)
+            state_->hotbar_cooldowns[i] = std::max(0.0f, state_->hotbar_cooldowns[i] - dt);
+    }
+
+    if (hero_.GetState() == HeroState::Skill && !skill_damage_applied_) {
+        ApplySkillDamage(state_->pending_skill_id);
+        skill_damage_applied_ = true;
+    } else if (hero_.GetState() != HeroState::Skill) {
+        skill_damage_applied_ = false;
+    }
 
     for (auto& m : monsters_) {
         float mh = terrain_ ? terrain_->GetHeight(m.GetX(), m.GetZ()) + 0.5f : 0.5f;
@@ -998,18 +1087,19 @@ void GameScreen::RenderUI(UIRenderer& ui) {
     {
         float hb_y = lh - 50.0f, hb_s = 40, hb_p = 4;
         float hb_x = (lw - (10 * (hb_s + hb_p))) / 2;
-        float cd_now = state_->combat_timer;
         for (int s = 0; s < 10; s++) {
             float sx = hb_x + s * (hb_s + hb_p);
-            ui.DrawRect(sx, hb_y, hb_s, hb_s, {30, 30, 50, 200});
+            bool has_skill = state_->hotbar_skills[s] != 0;
+            ui.DrawRect(sx, hb_y, hb_s, hb_s, has_skill ? UIColor{40, 40, 70, 220} : UIColor{30, 30, 50, 200});
             ui.DrawBorder(sx, hb_y, hb_s, hb_s, {100, 100, 150, 150});
-            char buf[8]; snprintf(buf, 8, "%d", (s+1)%10);
+            char buf[8]; snprintf(buf, 8, "%d", (s + 1) % 10);
             ui.DrawText(sx + 12, hb_y + 24, 0xffcccccc, "%s", buf);
-            
-            // Cooldown overlay (dim the slot during cooldown)
-            if (s == 0 && cd_now > 0 && cd_now < 0.8f) {
-                float pct = cd_now / 0.8f;
-                ui.DrawRect(sx, hb_y, hb_s, hb_s * (1.0f - pct), {0, 0, 0, 160});
+            if (has_skill) {
+                ui.DrawText(sx + 4, hb_y + 4, 0xff88ccff, "%u", state_->hotbar_skills[s]);
+            }
+            if (state_->hotbar_cooldowns[s] > 0.0f) {
+                float pct = state_->hotbar_cooldowns[s] / 2.5f;
+                ui.DrawRect(sx, hb_y, hb_s, hb_s * pct, {0, 0, 0, 170});
             }
         }
     }

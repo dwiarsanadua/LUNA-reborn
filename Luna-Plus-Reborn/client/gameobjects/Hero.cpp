@@ -1,5 +1,6 @@
 #include "Hero.hpp"
 #include "NavMeshSystem.hpp"
+#include "ClassAdvancement.hpp"
 #include <ui/GameState.hpp>
 #include <rendering/UIRenderer.hpp>
 #include <rendering/CharacterRenderer.hpp>
@@ -118,12 +119,28 @@ void Hero::SetState(HeroState s, float duration) {
     }
 }
 
-void Hero::UseSkill(int skill_id) {
-    if (!CanAct() || !IsAlive()) return;
+bool Hero::UseSkill(int skill_id) {
+    if (!CanAct() || !IsAlive() || skill_id <= 0) return false;
+    if (skill_cooldown_ > 0.0f) return false;
+
+    int mp_cost = 8;
+    auto skills = ClassAdvancement::GetSkillsForClass(game_state_ ? game_state_->class_id : 0);
+    for (const auto& sk : skills) {
+        if (sk.skill_id == skill_id) {
+            mp_cost = std::max(5, sk.required_level * 2);
+            break;
+        }
+    }
+    if (mp_ < mp_cost) return false;
+
+    mp_ -= mp_cost;
     current_skill_id_ = skill_id;
-    cast_time_ = 0.3f; // 300ms cast time
+    skill_cooldown_ = 2.5f;
+    cast_time_ = 0.4f;
     SetState(HeroState::Casting, cast_time_);
+    if (game_state_) game_state_->pending_skill_id = static_cast<uint32_t>(skill_id);
     if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_UI, "button_ok.wav");
+    return true;
 }
 
 void Hero::TakeDamage(int dmg) {
@@ -275,6 +292,8 @@ void Hero::Update(float dt) {
     }
     if (battle_delay_timer_ > 0.0f)
         battle_delay_timer_ = std::max(0.0f, battle_delay_timer_ - dt);
+    if (skill_cooldown_ > 0.0f)
+        skill_cooldown_ = std::max(0.0f, skill_cooldown_ - dt);
 
     if (has_waypoint_ && CanAct()) {
         float dx = waypoint_x_ - x_, dz = waypoint_z_ - z_;

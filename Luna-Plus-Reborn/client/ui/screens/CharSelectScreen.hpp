@@ -10,6 +10,7 @@ public:
     void Update(float dt) override;
     void Render(UIRenderer& ui) override;
     bool HandleKey(int key, int scancode, int action, int mods) override;
+    bool HandleChar(unsigned int codepoint) override;
     bool HandlePacket(uint16_t type, const std::vector<uint8_t>& payload) override;
     void SetSceneClearer(std::function<void(uint32_t)> f) { set_clear_color_ = f; }
 private:

@@ -22,12 +22,18 @@ CharMakeDlg::~CharMakeDlg() {
 }
 
 void CharMakeDlg::Open(WindowManager* wm) {
-    if (window_) return;
-    window_ = wm->Open("Character Creation", 40, 20, 1200, 680);
-    window_->SetClosable(false);
-    window_->SetMovable(false);
-    window_->SetTitleBarH(0);
-    window_->SetModal(true);
+    if (open_) return;
+    open_ = true;
+    complete_ = false;
+    name_.clear();
+    if (wm) {
+        window_ = wm->Open("Character Creation", 40, 20, 1200, 680);
+        window_->SetClosable(false);
+        window_->SetMovable(false);
+        window_->SetTitleBarH(0);
+        window_->SetModal(true);
+    }
+    UpdatePreview();
 }
 
 void CharMakeDlg::Close() {
@@ -36,6 +42,8 @@ void CharMakeDlg::Close() {
         preview_created_ = false;
     }
     window_ = nullptr;
+    open_ = false;
+    complete_ = false;
 }
 
 void CharMakeDlg::UpdatePreview() {
@@ -52,29 +60,25 @@ void CharMakeDlg::UpdatePreview() {
     }
 }
 
-GameState* CharMakeDlg::CreateCharacter() {
-    auto* state = new GameState();
-    state->name = name_;
-    state->race = race_;
-    state->gender = gender_;
-    state->class_id = class_;
-    state->level = 1;
-    state->hp = 100;
-    state->max_hp = 100;
-    state->mp = 50;
-    state->max_mp = 50;
-    state->exp = 0;
-    state->exp_next = 200;
-    state->gold = 100;
-    state->attack = 10;
-    state->defense = 5;
-    state->hair_style = appearance_.hair_style;
-    state->face_style = appearance_.face_style;
-    state->hair_color = appearance_.hair_color;
-    state->skin_color = appearance_.skin_color;
-    state->eye_color = appearance_.eye_color;
+bool CharMakeDlg::FinalizeInto(GameState& state, CharInfo& out_char) {
+    if (name_.empty()) return false;
+    out_char.id = 1000 + static_cast<uint32_t>(state.characters.size());
+    out_char.name = name_;
+    out_char.level = 1;
+    out_char.map_id = 51;
+    out_char.pos_x = 0;
+    out_char.pos_y = 0;
+    out_char.pos_z = 0;
+    state.race = race_;
+    state.gender = gender_;
+    state.class_id = class_;
+    state.hair_style = appearance_.hair_style;
+    state.face_style = appearance_.face_style;
+    state.hair_color = appearance_.hair_color;
+    state.skin_color = appearance_.skin_color;
+    state.eye_color = appearance_.eye_color;
     complete_ = true;
-    return state;
+    return true;
 }
 
 void CharMakeDlg::OnConfirm() {
@@ -82,12 +86,53 @@ void CharMakeDlg::OnConfirm() {
     complete_ = true;
 }
 
+bool CharMakeDlg::HandleKey(int key, int action) {
+    if (!open_ || action != 1) return false;
+    if (key == 256) { Close(); return true; }
+    if (key == 258) { // Tab
+        selected_tab_ = (selected_tab_ + 1) % 3;
+        return true;
+    }
+    if (key == 257) { OnConfirm(); return true; }
+    if (selected_tab_ == 0) {
+        if (key == 49) { race_ = 0; UpdatePreview(); return true; }
+        if (key == 50) { race_ = 1; UpdatePreview(); return true; }
+        if (key == 51) { race_ = 2; UpdatePreview(); return true; }
+        if (key == 52) { race_ = 3; UpdatePreview(); return true; }
+        if (key == 81) { gender_ = 0; return true; }
+        if (key == 87) { gender_ = 1; return true; }
+        if (key == 90) { class_ = 0; return true; }
+        if (key == 88) { class_ = 1; return true; }
+        if (key == 67) { class_ = 2; return true; }
+        if (key == 86) { class_ = 3; return true; }
+    } else if (selected_tab_ == 1) {
+        if (key == 263) { appearance_.hair_style = std::max(0, appearance_.hair_style - 1); return true; }
+        if (key == 262) { appearance_.hair_style++; return true; }
+        if (key == 265) { appearance_.face_style = std::max(0, appearance_.face_style - 1); return true; }
+        if (key == 264) { appearance_.face_style++; return true; }
+    }
+    return false;
+}
+
+bool CharMakeDlg::HandleChar(unsigned int codepoint) {
+    if (!open_) return false;
+    if (codepoint >= 32 && codepoint <= 126 && name_.size() < 12) {
+        name_ += static_cast<char>(codepoint);
+        return true;
+    }
+    if (codepoint == 8 && !name_.empty()) {
+        name_.pop_back();
+        return true;
+    }
+    return false;
+}
+
 void CharMakeDlg::Render(UIRenderer& ui) {
-    if (!window_) return;
-    float wx = window_->GetX();
-    float wy = window_->GetY();
-    float ww = window_->GetW();
-    float wh = window_->GetH();
+    if (!open_) return;
+    float wx = window_ ? window_->GetX() : 40;
+    float wy = window_ ? window_->GetY() : 20;
+    float ww = window_ ? window_->GetW() : 1200;
+    float wh = window_ ? window_->GetH() : 680;
 
     // Dark overlay
     ui.DrawRect(0, 0, 1280, 720, {0, 0, 0, 180});
@@ -125,7 +170,8 @@ void CharMakeDlg::Render(UIRenderer& ui) {
         can_confirm ? UIColor{40, 80, 40, 220} : UIColor{40, 40, 40, 220});
     ui.DrawBorder(wx + ww - 160, wy + wh - 45, 130, 30,
         can_confirm ? UIColor{80, 180, 80, 200} : UIColor{80, 80, 80, 200});
-    ui.DrawTextCentered(wy + wh - 38, can_confirm ? 0xffffffff : 0xff666666, "CREATE");
+    ui.DrawTextCentered(wy + wh - 38, can_confirm ? 0xffffffff : 0xff666666, "CREATE (Enter)");
+    ui.DrawText(wx + 20, wy + wh - 20, 0xff888888, "Tab: sections | 1-4 race | Q/W gender | Z/X/C/V class | Esc cancel");
 }
 
 void CharMakeDlg::RenderClassSelection(UIRenderer& ui, float x, float y) {

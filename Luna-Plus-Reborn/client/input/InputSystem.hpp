@@ -172,8 +172,10 @@ public:
     // Events
     using KeyCallback = std::function<void(const KeyEvent&)>;
     using MouseCallback = std::function<void(const MouseEvent&)>;
+    using CharCallback = std::function<void(unsigned int codepoint)>;
     void SetKeyCallback(KeyCallback cb) { key_cb_ = cb; }
     void SetMouseCallback(MouseCallback cb) { mouse_cb_ = cb; }
+    void SetCharCallback(CharCallback cb) { char_cb_ = cb; }
 
     using GamepadConnectionCallback = std::function<void(int index, bool connected)>;
     void SetGamepadConnectionCallback(GamepadConnectionCallback cb) { gamepad_connect_cb_ = cb; }
@@ -221,6 +223,7 @@ private:
     // Callbacks
     KeyCallback key_cb_;
     MouseCallback mouse_cb_;
+    CharCallback char_cb_;
 
     // ── Gamepad state ─────────────────────────────────────────────────────
     GamepadState gamepads_[MAX_GAMEPADS];

@@ -25,14 +25,18 @@ public:
     void Open(WindowManager* wm);
     void Close();
     Window* GetWindow() { return window_; }
-    bool IsOpen() const { return window_ != nullptr; }
+    bool IsOpen() const { return open_; }
 
     bool IsComplete() const { return complete_; }
-    GameState* CreateCharacter();
+    void ResetComplete() { complete_ = false; }
+    bool FinalizeInto(GameState& state, CharInfo& out_char);
     void Render(UIRenderer& ui);
+    bool HandleKey(int key, int action);
+    bool HandleChar(unsigned int codepoint);
 
 private:
     Window* window_ = nullptr;
+    bool open_ = false;
     bool complete_ = false;
 
     // Selections

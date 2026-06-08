@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <array>
 #include <random>
 #include <cstdint>
 #include <game/ecs/components/Equipment.hpp>
@@ -74,6 +75,9 @@ struct GameState {
     uint32_t hair_color = 0xff442200, skin_color = 0xffe8c090, eye_color = 0xff4488cc;
     int stat_str = 10, stat_dex = 10, stat_int = 10, stat_con = 10;
     std::vector<int> learned_skills;
+    std::array<uint32_t, 10> hotbar_skills{};
+    std::array<float, 10> hotbar_cooldowns{};
+    uint32_t pending_skill_id = 0;
     int skill_points = 5;
     float cam_yaw = -45.0f, cam_pitch = -40.0f;
     float cam_dist = 80.0f;
