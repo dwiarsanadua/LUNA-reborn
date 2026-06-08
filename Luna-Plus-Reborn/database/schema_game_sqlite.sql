@@ -372,6 +372,8 @@ CREATE TABLE IF NOT EXISTS TB_CONSIGNMENT (
 );
 
 CREATE INDEX IF NOT EXISTS idx_consignment_char ON TB_CONSIGNMENT(CharacterIdx);
+CREATE INDEX IF NOT EXISTS idx_consignment_item ON TB_CONSIGNMENT(ItemIdx);
+CREATE INDEX IF NOT EXISTS idx_consignment_active ON TB_CONSIGNMENT(IsSold, IsCanceled);
 
 -- ─── Siege / Recall ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS TB_SIEGE_RECALL (
@@ -416,6 +418,175 @@ CREATE TABLE IF NOT EXISTS TB_NPC_RECALL (
     NpcID           INTEGER NOT NULL,
     RemainTime      INTEGER DEFAULT 0,
     RegDate         TEXT DEFAULT (datetime('now'))
+);
+
+-- ─── Guild Union ───────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_GUILD_UNION (
+    UnionIdx        INTEGER PRIMARY KEY AUTOINCREMENT,
+    UnionName       TEXT UNIQUE NOT NULL,
+    MasterGuildIdx  INTEGER NOT NULL REFERENCES TB_GUILD(GuildIdx),
+    CreateDate      TEXT DEFAULT (datetime('now')),
+    MarkData        BLOB,
+    MarkLen         INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS TB_GUILD_UNION_MEMBER (
+    UnionIdx        INTEGER NOT NULL REFERENCES TB_GUILD_UNION(UnionIdx) ON DELETE CASCADE,
+    GuildIdx        INTEGER NOT NULL REFERENCES TB_GUILD(GuildIdx),
+    JoinDate        TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (UnionIdx, GuildIdx)
+);
+
+-- ─── Housing Furniture ──────────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_HOUSE_FURNITURE (
+    FurnitureIdx    INTEGER PRIMARY KEY AUTOINCREMENT,
+    HouseIdx        INTEGER NOT NULL REFERENCES TB_HOUSE(HouseIdx) ON DELETE CASCADE,
+    ItemDBIdx       INTEGER NOT NULL,
+    PosX            REAL DEFAULT 0,
+    PosY            REAL DEFAULT 0,
+    PosZ            REAL DEFAULT 0,
+    RotY            REAL DEFAULT 0
+);
+
+-- ─── Vehicle Passenger ──────────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_VEHICLE_PASSENGER (
+    VehicleIdx      INTEGER NOT NULL REFERENCES TB_VEHICLE(VehicleIdx) ON DELETE CASCADE,
+    CharacterIdx    INTEGER NOT NULL REFERENCES TB_CHARACTER(CharacterIdx),
+    SeatIdx         INTEGER DEFAULT 0,
+    PRIMARY KEY (VehicleIdx, CharacterIdx)
+);
+
+-- ─── Cook Recipe ────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_COOKRECIPE (
+    RecipeIdx       INTEGER PRIMARY KEY AUTOINCREMENT,
+    CharacterIdx    INTEGER NOT NULL REFERENCES TB_CHARACTER(CharacterIdx),
+    RecipeID        INTEGER NOT NULL,
+    IsLearned       INTEGER DEFAULT 0,
+    UNIQUE(CharacterIdx, RecipeID)
+);
+
+-- ─── Guild Tournament ──────────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_GUILD_TOURNAMENT (
+    TournamentIdx   INTEGER PRIMARY KEY AUTOINCREMENT,
+    GuildIdx        INTEGER NOT NULL REFERENCES TB_GUILD(GuildIdx),
+    RegDate         TEXT DEFAULT (datetime('now')),
+    State           INTEGER DEFAULT 0,
+    Round           INTEGER DEFAULT 0,
+    Score           INTEGER DEFAULT 0,
+    Reward          INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS TB_GUILD_TOURNAMENT_PLAYER (
+    TournamentIdx   INTEGER NOT NULL REFERENCES TB_GUILD_TOURNAMENT(TournamentIdx) ON DELETE CASCADE,
+    CharacterIdx    INTEGER NOT NULL REFERENCES TB_CHARACTER(CharacterIdx),
+    KillCount       INTEGER DEFAULT 0,
+    DeathCount      INTEGER DEFAULT 0,
+    Score           INTEGER DEFAULT 0,
+    PRIMARY KEY (TournamentIdx, CharacterIdx)
+);
+
+-- ─── Challenge Zone ─────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_CHALLENGEZONE (
+    CharacterIdx    INTEGER NOT NULL REFERENCES TB_CHARACTER(CharacterIdx),
+    EnterFreq       INTEGER DEFAULT 0,
+    EnterBonusFreq  INTEGER DEFAULT 0,
+    SuccessCount    INTEGER DEFAULT 0,
+    ExpRate         REAL DEFAULT 1.0,
+    PRIMARY KEY (CharacterIdx)
+);
+
+-- ─── Monster Meter ─────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_MONSTERMETER (
+    CharacterIdx    INTEGER NOT NULL REFERENCES TB_CHARACTER(CharacterIdx),
+    MonsterDBIdx    INTEGER NOT NULL,
+    KillCount       INTEGER DEFAULT 0,
+    MaxDamage       INTEGER DEFAULT 0,
+    PRIMARY KEY (CharacterIdx, MonsterDBIdx)
+);
+
+-- ─── Dungeon ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_DUNGEON (
+    DungeonIdx      INTEGER PRIMARY KEY AUTOINCREMENT,
+    CharacterIdx    INTEGER NOT NULL REFERENCES TB_CHARACTER(CharacterIdx),
+    MapIdx          INTEGER NOT NULL,
+    EnterDate       TEXT DEFAULT (datetime('now')),
+    ClearDate       TEXT,
+    State           INTEGER DEFAULT 0
+);
+
+-- ─── Trigger ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_TRIGGER (
+    TriggerIdx      INTEGER PRIMARY KEY AUTOINCREMENT,
+    MapIdx          INTEGER NOT NULL,
+    TriggerType     INTEGER DEFAULT 0,
+    TriggerData     TEXT,
+    TriggerCount    INTEGER DEFAULT 0,
+    RegDate         TEXT DEFAULT (datetime('now')),
+    UpdateDate      TEXT
+);
+
+-- ─── Auto Note ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_AUTONOTELIST (
+    AutoNoteIdx     INTEGER PRIMARY KEY AUTOINCREMENT,
+    CharacterIdx    INTEGER NOT NULL REFERENCES TB_CHARACTER(CharacterIdx),
+    AutoName        TEXT,
+    AutoCharIdx     INTEGER,
+    AutoUserIdx     INTEGER,
+    RegDate         TEXT DEFAULT (datetime('now'))
+);
+
+-- ─── PC Room ─────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_PCROOM (
+    PCRoomIdx       INTEGER PRIMARY KEY AUTOINCREMENT,
+    CharacterIdx    INTEGER NOT NULL REFERENCES TB_CHARACTER(CharacterIdx),
+    Point           INTEGER DEFAULT 0,
+    PlayTime        INTEGER DEFAULT 0,
+    RegDate         TEXT DEFAULT (datetime('now'))
+);
+
+-- ─── Bad Fame ──────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_BADFAME (
+    BadFameIdx      INTEGER PRIMARY KEY AUTOINCREMENT,
+    CharacterIdx    INTEGER NOT NULL REFERENCES TB_CHARACTER(CharacterIdx),
+    BadFameValue    INTEGER DEFAULT 0,
+    Reason          TEXT,
+    RegDate         TEXT DEFAULT (datetime('now'))
+);
+
+-- ─── Event ──────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_EVENT (
+    EventIdx        INTEGER PRIMARY KEY AUTOINCREMENT,
+    CharacterIdx    INTEGER NOT NULL REFERENCES TB_CHARACTER(CharacterIdx),
+    EventID         INTEGER NOT NULL,
+    EventData       TEXT,
+    RegDate         TEXT DEFAULT (datetime('now')),
+    UNIQUE(CharacterIdx, EventID)
+);
+
+-- ─── Job ────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_JOB (
+    CharacterIdx    INTEGER PRIMARY KEY REFERENCES TB_CHARACTER(CharacterIdx),
+    JobID           INTEGER DEFAULT 0,
+    JobLevel        INTEGER DEFAULT 0,
+    JobExp          INTEGER DEFAULT 0
+);
+
+-- ─── Move Recall ──────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_MOVE_RECALL (
+    RecallIdx       INTEGER PRIMARY KEY AUTOINCREMENT,
+    CharacterIdx    INTEGER NOT NULL REFERENCES TB_CHARACTER(CharacterIdx),
+    MapIdx          INTEGER NOT NULL,
+    PosX            REAL DEFAULT 0,
+    PosY            REAL DEFAULT 0,
+    PosZ            REAL DEFAULT 0,
+    RegDate         TEXT DEFAULT (datetime('now'))
+);
+
+-- ─── Migration Version Tracking ────────────────────────────
+CREATE TABLE IF NOT EXISTS _migration_version (
+    version         TEXT PRIMARY KEY,
+    applied_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    description     TEXT
 );
 
 COMMIT;

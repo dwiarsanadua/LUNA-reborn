@@ -581,6 +581,265 @@ def create_legacy_db(src_path: Path, dst_path: Path):
     print(f"  [LEGACY] Created {dst_path} ({size / 1024:.1f} KB)")
 
 
+# ═══════════════════════════════════════════════════════════════════════
+#  Export functions — legacy DB → JSON for ECS consumption
+# ═══════════════════════════════════════════════════════════════════════
+
+OUTPUT_DIR = Path("/Users/macbookair/PRIBADI/luna-plus-master/LUNA-Plus-Reborn/assets/data")
+
+
+def export_items(db_path: str, output_path: str) -> int:
+    """Export all item templates to JSON"""
+    db = sqlite3.connect(db_path)
+    db.row_factory = sqlite3.Row
+    rows = db.execute("SELECT * FROM item_templates").fetchall()
+    items = []
+    for r in rows:
+        items.append({
+            "id": r["id"],
+            "name": r["name"],
+            "item_type": r["item_type"],
+            "item_subtype": r["item_subtype"],
+            "rarity": r["rarity"],
+            "level_required": r["level_required"],
+            "attack": r["attack"],
+            "defense": r["defense"],
+            "magic_attack": r["magic_attack"],
+            "magic_defense": r["magic_defense"],
+            "price_buy": r["price_buy"],
+            "price_sell": r["price_sell"],
+            "max_stack": r["max_stack"],
+            "resource_id": r["resource_id"]
+        })
+    db.close()
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(items, f, indent=2, ensure_ascii=False)
+    print(f"  [EXPORT] items: {len(items)} records -> {output_path}")
+    return len(items)
+
+
+def export_monsters(db_path: str, output_path: str) -> int:
+    """Export monster stats + loot tables to JSON"""
+    db = sqlite3.connect(db_path)
+    db.row_factory = sqlite3.Row
+    mrows = db.execute("SELECT * FROM monster_templates").fetchall()
+    drows = db.execute("SELECT * FROM monster_drops").fetchall()
+    srows = db.execute("SELECT * FROM monster_spawns").fetchall()
+
+    drops_by_monster: dict[int, list[dict]] = {}
+    for d in drows:
+        mid = d["monster_id"]
+        drops_by_monster.setdefault(mid, []).append({
+            "item_id": d["item_id"],
+            "item_name": d["item_name"],
+            "min_count": d["min_count"],
+            "max_count": d["max_count"],
+            "probability": d["probability"]
+        })
+
+    spawns_by_monster: dict[int, list[dict]] = {}
+    for s in srows:
+        mid = s["monster_id"]
+        spawns_by_monster.setdefault(mid, []).append({
+            "map_id": s["map_id"],
+            "count": s["count"],
+            "respawn_time": s["respawn_time"],
+            "spawn_radius": s["spawn_radius"]
+        })
+
+    monsters = []
+    for r in mrows:
+        mid = r["id"]
+        monsters.append({
+            "id": mid,
+            "name": r["name"],
+            "level": r["level"],
+            "hp": r["hp"],
+            "mp": r["mp"],
+            "attack": r["attack"],
+            "defense": r["defense"],
+            "magic_attack": 0,
+            "magic_defense": 0,
+            "speed": r["speed"],
+            "exp_reward": r["exp_reward"],
+            "gold_min": r["gold_min"],
+            "gold_max": r["gold_max"],
+            "element_type": r["element_type"],
+            "ai_type": r["ai_type"],
+            "aggro_range": r["aggro_range"],
+            "size_scale": r["size_scale"],
+            "drops": drops_by_monster.get(mid, []),
+            "spawns": spawns_by_monster.get(mid, [])
+        })
+    db.close()
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(monsters, f, indent=2, ensure_ascii=False)
+    print(f"  [EXPORT] monsters: {len(monsters)} records -> {output_path}")
+    return len(monsters)
+
+
+def export_skills(db_path: str, output_path: str) -> int:
+    """Export skill definitions to JSON"""
+    db = sqlite3.connect(db_path)
+    db.row_factory = sqlite3.Row
+    srows = db.execute("SELECT * FROM skill_data").fetchall()
+    brows = db.execute("SELECT * FROM buff_skills").fetchall()
+    trows = db.execute("SELECT * FROM skill_trees").fetchall()
+
+    buffs_by_skill: dict[int, list[dict]] = {}
+    for b in brows:
+        ref = b["skill_ref_id"]
+        buffs_by_skill.setdefault(ref, []).append({
+            "buff_id": b["id"],
+            "name": b["name"],
+            "buff_level": b["buff_level"],
+            "duration_ms": b["duration_ms"],
+            "buff_type": b["buff_type"],
+            "buff_value": b["buff_value"],
+            "buff_chance": b["buff_chance"],
+            "icon_id": b["icon_id"]
+        })
+
+    trees_by_skill: dict[int, list[dict]] = {}
+    for t in trows:
+        sid = t["skill_id"]
+        trees_by_skill.setdefault(sid, []).append({
+            "class_id": t["class_id"],
+            "tree_level": t["tree_level"],
+            "slot_index": t["slot_index"]
+        })
+
+    skills = []
+    for r in srows:
+        sid = r["id"]
+        skills.append({
+            "id": sid,
+            "name": r["name"],
+            "class_id": r["class_id"],
+            "skill_type": r["skill_type"],
+            "level_required": r["level_required"],
+            "target_type": r["target_type"],
+            "range": r["range"],
+            "cost_hp": r["cost_hp"],
+            "cost_mp": r["cost_mp"],
+            "cooldown_ms": r["cooldown_ms"],
+            "damage_mult": r["damage_mult"],
+            "damage_fixed": r["damage_fixed"],
+            "weapon_type": r["weapon_type"],
+            "sp_cost": r["sp_cost"],
+            "buffs": buffs_by_skill.get(sid, []),
+            "tree_entries": trees_by_skill.get(sid, [])
+        })
+    db.close()
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(skills, f, indent=2, ensure_ascii=False)
+    print(f"  [EXPORT] skills: {len(skills)} records -> {output_path}")
+    return len(skills)
+
+
+def export_quests(db_path: str, output_path: str) -> int:
+    """Export quest chains + conditions + rewards to JSON"""
+    db = sqlite3.connect(db_path)
+    db.row_factory = sqlite3.Row
+    qrows = db.execute("SELECT * FROM quest_templates").fetchall()
+    crows = db.execute("SELECT * FROM quest_conditions").fetchall()
+    srows = db.execute("SELECT * FROM quest_strings").fetchall()
+
+    conds_by_quest: dict[int, list[dict]] = {}
+    for c in crows:
+        qid = c["quest_id"]
+        conds_by_quest.setdefault(qid, []).append({
+            "condition_type": c["condition_type"],
+            "target_id": c["target_id"],
+            "target_count": c["target_count"],
+            "map_id": c["map_id"],
+            "pos_x": c["pos_x"],
+            "pos_y": c["pos_y"],
+            "radius": c["radius"]
+        })
+
+    strings_by_quest: dict[int, dict] = {}
+    for s in srows:
+        qid = s["quest_id"]
+        strings_by_quest[qid] = {
+            "title": s["title"],
+            "description": s["description"]
+        }
+
+    quests = []
+    for r in qrows:
+        qid = r["id"]
+        st = strings_by_quest.get(qid, {})
+        quests.append({
+            "id": qid,
+            "title": r["title"] or st.get("title", ""),
+            "description": r["description"] or st.get("description", ""),
+            "level_required": r["level_required"],
+            "giver_npc_id": r["giver_npc_id"],
+            "completer_npc_id": r["completer_npc_id"],
+            "reward_exp": r["reward_exp"],
+            "reward_gold": r["reward_gold"],
+            "reward_item_id": r["reward_item_id"],
+            "reward_item_count": r["reward_item_count"],
+            "conditions": conds_by_quest.get(qid, []),
+            "dialog_start": "",
+            "dialog_progress": "",
+            "dialog_complete": ""
+        })
+    db.close()
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(quests, f, indent=2, ensure_ascii=False)
+    print(f"  [EXPORT] quests: {len(quests)} records -> {output_path}")
+    return len(quests)
+
+
+def export_npcs(db_path: str, output_path: str) -> int:
+    """Export NPC data + dialogs + shops to JSON"""
+    db = sqlite3.connect(db_path)
+    db.row_factory = sqlite3.Row
+    nrows = db.execute("SELECT * FROM npc_templates").fetchall()
+    prows = db.execute("SELECT * FROM npc_positions").fetchall()
+    srows = db.execute("SELECT * FROM npc_shop_entries").fetchall()
+
+    positions: dict[int, list[dict]] = {}
+    for p in prows:
+        nid = p["npc_id"]
+        positions.setdefault(nid, []).append({
+            "map_id": p["map_id"],
+            "pos_x": p["pos_x"],
+            "pos_y": p["pos_y"],
+            "pos_z": p["pos_z"],
+            "rotation": p["rotation"]
+        })
+
+    shop_items: dict[int, list[dict]] = {}
+    for s in srows:
+        nid = s["npc_id"]
+        shop_items.setdefault(nid, []).append({
+            "item_id": s["item_id"],
+            "price": s["price"],
+            "stock": s["stock"]
+        })
+
+    npcs = []
+    for r in nrows:
+        nid = r["id"]
+        npcs.append({
+            "id": nid,
+            "name": r["name"],
+            "npc_type": r["npc_type"],
+            "shop_type": r["shop_type"],
+            "dialog_text": r["dialog_text"] or "",
+            "positions": positions.get(nid, []),
+            "shop_items": shop_items.get(nid, [])
+        })
+    db.close()
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(npcs, f, indent=2, ensure_ascii=False)
+    print(f"  [EXPORT] npcs: {len(npcs)} records -> {output_path}")
+    return len(npcs)
+
+
 def main():
     if not DATA_SRC.is_dir():
         print(f"ERROR: Data directory not found: {DATA_SRC}")
@@ -655,6 +914,29 @@ def main():
     print(f"{'='*60}")
 
     print("\n" + SCHEMA_DOC)
+
+    # Export to JSON
+    print("\nExporting legacy data to JSON for ECS consumption...")
+    legacy_path = str(LEGACY_DB_OUT)
+    output_dir = str(OUTPUT_DIR)
+    try:
+        n_items = export_items(legacy_path, os.path.join(output_dir, "items.json"))
+        n_monsters = export_monsters(legacy_path, os.path.join(output_dir, "monsters.json"))
+        n_skills = export_skills(legacy_path, os.path.join(output_dir, "skills.json"))
+        n_quests = export_quests(legacy_path, os.path.join(output_dir, "quests.json"))
+        n_npcs = export_npcs(legacy_path, os.path.join(output_dir, "npcs.json"))
+        print(f"\n{'='*60}")
+        print(f"  Export complete:")
+        print(f"    Items:    {n_items}")
+        print(f"    Monsters: {n_monsters}")
+        print(f"    Skills:   {n_skills}")
+        print(f"    Quests:   {n_quests}")
+        print(f"    NPCs:     {n_npcs}")
+        print(f"{'='*60}")
+    except Exception as e:
+        print(f"  [EXPORT ERROR] {e}")
+        import traceback
+        traceback.print_exc()
 
 
 if __name__ == "__main__":
