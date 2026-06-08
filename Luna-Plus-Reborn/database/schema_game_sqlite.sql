@@ -589,4 +589,268 @@ CREATE TABLE IF NOT EXISTS _migration_version (
     description     TEXT
 );
 
+-- ============================================================
+-- GAME CONTENT TABLES (migrated from game_data_legacy.db)
+-- These are read-only reference tables for game content.
+-- ============================================================
+
+-- ─── Item Templates ─────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS item_templates (
+    id              INTEGER PRIMARY KEY,
+    name            TEXT,
+    item_type       INTEGER DEFAULT 0,
+    item_subtype    INTEGER DEFAULT 0,
+    level_required  INTEGER DEFAULT 0,
+    attack          INTEGER DEFAULT 0,
+    defense         INTEGER DEFAULT 0,
+    magic_attack    INTEGER DEFAULT 0,
+    magic_defense   INTEGER DEFAULT 0,
+    price_buy       INTEGER DEFAULT 0,
+    price_sell      INTEGER DEFAULT 0,
+    max_stack       INTEGER DEFAULT 1,
+    rarity          INTEGER DEFAULT 0,
+    resource_id     INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_item_templates_type ON item_templates(item_type);
+CREATE INDEX IF NOT EXISTS idx_item_templates_subtype ON item_templates(item_subtype);
+CREATE INDEX IF NOT EXISTS idx_item_templates_level ON item_templates(level_required);
+CREATE INDEX IF NOT EXISTS idx_item_templates_name ON item_templates(name);
+
+-- ─── Monster Templates ──────────────────────────────────────
+CREATE TABLE IF NOT EXISTS monster_templates (
+    id              INTEGER PRIMARY KEY,
+    name            TEXT,
+    model_file      TEXT,
+    level           INTEGER,
+    hp              INTEGER,
+    mp              INTEGER DEFAULT 0,
+    attack          INTEGER,
+    defense         INTEGER,
+    speed           REAL DEFAULT 1.0,
+    exp_reward      INTEGER DEFAULT 0,
+    gold_min        INTEGER DEFAULT 0,
+    gold_max        INTEGER DEFAULT 0,
+    element_type    INTEGER DEFAULT 0,
+    ai_type         INTEGER DEFAULT 0,
+    aggro_range     INTEGER DEFAULT 0,
+    size_scale      REAL DEFAULT 1.0,
+    monster_type    INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_monster_templates_level ON monster_templates(level);
+CREATE INDEX IF NOT EXISTS idx_monster_templates_zone ON monster_templates(monster_type);
+CREATE INDEX IF NOT EXISTS idx_monster_templates_element ON monster_templates(element_type);
+
+-- ─── Monster Drops ──────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS monster_drops (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    monster_id      INTEGER,
+    item_id         INTEGER,
+    item_name       TEXT,
+    min_count       INTEGER DEFAULT 1,
+    max_count       INTEGER DEFAULT 1,
+    probability     REAL DEFAULT 0.0,
+    drop_table_id   INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_monster_drops_monster ON monster_drops(monster_id);
+CREATE INDEX IF NOT EXISTS idx_monster_drops_item ON monster_drops(item_id);
+
+-- ─── Monster Spawns ─────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS monster_spawns (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    map_id          INTEGER,
+    monster_id      INTEGER,
+    count           INTEGER DEFAULT 1,
+    respawn_time    INTEGER DEFAULT 30,
+    spawn_radius    REAL DEFAULT 10.0
+);
+
+CREATE INDEX IF NOT EXISTS idx_monster_spawns_map ON monster_spawns(map_id);
+CREATE INDEX IF NOT EXISTS idx_monster_spawns_monster ON monster_spawns(monster_id);
+
+-- ─── NPC Templates ──────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS npc_templates (
+    id              INTEGER PRIMARY KEY,
+    name            TEXT,
+    npc_type        INTEGER DEFAULT 0,
+    shop_type       INTEGER DEFAULT 0,
+    dialog_text     TEXT DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_npc_templates_type ON npc_templates(npc_type);
+
+-- ─── NPC Positions ──────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS npc_positions (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    map_id          INTEGER,
+    npc_id          INTEGER,
+    name            TEXT,
+    npc_type        INTEGER DEFAULT 0,
+    pos_x           REAL,
+    pos_y           REAL,
+    pos_z           REAL,
+    rotation        REAL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_npc_positions_map ON npc_positions(map_id);
+CREATE INDEX IF NOT EXISTS idx_npc_positions_npc ON npc_positions(npc_id);
+
+-- ─── NPC Shop Entries ───────────────────────────────────────
+CREATE TABLE IF NOT EXISTS npc_shop_entries (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    npc_id          INTEGER,
+    item_id         INTEGER,
+    price           INTEGER DEFAULT 0,
+    stock           INTEGER DEFAULT -1,
+    map_id          INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_npc_shop_npc ON npc_shop_entries(npc_id);
+CREATE INDEX IF NOT EXISTS idx_npc_shop_item ON npc_shop_entries(item_id);
+
+-- ─── Quest Templates ────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS quest_templates (
+    id                INTEGER PRIMARY KEY,
+    title             TEXT DEFAULT '',
+    description       TEXT DEFAULT '',
+    level_required    INTEGER DEFAULT 0,
+    giver_npc_id      INTEGER DEFAULT 0,
+    completer_npc_id  INTEGER DEFAULT 0,
+    reward_exp        INTEGER DEFAULT 0,
+    reward_gold       INTEGER DEFAULT 0,
+    reward_item_id    INTEGER DEFAULT 0,
+    reward_item_count INTEGER DEFAULT 1
+);
+
+CREATE INDEX IF NOT EXISTS idx_quest_templates_level ON quest_templates(level_required);
+CREATE INDEX IF NOT EXISTS idx_quest_templates_giver ON quest_templates(giver_npc_id);
+
+-- ─── Quest Conditions ───────────────────────────────────────
+CREATE TABLE IF NOT EXISTS quest_conditions (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    quest_id        INTEGER,
+    condition_type  INTEGER DEFAULT 0,
+    target_id       INTEGER DEFAULT 0,
+    target_count    INTEGER DEFAULT 1,
+    map_id          INTEGER DEFAULT 0,
+    pos_x           REAL DEFAULT 0,
+    pos_y           REAL DEFAULT 0,
+    radius          REAL DEFAULT 10
+);
+
+CREATE INDEX IF NOT EXISTS idx_quest_conditions_quest ON quest_conditions(quest_id);
+
+-- ─── Quest Strings ──────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS quest_strings (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    quest_id        INTEGER,
+    language        TEXT DEFAULT 'EN',
+    title           TEXT DEFAULT '',
+    description     TEXT DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_quest_strings_quest ON quest_strings(quest_id);
+
+-- ─── Skill Data ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS skill_data (
+    id              INTEGER PRIMARY KEY,
+    name            TEXT,
+    class_id        INTEGER DEFAULT 0,
+    skill_type      INTEGER DEFAULT 0,
+    level_required  INTEGER DEFAULT 0,
+    target_type     INTEGER DEFAULT 0,
+    range           REAL DEFAULT 0,
+    cost_hp         INTEGER DEFAULT 0,
+    cost_mp         INTEGER DEFAULT 0,
+    cooldown_ms     INTEGER DEFAULT 0,
+    damage_mult     REAL DEFAULT 1.0,
+    damage_fixed    INTEGER DEFAULT 0,
+    weapon_type     INTEGER DEFAULT 0,
+    sp_cost         INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_skill_data_class ON skill_data(class_id);
+CREATE INDEX IF NOT EXISTS idx_skill_data_type ON skill_data(skill_type);
+CREATE INDEX IF NOT EXISTS idx_skill_data_level ON skill_data(level_required);
+
+-- ─── Buff Skills ────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS buff_skills (
+    id              INTEGER PRIMARY KEY,
+    name            TEXT,
+    buff_level      INTEGER DEFAULT 1,
+    skill_ref_id    INTEGER DEFAULT 0,
+    duration_ms     INTEGER DEFAULT 0,
+    buff_type       INTEGER DEFAULT 0,
+    buff_value      INTEGER DEFAULT 0,
+    buff_chance     INTEGER DEFAULT 100,
+    icon_id         INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_buff_skills_ref ON buff_skills(skill_ref_id);
+CREATE INDEX IF NOT EXISTS idx_buff_skills_type ON buff_skills(buff_type);
+
+-- ─── Skill Trees ────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS skill_trees (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    class_id        INTEGER,
+    tree_level      INTEGER,
+    slot_index      INTEGER,
+    skill_id        INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_skill_trees_class ON skill_trees(class_id);
+CREATE INDEX IF NOT EXISTS idx_skill_trees_skill ON skill_trees(skill_id);
+
+-- ─── Map Warps ──────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS map_warps (
+    id              INTEGER PRIMARY KEY,
+    map_from        INTEGER,
+    map_to          INTEGER,
+    from_x          REAL,
+    from_z          REAL,
+    to_x            REAL,
+    to_z            REAL,
+    name            TEXT,
+    dest_name       TEXT,
+    fee             INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_map_warps_from ON map_warps(map_from);
+CREATE INDEX IF NOT EXISTS idx_map_warps_to ON map_warps(map_to);
+
+-- ─── Map Boundaries ─────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS map_boundaries (
+    id              INTEGER PRIMARY KEY,
+    map_a           INTEGER,
+    map_b           INTEGER,
+    boundary_x_a    REAL,
+    boundary_z_a    REAL,
+    boundary_x_b    REAL,
+    boundary_z_b    REAL,
+    name_a          TEXT,
+    name_b          TEXT,
+    level_required  INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_map_boundaries_a ON map_boundaries(map_a);
+CREATE INDEX IF NOT EXISTS idx_map_boundaries_b ON map_boundaries(map_b);
+
+-- ─── Map Data ───────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS map_data (
+    id              INTEGER PRIMARY KEY,
+    name            TEXT,
+    file_path       TEXT,
+    hgt_file        TEXT,
+    box_min_x       REAL,
+    box_min_y       REAL,
+    box_min_z       REAL,
+    box_max_x       REAL,
+    box_max_y       REAL,
+    box_max_z       REAL
+);
+
+CREATE INDEX IF NOT EXISTS idx_map_data_name ON map_data(name);
+
 COMMIT;

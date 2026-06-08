@@ -1,7 +1,7 @@
 [
   {
     "id": 13,
-    "title": "$SUBQUESTSTR",
+    "title": "",
     "description": "",
     "level_required": 0,
     "giver_npc_id": 137,
@@ -9,30 +9,7 @@
     "reward_exp": 0,
     "reward_gold": 0,
     "reward_item_id": 0,
-    "reward_item_count": 1,
-    "conditions": [
-      {
-        "condition_type": 0,
-        "target_id": 408,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 41400.0,
-        "pos_y": 30500.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 409,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 26400.0,
-        "pos_y": 6300.0,
-        "radius": 10.0
-      }
-    ],
-    "dialog_start": "",
-    "dialog_progress": "",
-    "dialog_complete": ""
+    "reward_item_count": 1
   },
   {
     "id": 14,
@@ -44,102 +21,7 @@
     "reward_exp": 0,
     "reward_gold": 0,
     "reward_item_id": 0,
-    "reward_item_count": 1,
-    "conditions": [
-      {
-        "condition_type": 0,
-        "target_id": 100,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 37700.0,
-        "pos_y": 11700.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 101,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 35300.0,
-        "pos_y": 26900.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 102,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 23400.0,
-        "pos_y": 20500.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 103,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 31900.0,
-        "pos_y": 17300.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 104,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 26000.0,
-        "pos_y": 13300.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 105,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 14500.0,
-        "pos_y": 26900.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 106,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 7400.0,
-        "pos_y": 14700.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 107,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 6800.0,
-        "pos_y": 23000.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 108,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 14100.0,
-        "pos_y": 17000.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 410,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 30100.0,
-        "pos_y": 39000.0,
-        "radius": 10.0
-      }
-    ],
-    "dialog_start": "",
-    "dialog_progress": "",
-    "dialog_complete": ""
+    "reward_item_count": 1
   },
   {
     "id": 15,
@@ -151,25 +33,11 @@
     "reward_exp": 0,
     "reward_gold": 0,
     "reward_item_id": 0,
-    "reward_item_count": 1,
-    "conditions": [
-      {
-        "condition_type": 0,
-        "target_id": 407,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 7600.0,
-        "pos_y": 22200.0,
-        "radius": 10.0
-      }
-    ],
-    "dialog_start": "",
-    "dialog_progress": "",
-    "dialog_complete": ""
+    "reward_item_count": 1
   },
   {
     "id": 16,
-    "title": "$SUBQUESTSTR",
+    "title": "",
     "description": "",
     "level_required": 0,
     "giver_npc_id": 63,
@@ -177,43 +45,11 @@
     "reward_exp": 0,
     "reward_gold": 0,
     "reward_item_id": 0,
-    "reward_item_count": 1,
-    "conditions": [
-      {
-        "condition_type": 0,
-        "target_id": 84,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 34000.0,
-        "pos_y": 43400.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 85,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 31000.0,
-        "pos_y": 22200.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 86,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 10600.0,
-        "pos_y": 13300.0,
-        "radius": 10.0
-      }
-    ],
-    "dialog_start": "",
-    "dialog_progress": "",
-    "dialog_complete": ""
+    "reward_item_count": 1
   },
   {
     "id": 17,
-    "title": "$SUBQUESTSTR",
+    "title": "",
     "description": "",
     "level_required": 0,
     "giver_npc_id": 66,
@@ -221,39 +57,7 @@
     "reward_exp": 0,
     "reward_gold": 0,
     "reward_item_id": 0,
-    "reward_item_count": 1,
-    "conditions": [
-      {
-        "condition_type": 0,
-        "target_id": 87,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 5400.0,
-        "pos_y": 35800.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 88,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 37200.0,
-        "pos_y": 26400.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 89,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 31300.0,
-        "pos_y": 3300.0,
-        "radius": 10.0
-      }
-    ],
-    "dialog_start": "",
-    "dialog_progress": "",
-    "dialog_complete": ""
+    "reward_item_count": 1
   },
   {
     "id": 20,
@@ -265,115 +69,11 @@
     "reward_exp": 0,
     "reward_gold": 0,
     "reward_item_id": 0,
-    "reward_item_count": 1,
-    "conditions": [
-      {
-        "condition_type": 0,
-        "target_id": 610,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 30100.0,
-        "pos_y": 3800.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 611,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 30100.0,
-        "pos_y": 3800.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 612,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 30100.0,
-        "pos_y": 3800.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 613,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 30100.0,
-        "pos_y": 3800.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 614,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 30100.0,
-        "pos_y": 3800.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 615,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 30100.0,
-        "pos_y": 3800.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 616,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 30100.0,
-        "pos_y": 3800.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 617,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 30100.0,
-        "pos_y": 3800.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 618,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 30100.0,
-        "pos_y": 3800.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 619,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 30100.0,
-        "pos_y": 3800.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 620,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 45800.0,
-        "pos_y": 35800.0,
-        "radius": 10.0
-      }
-    ],
-    "dialog_start": "",
-    "dialog_progress": "",
-    "dialog_complete": ""
+    "reward_item_count": 1
   },
   {
     "id": 23,
-    "title": "$SUBQUESTSTR",
+    "title": "",
     "description": "",
     "level_required": 0,
     "giver_npc_id": 22,
@@ -381,25 +81,11 @@
     "reward_exp": 0,
     "reward_gold": 0,
     "reward_item_id": 0,
-    "reward_item_count": 1,
-    "conditions": [
-      {
-        "condition_type": 0,
-        "target_id": 27,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 42100.0,
-        "pos_y": 39100.0,
-        "radius": 10.0
-      }
-    ],
-    "dialog_start": "",
-    "dialog_progress": "",
-    "dialog_complete": ""
+    "reward_item_count": 1
   },
   {
     "id": 26,
-    "title": "$SUBQUESTSTR",
+    "title": "",
     "description": "",
     "level_required": 0,
     "giver_npc_id": 57,
@@ -407,79 +93,11 @@
     "reward_exp": 0,
     "reward_gold": 0,
     "reward_item_id": 0,
-    "reward_item_count": 1,
-    "conditions": [
-      {
-        "condition_type": 0,
-        "target_id": 72,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 5600.0,
-        "pos_y": 16300.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 73,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 5800.0,
-        "pos_y": 23400.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 74,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 18300.0,
-        "pos_y": 34800.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 75,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 25800.0,
-        "pos_y": 37000.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 76,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 36200.0,
-        "pos_y": 28700.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 77,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 39100.0,
-        "pos_y": 23300.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 78,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 40600.0,
-        "pos_y": 12200.0,
-        "radius": 10.0
-      }
-    ],
-    "dialog_start": "",
-    "dialog_progress": "",
-    "dialog_complete": ""
+    "reward_item_count": 1
   },
   {
     "id": 27,
-    "title": "$SUBQUESTSTR",
+    "title": "",
     "description": "",
     "level_required": 0,
     "giver_npc_id": 128,
@@ -487,25 +105,11 @@
     "reward_exp": 0,
     "reward_gold": 0,
     "reward_item_id": 0,
-    "reward_item_count": 1,
-    "conditions": [
-      {
-        "condition_type": 0,
-        "target_id": 405,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 45200.0,
-        "pos_y": 6600.0,
-        "radius": 10.0
-      }
-    ],
-    "dialog_start": "",
-    "dialog_progress": "",
-    "dialog_complete": ""
+    "reward_item_count": 1
   },
   {
     "id": 28,
-    "title": "$SUBQUESTSTR",
+    "title": "",
     "description": "",
     "level_required": 0,
     "giver_npc_id": 56,
@@ -513,25 +117,11 @@
     "reward_exp": 0,
     "reward_gold": 0,
     "reward_item_id": 0,
-    "reward_item_count": 1,
-    "conditions": [
-      {
-        "condition_type": 0,
-        "target_id": 71,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 29700.0,
-        "pos_y": 24600.0,
-        "radius": 10.0
-      }
-    ],
-    "dialog_start": "",
-    "dialog_progress": "",
-    "dialog_complete": ""
+    "reward_item_count": 1
   },
   {
     "id": 31,
-    "title": "$SUBQUESTSTR",
+    "title": "",
     "description": "",
     "level_required": 0,
     "giver_npc_id": 48,
@@ -539,88 +129,11 @@
     "reward_exp": 0,
     "reward_gold": 0,
     "reward_item_id": 0,
-    "reward_item_count": 1,
-    "conditions": [
-      {
-        "condition_type": 0,
-        "target_id": 109,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 37000.0,
-        "pos_y": 29100.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 110,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 42200.0,
-        "pos_y": 37400.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 111,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 32000.0,
-        "pos_y": 46600.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 112,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 10300.0,
-        "pos_y": 40500.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 113,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 16500.0,
-        "pos_y": 21200.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 114,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 23700.0,
-        "pos_y": 13000.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 115,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 9500.0,
-        "pos_y": 6500.0,
-        "radius": 10.0
-      },
-      {
-        "condition_type": 0,
-        "target_id": 116,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 22800.0,
-        "pos_y": 26600.0,
-        "radius": 10.0
-      }
-    ],
-    "dialog_start": "",
-    "dialog_progress": "",
-    "dialog_complete": ""
+    "reward_item_count": 1
   },
   {
     "id": 32,
-    "title": "$SUBQUESTSTR",
+    "title": "",
     "description": "",
     "level_required": 0,
     "giver_npc_id": 129,
@@ -628,20 +141,6 @@
     "reward_exp": 0,
     "reward_gold": 0,
     "reward_item_id": 0,
-    "reward_item_count": 1,
-    "conditions": [
-      {
-        "condition_type": 0,
-        "target_id": 406,
-        "target_count": 1,
-        "map_id": 0,
-        "pos_x": 46600.0,
-        "pos_y": 6600.0,
-        "radius": 10.0
-      }
-    ],
-    "dialog_start": "",
-    "dialog_progress": "",
-    "dialog_complete": ""
+    "reward_item_count": 1
   }
 ]
