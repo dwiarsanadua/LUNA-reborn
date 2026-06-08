@@ -303,7 +303,7 @@ void TerrainRenderer::Render(const glm::mat4& view, const glm::mat4& proj, const
     if (!bgfx::isValid(prog)) return;
 
     bgfx::setViewTransform(view_id_, &view, &proj);
-    bgfx::setViewClear(view_id_, BGFX_CLEAR_NONE, 0, 1.0f, 0);
+    bgfx::setViewClear(view_id_, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0xFF6688AA, 1.0f, 0);
     bgfx::setViewRect(view_id_, 0, 0, (uint16_t)width, (uint16_t)height);
 
     bgfx::setUniform(u_light_dir_, glm::value_ptr(env.light_dir));

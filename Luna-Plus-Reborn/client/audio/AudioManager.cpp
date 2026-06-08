@@ -117,6 +117,9 @@ void AudioManager::SmoothBGMTransition(const std::string& new_bgm, float duratio
 
 void AudioManager::PlaySFX(const std::string& name) {
     std::string path = ASSETS_PATH + std::string("audio/SFX/") + name;
+    FILE* f = fopen(path.c_str(), "rb");
+    if (!f) return;
+    fclose(f);
     int id = sound_lib_->LoadSFX(path.c_str());
     if (id >= 0) {
         sound_lib_->PlaySFX(id);
@@ -138,6 +141,9 @@ void AudioManager::PlaySFXByCategory(Category cat, const std::string& name) {
         default: break;
     }
     std::string path = ASSETS_PATH + std::string("audio/") + folder + "/" + name;
+    FILE* f = fopen(path.c_str(), "rb");
+    if (!f) return;
+    fclose(f);
     int id = sound_lib_->LoadSFX(path.c_str());
     if (id >= 0) {
         sound_lib_->PlaySFX(id);
@@ -151,6 +157,10 @@ void AudioManager::PlaySFXInst(const std::string& name, float x, float y, float 
 
 int AudioManager::Play3D(const std::string& name, float x, float y, float z) {
     std::string path = ASSETS_PATH + std::string("audio/SFX/") + name;
+    // Check file exists before attempting load, to avoid log flood
+    FILE* f = fopen(path.c_str(), "rb");
+    if (!f) return -1;
+    fclose(f);
     int lib_id = sound_lib_->LoadSFX(path.c_str());
     if (lib_id < 0) return -1;
 

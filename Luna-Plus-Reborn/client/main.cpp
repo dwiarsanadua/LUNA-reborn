@@ -267,6 +267,18 @@ int main() {
     InputSystem input_sys;
     input_sys.Init(window);
 
+    // Flush all pending GPU operations (texture uploads, program linking, etc.)
+    // so they are available on the GPU by the first frame.
+    bgfx::frame();
+    bgfx::frame(); // Double flush for triple-buffering safety
+
+    // Suppress repetitive SoundLib error flood
+    spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] %v");
+    spdlog::set_level(spdlog::level::info);
+    spdlog::flush_on(spdlog::level::warn);
+
+    // --- Main Loop ---
+
     // Register GLFW callbacks via InputSystem
     glfwSetKeyCallback(window, InputSystem::GlfwKeyCallback);
     glfwSetCharCallback(window, InputSystem::GlfwCharCallback);

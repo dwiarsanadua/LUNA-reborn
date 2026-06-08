@@ -12,10 +12,50 @@
 void LoginScreen::Init(GameState* state, NetworkClient* network) {
     state_ = state;
     network_ = network;
+    textures_loaded_ = false;
+}
+
+void LoginScreen::LoadTexture(bgfx::TextureHandle& cache, const std::string& name) {
+    if (bgfx::isValid(cache)) return;
+    std::string paths[] = {
+        "assets/textures/ui/Launcher/" + name,
+        "assets/textures/ui/" + name,
+        "assets/textures/" + name,
+        "assets/textures/unpacked/image/" + name,
+        "assets/textures/unpacked/map/" + name,
+    };
+    for (auto& p : paths) {
+        int w, h, n;
+        unsigned char* d = stbi_load(p.c_str(), &w, &h, &n, 4);
+        if (d) {
+            cache = bgfx::createTexture2D((uint16_t)w, (uint16_t)h, false, 1,
+                bgfx::TextureFormat::RGBA8, BGFX_SAMPLER_NONE,
+                bgfx::copy(d, w * h * 4));
+            stbi_image_free(d);
+            spdlog::info("LoginScreen: loaded {}", p);
+            if (bgfx::isValid(cache)) {
+                spdlog::info("LoginScreen: {} texture handle valid ({}x{})", name, w, h);
+            } else {
+                spdlog::warn("LoginScreen: {} texture create FAILED after loading", name);
+            }
+            return;
+        }
+    }
+    spdlog::warn("LoginScreen: could not find {}", name);
 }
 
 void LoginScreen::Enter() {
     spdlog::info("Entering Login Screen");
+    if (!textures_loaded_) {
+        LoadTexture(tex_bg_, "Launcher_01_01.png");
+        if (!bgfx::isValid(tex_bg_)) LoadTexture(tex_bg_, "login.png");
+        LoadTexture(tex_bar_, "login_bar00.png");
+        LoadTexture(tex_btn_, "login_bar01.png");
+        bg_ok_ = bgfx::isValid(tex_bg_);
+        textures_loaded_ = true;
+        // Set clear color to match Luna Plus login theme
+        if (scene_renderer_) scene_renderer_->SetClearColor(0x887766FF);
+    }
 }
 
 void LoginScreen::Exit() {
@@ -49,46 +89,21 @@ void LoginScreen::Render(UIRenderer& ui) {
     float lw = ui.logicalWidth;
     float lh = ui.logicalHeight;
 
-    // Cache login textures across frames (static so they load once)
-    static bgfx::TextureHandle s_bg = BGFX_INVALID_HANDLE;
-    static bgfx::TextureHandle s_bar = BGFX_INVALID_HANDLE;
-    static bgfx::TextureHandle s_btn = BGFX_INVALID_HANDLE;
-    
-    auto LoadOnce = [&](bgfx::TextureHandle& cache, const std::string& name) {
-        if (bgfx::isValid(cache)) return cache;
-        std::string paths[] = {
-            "assets/textures/ui/Launcher/" + name,
-            "assets/textures/ui/" + name,
-            "assets/textures/" + name,
-            "assets/textures/unpacked/image/" + name,
-            "assets/textures/unpacked/map/" + name,
-        };
-        for (auto& p : paths) {
-            int w, h, n;
-            unsigned char* d = stbi_load(p.c_str(), &w, &h, &n, 4);
-            if (d) {
-                cache = bgfx::createTexture2D((uint16_t)w, (uint16_t)h, false, 1,
-                    bgfx::TextureFormat::RGBA8, BGFX_SAMPLER_NONE,
-                    bgfx::copy(d, w * h * 4));
-                stbi_image_free(d);
-                spdlog::info("LoginScreen: cached {}", p);
-                return cache;
-            }
-        }
-        return cache;
-    };
+    // Ensure textures are loaded (safety check if Enter() was not called)
+    if (!textures_loaded_) {
+        TexturesLoadOnce();
+    }
 
-    // Load all textures once (cached statically)
-    LoadOnce(s_bg, "Launcher_01_01.png");
-    if (!bgfx::isValid(s_bg)) LoadOnce(s_bg, "login.png");
-    LoadOnce(s_bar, "login_bar00.png");
-    LoadOnce(s_btn, "login_bar01.png");
-    
-    // Background
-    if (bgfx::isValid(s_bg)) ui.DrawImage(0, 0, lw, lh, s_bg);
+    // Draw background (triangular fade pattern like Luna Plus Old)
+    if (bg_ok_ && bgfx::isValid(tex_bg_)) {
+        ui.DrawImage(0, 0, lw, lh, tex_bg_);
+    } else {
+        // Fallback: gradient background instead of magenta
+        ui.DrawRect(0, 0, lw, lh, UIColor{80, 50, 30, 255});
+    }
     
     // Bottom bar
-    if (bgfx::isValid(s_bar)) ui.DrawImage(0, lh - 120.0f, lw, 120, s_bar);
+    if (bgfx::isValid(tex_bar_)) ui.DrawImage(0, lh - 120.0f, lw, 120, tex_bar_);
 
     // Title
     ui.DrawTextCentered(lh * 0.2f, 0xffffcc88, "LUNA Plus Reborn");
@@ -99,8 +114,8 @@ void LoginScreen::Render(UIRenderer& ui) {
     for (int i = 0; i < 3; i++) {
         float by = lh * 0.45f + i * 50;
         bool sel = (i == state_->selected_account);
-        if (bgfx::isValid(s_btn)) {
-            ui.DrawImage(lw * 0.5f - 200, by, 400, 40, s_btn, sel ? UIColor{255,255,200,255} : UIColor{200,200,200,255});
+        if (bgfx::isValid(tex_btn_)) {
+            ui.DrawImage(lw * 0.5f - 200, by, 400, 40, tex_btn_, sel ? UIColor{255,255,200,255} : UIColor{200,200,200,255});
         }
         ui.DrawTextCentered(by + 10, sel ? 0xffffffff : 0xffaaaaaa, names[i]);
     }
@@ -108,6 +123,15 @@ void LoginScreen::Render(UIRenderer& ui) {
     ui.DrawTextCentered(lh * 0.75f, 0xffffffff, "Press ENTER to Login");
     if (!state_->login_error.empty())
         ui.DrawTextCentered(lh * 0.8f, 0xffff4444, "%s", state_->login_error.c_str());
+}
+
+void LoginScreen::TexturesLoadOnce() {
+    LoadTexture(tex_bg_, "Launcher_01_01.png");
+    if (!bgfx::isValid(tex_bg_)) LoadTexture(tex_bg_, "login.png");
+    LoadTexture(tex_bar_, "login_bar00.png");
+    LoadTexture(tex_btn_, "login_bar01.png");
+    bg_ok_ = bgfx::isValid(tex_bg_);
+    textures_loaded_ = true;
 }
 
 bool LoginScreen::HandleKey(int key, int scancode, int action, int mods) {
