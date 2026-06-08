@@ -80,6 +80,9 @@ local quest_460 = fsm:new({
             on_enter = function(self)
                 self:log("Quest 460: Rewards given")
                 self:give_rewards({
+                    items = {
+                        { item_id = 30000544, count = 1 },
+                    },
                 })
             end,
             transitions = {},

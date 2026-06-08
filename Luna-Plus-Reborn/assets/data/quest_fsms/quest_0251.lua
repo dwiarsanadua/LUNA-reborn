@@ -95,6 +95,10 @@ local quest_251 = fsm:new({
                     gold = 2000,
                     items = {
                         { item_id = 163, count = 1 },
+                        { item_id = 30000055, count = 30 },
+                        { item_id = 30000053, count = 30 },
+                        { item_id = 30000084, count = 30 },
+                        { item_id = 163, count = 1 },
                         { item_id = 11007297, count = 1 },
                         { item_id = 164, count = 10 },
                         { item_id = 21000164, count = 1 },

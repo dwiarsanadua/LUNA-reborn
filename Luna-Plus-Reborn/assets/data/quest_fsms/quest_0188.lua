@@ -137,6 +137,9 @@ local quest_188 = fsm:new({
                         { item_id = 11007256, count = 1 },
                         { item_id = 99, count = 1 },
                         { item_id = 100, count = 1 },
+                        { item_id = 100, count = 1 },
+                        { item_id = 101, count = 1 },
+                        { item_id = 11007256, count = 1 },
                         { item_id = 101, count = 1 },
                     },
                 })

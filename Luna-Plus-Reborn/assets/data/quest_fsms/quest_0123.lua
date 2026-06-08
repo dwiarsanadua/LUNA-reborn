@@ -94,6 +94,8 @@ local quest_123 = fsm:new({
                     exp = 19326,
                     gold = 3040,
                     items = {
+                        { item_id = 58, count = 1 },
+                        { item_id = 59, count = 1 },
                         { item_id = 58, count = 5 },
                         { item_id = 21000006, count = 5 },
                         { item_id = 59, count = 5 },

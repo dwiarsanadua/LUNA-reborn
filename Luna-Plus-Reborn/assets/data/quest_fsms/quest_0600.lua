@@ -166,8 +166,12 @@ local quest_600 = fsm:new({
                 self:give_rewards({
                     items = {
                         { item_id = 21001192, count = 1 },
+                        { item_id = 21001192, count = 1 },
+                        { item_id = 30000740, count = 1 },
                         { item_id = 30000740, count = 1 },
                         { item_id = 30000741, count = 1 },
+                        { item_id = 30000741, count = 1 },
+                        { item_id = 30000742, count = 1 },
                         { item_id = 30000742, count = 1 },
                         { item_id = 30000743, count = 1 },
                     },

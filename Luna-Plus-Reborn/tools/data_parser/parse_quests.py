@@ -390,7 +390,7 @@ def accumulate_rewards(executes: list[dict]) -> dict:
                 rewards["gold"] += int(p[0])
             except (ValueError, IndexError):
                 pass
-        elif k in ("take_item", "give_quest_item") and len(p) >= 2:
+        elif k in ("take_item", "give_item", "give_quest_item", "take_quest_item") and len(p) >= 2:
             try:
                 rewards["items"].append({"item_id": int(p[0]), "count": int(p[1])})
             except ValueError:

@@ -76,6 +76,8 @@ local quest_988 = fsm:new({
                 self:log("Quest 988: Rewards given")
                 self:give_rewards({
                     items = {
+                        { item_id = 21001071, count = 15 },
+                        { item_id = 21001072, count = 1 },
                         { item_id = 21001068, count = 1 },
                     },
                 })

@@ -78,6 +78,7 @@ local quest_2009 = fsm:new({
                 self:give_rewards({
                     exp = 229695,
                     items = {
+                        { item_id = 21000624, count = 10 },
                         { item_id = 30000704, count = 10 },
                     },
                 })

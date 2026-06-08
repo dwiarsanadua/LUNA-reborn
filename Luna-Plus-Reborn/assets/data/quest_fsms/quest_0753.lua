@@ -82,6 +82,9 @@ local quest_753 = fsm:new({
                 self:log("Quest 753: Rewards given")
                 self:give_rewards({
                     exp = 3733,
+                    items = {
+                        { item_id = 21000624, count = 1 },
+                    },
                 })
             end,
             transitions = {},
