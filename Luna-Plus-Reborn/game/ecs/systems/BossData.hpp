@@ -264,6 +264,39 @@ static inline std::unordered_map<uint32_t, BossDefinition> CreateDefaultBossDefi
         true, 300.0f, 6.0f, "guardian_crest_loot"
     };
 
+    // ========== 5 SPECIAL BOSS TYPES (Agent 2) ==========
+
+    defs[9701] = {
+        9701, "Arach the Poison Weaver", 35, 400.0f, 50.0f, 0.0f, 480.0f,
+        {75.0f, 50.0f, 25.0f, 10.0f},
+        {"poison_spit", "web_trap", "summon_spiders", "venom_aura"},
+        true, 240.0f, 6.0f, "arach_loot"
+    };
+    defs[9702] = {
+        9702, "Dragonian the Inferno", 36, 450.0f, 60.0f, 0.0f, 540.0f,
+        {75.0f, 50.0f, 25.0f, 10.0f},
+        {"fire_breath", "tail_sweep", "wing_gust", "inferno"},
+        true, 270.0f, 6.0f, "dragonian_loot"
+    };
+    defs[9703] = {
+        9703, "Leostein the Storm Lord", 36, 500.0f, 70.0f, 0.0f, 600.0f,
+        {75.0f, 50.0f, 25.0f, 10.0f},
+        {"lightning_strike", "roar", "storm_aura", "thunder_fall"},
+        true, 300.0f, 8.0f, "leostein_loot"
+    };
+    defs[9704] = {
+        9704, "Tarintus the Frost Giant", 37, 550.0f, 80.0f, 0.0f, 660.0f,
+        {75.0f, 50.0f, 25.0f, 10.0f},
+        {"ice_shard", "blizzard", "freeze_aura", "absolute_zero"},
+        true, 330.0f, 8.0f, "tarintus_loot"
+    };
+    defs[9705] = {
+        9705, "Kierra the Dark Empress", 38, 600.0f, 90.0f, 0.0f, 720.0f,
+        {75.0f, 50.0f, 25.0f, 10.0f},
+        {"dark_bolt", "life_drain", "shadow_pulse", "annihilate"},
+        true, 360.0f, 10.0f, "kierra_loot"
+    };
+
     // Named zone bosses
     defs[1236] = {
         1236, "Arasedual", 37, 250.0f, 0.0f, 0.0f, 480.0f,

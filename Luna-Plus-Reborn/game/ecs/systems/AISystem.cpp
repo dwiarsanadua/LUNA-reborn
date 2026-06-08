@@ -226,82 +226,245 @@ void AISystem::HandleBossAI(entt::registry& reg, entt::entity e,
         auto boss_state = static_cast<AIComponent::State>(
             AIComponent::BossPhase1 + (new_phase - 1));
         TransitionState(ai, boss_state);
+        stats.hp = std::min(stats.hp + static_cast<int32_t>(stats.max_hp * 0.05f), stats.max_hp);
         spdlog::info("Boss {} entered phase {} (HP: {:.1f}%)",
                      static_cast<uint32_t>(e), new_phase, hp_pct);
     }
 
     // --- Enrage countdown ---
+    bool enraged = false;
     if (ai.enrage_threshold > 0.0f) {
         ai.enrage_timer += dt;
-        bool is_enraged = (ai.enrage_timer >= ai.enrage_threshold);
-        if (is_enraged) {
-            // +50% ATK, -50% DEF while enraged
-            stats.physic_attack *= 1.005f;
-            stats.magic_attack *= 1.005f;
-            stats.magic_defense *= 0.995f;
-            stats.physic_defense *= 0.995f;
-            ai.enrage_timer = 0.0f;
-            spdlog::warn("Boss {} is ENRAGED!", static_cast<uint32_t>(e));
+        if (ai.enrage_timer >= ai.enrage_threshold) {
+            enraged = true;
         }
     }
 
+    // --- Phase-specific stat modifiers & behaviors ---
+    float atk_mult = 1.0f;
+    float def_mult = 1.0f;
+    float speed_mult = 1.0f;
+    float cd_mult = 1.0f;
+
+    switch (ai.boss_phase) {
+        case 1:
+            cd_mult = 1.0f;
+            break;
+        case 2:
+            cd_mult = 0.9f;
+            break;
+        case 3: {
+            cd_mult = 0.8f;
+            atk_mult = 1.15f;
+            if (!enraged && static_cast<int>(ai.special_attack_timer * 10) % 8 == 0) {
+                // AOE attack every 8s in phase 3
+                auto boss_view = reg.view<Transform, CharacterStats, TagPlayer>();
+                for (auto player : boss_view) {
+                    auto& p_xform = boss_view.get<Transform>(player);
+                    auto& boss_xform = reg.get<Transform>(e);
+                    float d = glm::distance(boss_xform.position, p_xform.position);
+                    if (d < ai.attack_range * 2.0f) {
+                        int32_t aoe_dmg = static_cast<int32_t>(stats.physic_attack * 1.5f);
+                        reg.get<CharacterStats>(player).hp = std::max(0, reg.get<CharacterStats>(player).hp - aoe_dmg);
+                        spdlog::debug("Boss AOE hits player {} for {}", static_cast<uint32_t>(player), aoe_dmg);
+                    }
+                }
+            }
+            break;
+        }
+        case 4:
+            cd_mult = 0.7f;
+            atk_mult = 1.50f;
+            def_mult = 0.50f;
+            break;
+        case 5:
+            cd_mult = 0.5f;
+            atk_mult = 2.0f;
+            def_mult = 0.25f;
+            speed_mult = 2.0f;
+            break;
+    }
+
+    if (enraged) {
+        atk_mult *= 2.0f;
+        def_mult *= 0.25f;
+        speed_mult *= 2.0f;
+    }
+
+    // Apply stat multipliers
+    stats.physic_attack = stats.physic_attack * (1.0f + (atk_mult - 1.0f) * dt * 0.1f);
+    stats.physic_defense = stats.physic_defense * (1.0f - (1.0f - def_mult) * dt * 0.1f);
+    stats.magic_attack = stats.magic_attack * (1.0f + (atk_mult - 1.0f) * dt * 0.1f);
+    stats.magic_defense = stats.magic_defense * (1.0f - (1.0f - def_mult) * dt * 0.1f);
+
+    // --- Determine boss type from monster_id via boss_definitions_ ---
+    std::string boss_type;
+    auto it = boss_definitions_.find(static_cast<uint32_t>(e));
+    if (it != boss_definitions_.end()) {
+        for (auto& ab : it->second.special_abilities) {
+            if (boss_type.empty()) boss_type = ab;
+        }
+    }
+    // Detect type from abilities or monster_id
+    uint32_t mid = static_cast<uint32_t>(e);
+    bool is_arach = (mid == 9701);
+    bool is_dragonian = (mid == 9702);
+    bool is_leostein = (mid == 9703);
+    bool is_tarintus = (mid == 9704);
+    bool is_kierra = (mid == 9705);
+
     // --- Special attack rotation ---
     ai.special_attack_timer += dt;
-    float cd = ai.special_attack_cooldown;
-    if (ai.boss_phase >= 5) cd *= 0.5f;
-    else if (ai.boss_phase >= 4) cd *= 0.75f;
+    float cd = ai.special_attack_cooldown * cd_mult;
 
     if (ai.special_attack_timer >= cd) {
         ai.special_attack_timer = 0.0f;
+
+        if (!reg.valid(static_cast<entt::entity>(ai.aggro_target))) {
+            ScanForTargets(reg, e, ai, reg.get<Transform>(e));
+        }
+
         if (reg.valid(static_cast<entt::entity>(ai.aggro_target))) {
-            auto& target_xform = reg.get<Transform>(
-                static_cast<entt::entity>(ai.aggro_target));
-            auto& boss_xform = reg.get<Transform>(e);
-            float dist = glm::distance(boss_xform.position, target_xform.position);
-            if (dist < ai.attack_range * 3.0f) {
-                auto* combat = reg.try_get<CombatState>(e);
-                if (!combat) {
-                    combat = &reg.emplace<CombatState>(e);
+            auto* combat = reg.try_get<CombatState>(e);
+            if (!combat) {
+                combat = &reg.emplace<CombatState>(e);
+            }
+            if (!combat->is_casting && !combat->is_animation_locked) {
+                uint16_t skill_id = static_cast<uint16_t>(1000 + ai.boss_phase * 100 + mid % 100);
+                float cast_time = std::max(0.3f, 1.5f - ai.boss_phase * 0.2f);
+
+                // Boss-type specific special attacks
+                if (is_arach) {
+                    if (ai.boss_phase >= 2) {
+                        // Poison spit — AOE poison damage
+                        auto player_view = reg.view<Transform, CharacterStats, TagPlayer>();
+                        for (auto p : player_view) {
+                            auto& px = player_view.get<Transform>(p);
+                            auto& boss_xform = reg.get<Transform>(e);
+                            if (glm::distance(px.position, boss_xform.position) < ai.attack_range * 2.5f) {
+                                int32_t poison_dmg = static_cast<int32_t>(stats.physic_attack * 0.8f);
+                                player_view.get<CharacterStats>(p).hp = std::max(0, player_view.get<CharacterStats>(p).hp - poison_dmg);
+                                spdlog::debug("Arach poison spit hits player {} for {}", static_cast<uint32_t>(p), poison_dmg);
+                            }
+                        }
+                    }
+                    if (ai.boss_phase >= 3) {
+                        // Web trap — root player (simulated as reducing speed to 0)
+                        auto target_stats = reg.try_get<CharacterStats>(static_cast<entt::entity>(ai.aggro_target));
+                        if (target_stats) {
+                            target_stats->move_speed *= 0.1f;
+                            spdlog::debug("Arach web trap roots player {}", ai.aggro_target);
+                        }
+                    }
+                } else if (is_dragonian) {
+                    if (ai.boss_phase >= 2) {
+                        // Fire breath — cone AOE
+                        auto player_view = reg.view<Transform, CharacterStats, TagPlayer>();
+                        for (auto p : player_view) {
+                            auto& px = player_view.get<Transform>(p);
+                            auto& boss_xform = reg.get<Transform>(e);
+                            if (glm::distance(px.position, boss_xform.position) < ai.attack_range * 2.0f) {
+                                int32_t fire_dmg = static_cast<int32_t>(stats.physic_attack * 1.2f);
+                                player_view.get<CharacterStats>(p).hp = std::max(0, player_view.get<CharacterStats>(p).hp - fire_dmg);
+                                spdlog::debug("Dragonian fire breath hits player {} for {}", static_cast<uint32_t>(p), fire_dmg);
+                            }
+                        }
+                    }
+                    if (ai.boss_phase >= 3) {
+                        // Tail sweep — knockback (simulated as stun)
+                        auto target_stats = reg.try_get<CharacterStats>(static_cast<entt::entity>(ai.aggro_target));
+                        if (target_stats) {
+                            target_stats->move_speed = 0.0f;
+                        }
+                    }
+                } else if (is_leostein) {
+                    if (ai.boss_phase >= 2) {
+                        // Lightning strike — single target high damage
+                        auto target_stats = reg.try_get<CharacterStats>(static_cast<entt::entity>(ai.aggro_target));
+                        if (target_stats) {
+                            int32_t lightning_dmg = static_cast<int32_t>(stats.magic_attack * 2.5f);
+                            target_stats->hp = std::max(0, target_stats->hp - lightning_dmg);
+                            spdlog::debug("Leostein lightning strike hits player {} for {}", ai.aggro_target, lightning_dmg);
+                        }
+                    }
+                    if (ai.boss_phase >= 3) {
+                        // Roar — fear (reduces accuracy)
+                        auto target_stats = reg.try_get<CharacterStats>(static_cast<entt::entity>(ai.aggro_target));
+                        if (target_stats) {
+                            target_stats->accuracy *= 0.5f;
+                            spdlog::debug("Leostein roar fears player {}", ai.aggro_target);
+                        }
+                    }
+                } else if (is_tarintus) {
+                    if (ai.boss_phase >= 2) {
+                        // Ice shard — slow
+                        auto target_stats = reg.try_get<CharacterStats>(static_cast<entt::entity>(ai.aggro_target));
+                        if (target_stats) {
+                            target_stats->move_speed *= 0.4f;
+                            spdlog::debug("Tarintus ice shard slows player {}", ai.aggro_target);
+                        }
+                    }
+                    if (ai.boss_phase >= 3) {
+                        // Blizzard — AOE
+                        auto player_view = reg.view<Transform, CharacterStats, TagPlayer>();
+                        for (auto p : player_view) {
+                            auto& px = player_view.get<Transform>(p);
+                            auto& boss_xform = reg.get<Transform>(e);
+                            if (glm::distance(px.position, boss_xform.position) < ai.attack_range * 2.5f) {
+                                int32_t ice_dmg = static_cast<int32_t>(stats.magic_attack * 1.8f);
+                                player_view.get<CharacterStats>(p).hp = std::max(0, player_view.get<CharacterStats>(p).hp - ice_dmg);
+                                spdlog::debug("Tarintus blizzard hits player {} for {}", static_cast<uint32_t>(p), ice_dmg);
+                            }
+                        }
+                    }
+                } else if (is_kierra) {
+                    if (ai.boss_phase >= 2) {
+                        // Dark bolt — magic damage
+                        auto target_stats = reg.try_get<CharacterStats>(static_cast<entt::entity>(ai.aggro_target));
+                        if (target_stats) {
+                            int32_t dark_dmg = static_cast<int32_t>(stats.magic_attack * 2.0f);
+                            target_stats->hp = std::max(0, target_stats->hp - dark_dmg);
+                            spdlog::debug("Kierra dark bolt hits player {} for {}", ai.aggro_target, dark_dmg);
+                        }
+                    }
+                    if (ai.boss_phase >= 3) {
+                        // Life drain — heals self
+                        auto target_stats = reg.try_get<CharacterStats>(static_cast<entt::entity>(ai.aggro_target));
+                        if (target_stats) {
+                            int32_t drain_dmg = static_cast<int32_t>(stats.magic_attack * 1.5f);
+                            target_stats->hp = std::max(0, target_stats->hp - drain_dmg);
+                            int32_t heal = static_cast<int32_t>(drain_dmg * 0.6f);
+                            stats.hp = std::min(stats.max_hp, stats.hp + heal);
+                            spdlog::debug("Kierra life drain steals {} HP from player {}, heals for {}", drain_dmg, ai.aggro_target, heal);
+                        }
+                    }
                 }
-                if (!combat->is_casting) {
-                    // Map phase to skill_id: 1000 + phase * 100
-                    uint16_t skill_id = static_cast<uint16_t>(1000 + ai.boss_phase * 100);
-                    float cast_time = 1.0f;
-                    if (ai.boss_phase >= 5) cast_time = 0.3f;
-                    else if (ai.boss_phase >= 4) cast_time = 0.5f;
-                    combat->StartCast(skill_id, cast_time,
-                                      static_cast<entt::entity>(ai.aggro_target));
-                    spdlog::info("Boss {} uses special attack skill {} (phase {})",
-                                 static_cast<uint32_t>(e), skill_id, ai.boss_phase);
-                }
+
+                // General special attack per phase
+                combat->StartCast(skill_id, cast_time,
+                                  static_cast<entt::entity>(ai.aggro_target));
+                spdlog::info("Boss {} uses special attack skill {} (phase {}, cd_mult: {:.2f})",
+                             static_cast<uint32_t>(e), skill_id, ai.boss_phase, cd_mult);
             }
         }
     }
 
-    // --- Phase-specific behavior ---
-    switch (ai.boss_phase) {
-        case 1:
-            break;
-        case 2: {
-            ai.special_attack_cooldown = 7.0f;
-            break;
+    // --- Enraged berserk pulse ---
+    if (enraged) {
+        spdlog::warn("Boss {} is ENRAGED! +100% ATK, +100% speed, -75% DEF, berserk!",
+                     static_cast<uint32_t>(e));
+        // Every 3s while enraged, deal burst damage to all nearby players
+        if (static_cast<int>(ai.special_attack_timer * 10) % 30 == 0) {
+            auto player_view = reg.view<Transform, CharacterStats, TagPlayer>();
+            for (auto p : player_view) {
+                auto& px = player_view.get<Transform>(p);
+                auto& boss_xform = reg.get<Transform>(e);
+                if (glm::distance(px.position, boss_xform.position) < ai.attack_range * 3.0f) {
+                    int32_t burst = static_cast<int32_t>(stats.physic_attack * 0.5f);
+                    player_view.get<CharacterStats>(p).hp = std::max(0, player_view.get<CharacterStats>(p).hp - burst);
+                    spdlog::debug("Enrage burst hits player {} for {}", static_cast<uint32_t>(p), burst);
+                }
+            }
         }
-        case 3: {
-            ai.special_attack_cooldown = 6.0f;
-            ai.attack_range = ai.attack_range * 1.3f;
-            break;
-        }
-        case 4: {
-            ai.special_attack_cooldown = 5.0f;
-            ai.aggro_range *= 1.2f;
-            break;
-        }
-        case 5: {
-            ai.special_attack_cooldown = 3.0f;
-            ai.aggro_range *= 1.5f;
-            break;
-        }
-        default:
-            break;
     }
 }

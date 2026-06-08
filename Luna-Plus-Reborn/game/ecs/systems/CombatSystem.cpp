@@ -46,10 +46,11 @@ DamageResult CombatSystem::CalculateDamage(const CharacterStats& attacker,
                                            float plus_add_value) {
     DamageResult result{};
 
-    // 1. Miss Check: 5% base, reduced by DEX
-    float miss_chance = std::max(0.01f, 0.05f - attacker.dexterity * 0.002f);
+    // 1. Miss Check: 5% - DEX/500, minimum 1%
+    float miss_chance = std::max(0.01f, 0.05f - attacker.dexterity / 500.0f);
     if (std::uniform_real_distribution<float>(0, 1)(rng) < miss_chance) {
         result.is_miss = true;
+        spdlog::debug("DAMAGE: MISS (miss_chance={:.2f}%)", miss_chance * 100.0f);
         return result;
     }
 
@@ -58,6 +59,7 @@ DamageResult CombatSystem::CalculateDamage(const CharacterStats& attacker,
     float defense = defender.physic_defense;
     float damage = (attack * 2.0f) - defense;
     damage = std::max(1.0f, damage);
+    spdlog::debug("DAMAGE: base atk={:.1f} def={:.1f} raw={:.1f}", attack, defense, damage);
 
     // 3. Skill modifiers
     if (add_type == 1) {
@@ -66,41 +68,50 @@ DamageResult CombatSystem::CalculateDamage(const CharacterStats& attacker,
         damage = damage * ((1000.0f + skill_add_damage + attacker.physic_attack) / 1000.0f);
     }
     damage = (damage * (1.0f + (rate_add_value / 100.0f))) + plus_add_value;
+    spdlog::debug("DAMAGE: after skill add_type={} rate={:.1f} plus={:.1f} -> {:.1f}",
+                  add_type, rate_add_value, plus_add_value, damage);
 
-    // 4. Element Advantage
+    // 4. Element Advantage (all 7 elements: None/Earth/Water/Divine/Wind/Fire/Dark)
     Element atk_elem = GetAttackElement(attacker);
     Element def_elem = GetAttackElement(defender);
     float elem_mult = GetElementAdvantage(atk_elem, def_elem);
     damage *= elem_mult;
+    spdlog::debug("DAMAGE: element atk={} def={} mult={:.2f} -> {:.1f}",
+                  static_cast<int>(atk_elem), static_cast<int>(def_elem), elem_mult, damage);
 
     // 5. Level Difference Penalty: ±5% per level, cap 50%
     int32_t level_diff = static_cast<int32_t>(attacker.level) - static_cast<int32_t>(defender.level);
     float level_mod = 1.0f + std::clamp(static_cast<float>(level_diff) * 0.05f, -0.50f, 0.50f);
     damage *= level_mod;
+    spdlog::debug("DAMAGE: level diff={} mult={:.2f} -> {:.1f}", level_diff, level_mod, damage);
 
     // 6. Block Check
     if (defender.shield_defense > 0 && defender.block_rate > std::uniform_int_distribution<int>(0, 99)(rng)) {
         result.is_block = true;
         damage = (damage * (0.6f - (defender.constitution / 4000.0f))) - defender.shield_defense;
+        spdlog::debug("DAMAGE: BLOCKED -> {:.1f}", damage);
     }
 
-    // 7. Critical: base 5% + (DEX/100), crit damage = 150% + (STR/200)
-    float crit_rate = 5.0f + attacker.dexterity / 100.0f;
+    // 7. Critical: base 5% + (DEX/100), capped at 50%
+    float crit_rate = std::min(50.0f, 5.0f + attacker.dexterity / 100.0f);
     float crit_dmg = 1.50f + attacker.strength / 200.0f;
     if (!result.is_block && (attacker.critical_rate >= 100.0f ||
                              crit_rate >= std::uniform_real_distribution<float>(0, 100)(rng))) {
         result.is_critical = true;
         damage *= crit_dmg;
+        spdlog::debug("DAMAGE: CRITICAL rate={:.1f}% mult={:.2f} -> {:.1f}", crit_rate, crit_dmg, damage);
     }
 
     // 8. Damage Variance: ±10%
     float variance = 1.0f + std::uniform_real_distribution<float>(-0.10f, 0.10f)(rng);
     damage *= variance;
+    spdlog::debug("DAMAGE: variance={:.4f} -> {:.1f}", variance, damage);
 
     // 9. Minimum Damage clamp
     damage = std::max(1.0f, damage);
 
     result.damage = static_cast<int32_t>(damage);
+    spdlog::debug("DAMAGE: FINAL={}", result.damage);
     return result;
 }
 
