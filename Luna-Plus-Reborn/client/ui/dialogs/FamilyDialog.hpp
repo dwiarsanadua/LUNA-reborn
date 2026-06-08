@@ -6,6 +6,7 @@
 #include <ui/widgets/Button.hpp>
 #include <ui/widgets/TabPanel.hpp>
 #include <gameobjects/FamilySystem.hpp>
+#include <functional>
 
 class FamilyDialog {
 public:
@@ -13,6 +14,10 @@ public:
     void Open(GameState* state, WindowManager* wm, FamilySystem* family);
     void Close() { window_ = nullptr; }
     void UpdateFromState(GameState* state);
+    void SetNetworkCallbacks(std::function<void(const std::string&)> create_fn,
+                             std::function<void(uint32_t, const std::string&)> propose_fn,
+                             std::function<void()> accept_fn,
+                             std::function<void()> refresh_fn);
 
 private:
     Window* window_ = nullptr;
@@ -22,5 +27,9 @@ private:
     Label* tab2_label_ = nullptr;
     Label* tab3_label_ = nullptr;
     FamilySystem* family_ = nullptr;
+    std::function<void(const std::string&)> create_fn_;
+    std::function<void(uint32_t, const std::string&)> propose_fn_;
+    std::function<void()> accept_fn_;
+    std::function<void()> refresh_fn_;
     void Refresh(GameState* state);
 };

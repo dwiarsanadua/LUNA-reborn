@@ -21,3 +21,27 @@ CREATE TABLE IF NOT EXISTS player_quests (
 );
 
 CREATE INDEX IF NOT EXISTS idx_player_quests_char ON player_quests(character_id);
+
+-- Phase 6 secondary feature seeds (MapServer runtime)
+
+CREATE TABLE IF NOT EXISTS phase6_fish_types (
+    item_id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    rarity INTEGER DEFAULT 0,
+    weight REAL DEFAULT 1.0
+);
+
+CREATE TABLE IF NOT EXISTS phase6_territories (
+    territory_id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    owner_guild_id INTEGER DEFAULT 0,
+    owner_guild_name TEXT DEFAULT '',
+    tax_rate INTEGER DEFAULT 10
+);
+
+CREATE TABLE IF NOT EXISTS phase6_shop_items (
+    item_id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    price INTEGER DEFAULT 0,
+    category TEXT DEFAULT 'Misc'
+);

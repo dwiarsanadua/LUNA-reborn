@@ -1,6 +1,12 @@
 #include "CashShopDialog.hpp"
 #include <cstdio>
 
+void CashShopDialog::SetNetworkCallbacks(std::function<void(uint32_t)> buy_fn,
+                                         std::function<void()> refresh_fn) {
+    buy_fn_ = std::move(buy_fn);
+    refresh_fn_ = std::move(refresh_fn);
+}
+
 void CashShopDialog::Open(GameState* state, WindowManager* wm, CashShopSystem* shop) {
     (void)info_label_;
     shop_ = shop;
@@ -28,17 +34,21 @@ void CashShopDialog::Open(GameState* state, WindowManager* wm, CashShopSystem* s
     auto* buy_btn = window_->AddWidget<Button>("Buy Selected", 14, 430, 120, 24);
     buy_btn->SetColors({40,80,40,220}, {80,130,80,220}, {30,50,30,220});
     buy_btn->OnEvent([this, state](const UIEvent& e) {
-        if (e.type == UIEvent::Click && shop_) {
-            int luna = 500;
-            if (shop_->PurchaseItem(luna, 1)) {
-                state->chat_messages.push_back("Purchased from Cash Shop!");
-                if (luna_label_) {
-                    char buf[64];
-                    snprintf(buf, sizeof(buf), "Luna Points: %d  |  Gold: %d", luna, state->gold);
-                    luna_label_->SetText(buf);
+        if (e.type == UIEvent::Click) {
+            if (buy_fn_ && !state->network_cashshop_items.empty()) {
+                buy_fn_(state->network_cashshop_items[0].item_id);
+            } else if (shop_) {
+                int luna = 500;
+                if (shop_->PurchaseItem(luna, 1)) {
+                    state->chat_messages.push_back("Purchased from Cash Shop!");
+                    if (luna_label_) {
+                        char buf[64];
+                        snprintf(buf, sizeof(buf), "Luna Points: %d  |  Gold: %d", luna, state->gold);
+                        luna_label_->SetText(buf);
+                    }
+                } else {
+                    state->chat_messages.push_back("Not enough Luna Points!");
                 }
-            } else {
-                state->chat_messages.push_back("Not enough Luna Points!");
             }
         }
     });
@@ -72,7 +82,8 @@ void CashShopDialog::Open(GameState* state, WindowManager* wm, CashShopSystem* s
 }
 
 void CashShopDialog::RefreshShop(int) {
-    if (!shop_ || !shop_content_) return;
+    if (!shop_content_) return;
+    if (!shop_) return;
     std::string text = "=== Cash Shop Items ===\n\n";
     auto items = shop_->GetItems();
     int idx = 0;
@@ -86,6 +97,30 @@ void CashShopDialog::RefreshShop(int) {
     }
     text += "\nUse 'Buy Selected' to purchase item #1.\n(Full category browsing coming soon)";
     shop_content_->SetText(text);
+}
+
+void CashShopDialog::UpdateFromState(GameState* state) {
+    if (!state || !shop_content_) return;
+    if (!state->network_cashshop_items.empty()) {
+        std::string text = "=== Server Cash Shop ===\n\n";
+        int idx = 0;
+        for (const auto& item : state->network_cashshop_items) {
+            char buf[256];
+            snprintf(buf, sizeof(buf), "[%d] %s — %u gold (%s)\n",
+                idx + 1, item.name.c_str(), item.price, item.category.c_str());
+            text += buf;
+            idx++;
+        }
+        text += "\nUse 'Buy Selected' for first item.";
+        shop_content_->SetText(text);
+        if (luna_label_) {
+            char buf[64];
+            snprintf(buf, sizeof(buf), "Gold: %d", state->gold);
+            luna_label_->SetText(buf);
+        }
+        return;
+    }
+    RefreshShop(0);
 }
 
 void CashShopDialog::RefreshBattlePass(GameState* state) {
@@ -111,8 +146,4 @@ void CashShopDialog::RefreshBattlePass(GameState* state) {
         lvl, shop_->GetBattlePassRewards(lvl).empty() ? "Gold" : shop_->GetBattlePassRewards(lvl)[0].c_str());
     bp_content_->SetText(buf);
     bp_bar_->SetProgress((float)xp / (float)max_xp);
-}
-
-void CashShopDialog::UpdateFromState(GameState* state) {
-    (void)state;
 }

@@ -1,0 +1,45 @@
+include "Types.fbs";
+
+namespace luna.protocol;
+
+table FamilyMemberInfo {
+    character_id: uint32;
+    name: string;
+    relation: uint8;
+    partner_id: uint32;
+    partner_name: string;
+    family_id: uint32;
+    family_name: string;
+}
+
+table FamilyInfo {
+    family_id: uint32;
+    family_name: string;
+    master_id: uint32;
+    members: [FamilyMemberInfo];
+}
+
+table FamilyInfoRequest {
+    character_id: uint32;
+}
+
+table FamilyCreateRequest {
+    character_id: uint32;
+    family_name: string;
+}
+
+table FamilyProposeRequest {
+    character_id: uint32;
+    target_id: uint32;
+    target_name: string;
+}
+
+table FamilyAcceptRequest {
+    character_id: uint32;
+}
+
+table FamilyResponse {
+    result: uint8;
+    family: FamilyInfo;
+    message: string;
+}

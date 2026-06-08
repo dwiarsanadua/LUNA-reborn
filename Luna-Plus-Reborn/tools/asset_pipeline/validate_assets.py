@@ -146,6 +146,53 @@ def check_phase5_server() -> dict:
     return {"issues": issues, "status": "ok" if not issues else "error"}
 
 
+def check_phase6_server() -> dict:
+    reborn = Path(__file__).resolve().parents[2]
+    issues = []
+
+    for rel in (
+        "server/map/systems/SecondarySystem.hpp",
+        "server/map/systems/SecondarySystem.cpp",
+        "game/network/protocol/Family.fbs",
+        "game/network/protocol/Pet.fbs",
+        "game/network/protocol/Fishing.fbs",
+        "game/network/protocol/Secondary.fbs",
+        "tools/asset_pipeline/bootstrap_phase6.py",
+    ):
+        if not (reborn / rel).is_file():
+            issues.append(f"Phase6: missing {rel}")
+
+    pkt = (reborn / "game/network/protocol/PacketType.fbs").read_text()
+    for token in (
+        "MP_FAMILY_INFO_SYN",
+        "MP_PET_INFO_SYN",
+        "MP_FISHING_CAST_SYN",
+        "MP_SIEGE_INFO_SYN",
+        "MP_TOURNAMENT_LIST_SYN",
+        "MP_HOUSING_INFO_SYN",
+        "MP_CASHSHOP_LIST_SYN",
+    ):
+        if token not in pkt:
+            issues.append(f"Phase6: PacketType missing {token}")
+
+    map_db = reborn / "assets" / "data" / "luna_map.db"
+    if map_db.is_file():
+        import sqlite3
+        conn = sqlite3.connect(map_db)
+        tables = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()
+        names = {row[0] for row in tables}
+        for needed in ("phase6_fish_types", "phase6_territories", "phase6_shop_items"):
+            if needed not in names:
+                issues.append(f"Phase6: luna_map.db missing {needed} (run bootstrap_phase6.py)")
+        conn.close()
+    else:
+        issues.append("Phase6: missing assets/data/luna_map.db (run bootstrap_phase6.py)")
+
+    return {"issues": issues, "status": "ok" if not issues else "error"}
+
+
 def validate_assets_report() -> dict:
     report = {
         'timestamp': datetime.now().isoformat(),
@@ -189,6 +236,9 @@ def validate_assets_report() -> dict:
     phase5 = check_phase5_server()
     issues.extend(phase5["issues"])
     report['phase5'] = phase5
+    phase6 = check_phase6_server()
+    issues.extend(phase6["issues"])
+    report['phase6'] = phase6
     report['issues'] = issues
     return report
 
@@ -198,7 +248,18 @@ def main():
     parser.add_argument('--verbose', action='store_true', help='Verbose output')
     parser.add_argument('--phase4', action='store_true', help='Enforce Phase 4 UI gates only')
     parser.add_argument('--phase5', action='store_true', help='Enforce Phase 5 server gates only')
+    parser.add_argument('--phase6', action='store_true', help='Enforce Phase 6 server gates only')
     args = parser.parse_args()
+
+    if args.phase6:
+        phase6 = check_phase6_server()
+        print("Phase 6 server validation:")
+        if phase6['issues']:
+            for issue in phase6['issues']:
+                print(f"  ! {issue}")
+            return 1
+        print("  OK")
+        return 0
 
     if args.phase5:
         phase5 = check_phase5_server()

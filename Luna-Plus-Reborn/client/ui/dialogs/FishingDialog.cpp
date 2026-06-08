@@ -1,5 +1,6 @@
 #include "FishingDialog.hpp"
 #include <ui/WindowManager.hpp>
+#include <ui/widgets/Button.hpp>
 #include <cstdlib>
 #include <cstdio>
 
@@ -34,6 +35,13 @@ void FishingDialog::Open(GameState* state, WindowManager* wm) {
     caught_ = false;
     progress_ = 0;
     wait_timer_ = 0;
+
+    if (window_ && cast_cb_) {
+        auto* cast_btn = window_->AddWidget<Button>("Cast Line", 20, 130, 120, 24);
+        cast_btn->OnEvent([this](const UIEvent& e) {
+            if (e.type == UIEvent::Click && cast_cb_) cast_cb_();
+        });
+    }
 }
 
 void FishingDialog::Update(float dt) {

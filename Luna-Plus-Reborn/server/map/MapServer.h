@@ -11,6 +11,7 @@
 #include "systems/GridSystem.hpp"
 #include "systems/TriggerSystem.hpp"
 #include "systems/MapScriptRuntime.hpp"
+#include "systems/SecondarySystem.hpp"
 #include <ecs/systems/SkillSystem.hpp>
 #include <ecs/components/QuestLog.hpp>
 
@@ -122,6 +123,7 @@ private:
     GridSystem grid_;
     TriggerSystem triggers_;
     MapScriptRuntime script_runtime_;
+    SecondarySystem secondary_;
     SkillSystem skill_sys_;
 
     float auto_save_timer_ = 0.0f;

@@ -19,6 +19,15 @@ struct QuestUpdateNotify;
 struct DungeonEntranceResponse;
 struct DungeonInfoResponse;
 struct TriggerNotify;
+struct FamilyResponse;
+struct PetResponse;
+struct FishingCastResponse;
+struct SiegeInfoResponse;
+struct TournamentListResponse;
+struct TournamentRegisterResponse;
+struct HousingInfoResponse;
+struct CashShopListResponse;
+struct CashShopBuyResponse;
 }
 
 struct EntityInterp {
@@ -176,6 +185,31 @@ private:
     void ApplyDungeonEntranceResponse(const luna::protocol::DungeonEntranceResponse* resp);
     void ApplyDungeonInfoResponse(const luna::protocol::DungeonInfoResponse* resp);
     void ApplyTriggerNotify(const luna::protocol::TriggerNotify* resp);
+    void SetupSecondaryNetworkCallbacks();
+    void RequestFamilyInfo();
+    void SendFamilyCreate(const std::string& name);
+    void SendFamilyPropose(uint32_t target_id, const std::string& target_name);
+    void SendFamilyAccept();
+    void RequestPetInfo();
+    void SendPetAction(uint8_t action);
+    void SendFishingCast(uint32_t spot_id = 0);
+    void RequestSiegeInfo();
+    void RequestTournamentList();
+    void SendTournamentRegister(uint32_t tournament_id);
+    void RequestHousingInfo();
+    void RequestCashShopList();
+    void SendCashShopBuy(uint32_t item_id);
+    void ApplyFamilyResponse(const luna::protocol::FamilyResponse* resp);
+    void ApplyPetResponse(const luna::protocol::PetResponse* resp);
+    void ApplyFishingResponse(const luna::protocol::FishingCastResponse* resp);
+    void ApplySiegeInfoResponse(const luna::protocol::SiegeInfoResponse* resp);
+    void ApplyTournamentListResponse(const luna::protocol::TournamentListResponse* resp);
+    void ApplyTournamentRegisterResponse(const luna::protocol::TournamentRegisterResponse* resp);
+    void ApplyHousingInfoResponse(const luna::protocol::HousingInfoResponse* resp);
+    void ApplyCashShopListResponse(const luna::protocol::CashShopListResponse* resp);
+    void ApplyCashShopBuyResponse(const luna::protocol::CashShopBuyResponse* resp);
+    void SyncFamilyFromNetwork();
+    void SyncPetFromNetwork();
     uint32_t GetSelectedCharId() const;
     void CastHotbarSkill(int slot);
     void ApplySkillDamage(uint32_t skill_id);

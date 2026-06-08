@@ -4,6 +4,7 @@
 #include <ui/widgets/Label.hpp>
 #include <ui/widgets/ProgressBar.hpp>
 #include <cstdint>
+#include <functional>
 
 class FishingDialog {
 public:
@@ -19,6 +20,7 @@ public:
     void StartCasting() { casting_ = true; cast_timer_ = 0; }
     
     void SetResultCallback(std::function<void(bool success, int fish_type)> cb) { result_cb_ = cb; }
+    void SetCastCallback(std::function<void()> cb) { cast_cb_ = std::move(cb); }
 
 private:
     Window* window_ = nullptr;
@@ -40,6 +42,7 @@ private:
     int fish_type_ = 0;
     
     std::function<void(bool, int)> result_cb_;
+    std::function<void()> cast_cb_;
     
     static constexpr float MAX_WAIT = 8.0f;
     static constexpr float CATCH_WINDOW = 0.3f;

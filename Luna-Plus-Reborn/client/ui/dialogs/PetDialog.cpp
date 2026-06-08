@@ -1,6 +1,18 @@
 #include "PetDialog.hpp"
 #include <cstdio>
 
+void PetDialog::SetNetworkCallbacks(std::function<void()> summon_fn,
+                                      std::function<void()> dismiss_fn,
+                                      std::function<void()> feed_fn,
+                                      std::function<void()> evolve_fn,
+                                      std::function<void()> refresh_fn) {
+    summon_fn_ = std::move(summon_fn);
+    dismiss_fn_ = std::move(dismiss_fn);
+    feed_fn_ = std::move(feed_fn);
+    evolve_fn_ = std::move(evolve_fn);
+    refresh_fn_ = std::move(refresh_fn);
+}
+
 void PetDialog::Open(GameState* state, WindowManager* wm, Pet* pet) {
     pet_ = pet;
     window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/PetInfo.bin.txt",
@@ -28,34 +40,43 @@ void PetDialog::Open(GameState* state, WindowManager* wm, Pet* pet) {
     auto* summon_btn = window_->AddWidget<Button>("Summon", 10, 280, 80, 24);
     summon_btn->SetColors({40,80,40,220}, {80,130,80,220}, {30,50,30,220});
     summon_btn->OnEvent([this](const UIEvent& e) {
-        if (e.type == UIEvent::Click && pet_) {
-            pet_->Summon();
-            if (status_label_) status_label_->SetText("Pet summoned!");
-            Refresh();
+        if (e.type == UIEvent::Click) {
+            if (summon_fn_) summon_fn_();
+            else if (pet_) {
+                pet_->Summon();
+                if (status_label_) status_label_->SetText("Pet summoned!");
+                Refresh();
+            }
         }
     });
 
     auto* dismiss_btn = window_->AddWidget<Button>("Dismiss", 100, 280, 80, 24);
     dismiss_btn->SetColors({80,40,40,220}, {130,80,80,220}, {50,30,30,220});
     dismiss_btn->OnEvent([this](const UIEvent& e) {
-        if (e.type == UIEvent::Click && pet_) {
-            pet_->Dismiss();
-            if (status_label_) status_label_->SetText("Pet dismissed.");
-            Refresh();
+        if (e.type == UIEvent::Click) {
+            if (dismiss_fn_) dismiss_fn_();
+            else if (pet_) {
+                pet_->Dismiss();
+                if (status_label_) status_label_->SetText("Pet dismissed.");
+                Refresh();
+            }
         }
     });
 
     auto* feed_btn = window_->AddWidget<Button>("Feed (+30)", 190, 280, 90, 24);
     feed_btn->SetColors({80,80,40,220}, {130,130,80,220}, {50,50,30,220});
     feed_btn->OnEvent([this, state](const UIEvent& e) {
-        if (e.type == UIEvent::Click && pet_) {
-            if (state->gold >= 50) {
-                state->gold -= 50;
-                pet_->Feed(30);
-                if (status_label_) status_label_->SetText("Pet fed! -50g");
-                Refresh();
-            } else {
-                if (status_label_) status_label_->SetText("Not enough gold!");
+        if (e.type == UIEvent::Click) {
+            if (feed_fn_) feed_fn_();
+            else if (pet_) {
+                if (state->gold >= 50) {
+                    state->gold -= 50;
+                    pet_->Feed(30);
+                    if (status_label_) status_label_->SetText("Pet fed! -50g");
+                    Refresh();
+                } else {
+                    if (status_label_) status_label_->SetText("Not enough gold!");
+                }
             }
         }
     });
@@ -63,14 +84,17 @@ void PetDialog::Open(GameState* state, WindowManager* wm, Pet* pet) {
     auto* evolve_btn = window_->AddWidget<Button>("Evolve", 290, 280, 80, 24);
     evolve_btn->SetColors({80,40,80,220}, {130,80,130,220}, {50,30,50,220});
     evolve_btn->OnEvent([this, state](const UIEvent& e) {
-        if (e.type == UIEvent::Click && pet_) {
-            if (state->gold >= 1000) {
-                state->gold -= 1000;
-                state->chat_messages.push_back("Pet evolved!");
-                if (status_label_) status_label_->SetText("Pet evolved to next form!");
-                Refresh();
-            } else {
-                if (status_label_) status_label_->SetText("Need 1000g to evolve!");
+        if (e.type == UIEvent::Click) {
+            if (evolve_fn_) evolve_fn_();
+            else if (pet_) {
+                if (state->gold >= 1000) {
+                    state->gold -= 1000;
+                    state->chat_messages.push_back("Pet evolved!");
+                    if (status_label_) status_label_->SetText("Pet evolved to next form!");
+                    Refresh();
+                } else {
+                    if (status_label_) status_label_->SetText("Need 1000g to evolve!");
+                }
             }
         }
     });

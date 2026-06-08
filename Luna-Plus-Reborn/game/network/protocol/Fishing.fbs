@@ -1,0 +1,16 @@
+include "Types.fbs";
+
+namespace luna.protocol;
+
+table FishingCastRequest {
+    character_id: uint32;
+    spot_id: uint32;
+}
+
+table FishingCastResponse {
+    result: uint8;
+    fish_item_id: uint32;
+    fish_name: string;
+    rarity: uint8;
+    message: string;
+}

@@ -10,6 +10,7 @@ add_executable(MapServer
     systems/GridSystem.cpp
     systems/TriggerSystem.cpp
     systems/MapScriptRuntime.cpp
+    systems/SecondarySystem.cpp
 )
 
 target_include_directories(MapServer PRIVATE

@@ -10,6 +10,7 @@
 #include "systems/GridSystem.hpp"
 #include "systems/TriggerSystem.hpp"
 #include "systems/MapScriptRuntime.hpp"
+#include "systems/SecondarySystem.hpp"
 #include <ecs/systems/SkillSystem.hpp>
 #include <ecs/components/SkillBook.hpp>
 #include <ecs/components/QuestLog.hpp>
@@ -39,6 +40,10 @@
 #include <Quest_generated.h>
 #include <Trigger_generated.h>
 #include <Dungeon_generated.h>
+#include <Family_generated.h>
+#include <Pet_generated.h>
+#include <Fishing_generated.h>
+#include <Secondary_generated.h>
 #include <ecs/components/AIComponent.hpp>
 #include <PacketType_generated.h>
 #include <spdlog/spdlog.h>
@@ -218,6 +223,7 @@ bool MapServer::Initialize(int map_id, uint16_t port) {
     triggers_.LoadForMap(*db_, map_id_);
     quest_->LoadQuestTemplates("assets/data/game_data.db");
     quest_->LoadQuestTemplatesFromDatabase(*db_);
+    secondary_.Init(db_.get(), map_id_);
 
     running_ = true;
     SeedMarketData();
@@ -1010,6 +1016,53 @@ void MapServer::HandlePacket(uint16_t type, const uint8_t* payload, size_t len) 
     }
     if (type == PacketType_MP_DUNGEON_INFO_SYN) {
         HandleDungeonInfo(payload, len);
+        return;
+    }
+
+    if (type >= PacketType_MP_FAMILY_INFO_SYN && type <= PacketType_MP_FAMILY_ACCEPT_ACK) {
+        MapPlayerContext ctx;
+        ctx.character_id = static_cast<uint32_t>(connected_player_.id);
+        ctx.name = connected_player_.name;
+        ctx.guild_id = has_guild_ ? guild_.guild_id : 0;
+        ctx.guild_name = guild_.name;
+        ctx.gold = &player_gold_;
+        ctx.grant_loot = [this](uint32_t item_id, uint16_t count) {
+            GrantLootToPlayer(item_id, count);
+        };
+        secondary_.HandlePacket(network_.get(), ctx, type, payload, len);
+        return;
+    }
+    if (type >= PacketType_MP_PET_INFO_SYN && type <= PacketType_MP_PET_ACTION_NACK) {
+        MapPlayerContext ctx;
+        ctx.character_id = static_cast<uint32_t>(connected_player_.id);
+        ctx.name = connected_player_.name;
+        ctx.gold = &player_gold_;
+        ctx.grant_loot = [this](uint32_t item_id, uint16_t count) {
+            GrantLootToPlayer(item_id, count);
+        };
+        secondary_.HandlePacket(network_.get(), ctx, type, payload, len);
+        return;
+    }
+    if (type >= PacketType_MP_FISHING_CAST_SYN && type <= PacketType_MP_FISHING_CAST_NACK) {
+        MapPlayerContext ctx;
+        ctx.character_id = static_cast<uint32_t>(connected_player_.id);
+        ctx.grant_loot = [this](uint32_t item_id, uint16_t count) {
+            GrantLootToPlayer(item_id, count);
+        };
+        secondary_.HandlePacket(network_.get(), ctx, type, payload, len);
+        return;
+    }
+    if (type >= PacketType_MP_SIEGE_INFO_SYN && type <= PacketType_MP_CASHSHOP_BUY_ACK) {
+        MapPlayerContext ctx;
+        ctx.character_id = static_cast<uint32_t>(connected_player_.id);
+        ctx.name = connected_player_.name;
+        ctx.guild_id = has_guild_ ? guild_.guild_id : 0;
+        ctx.guild_name = guild_.name;
+        ctx.gold = &player_gold_;
+        ctx.grant_loot = [this](uint32_t item_id, uint16_t count) {
+            GrantLootToPlayer(item_id, count);
+        };
+        secondary_.HandlePacket(network_.get(), ctx, type, payload, len);
         return;
     }
 }

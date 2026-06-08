@@ -27,6 +27,10 @@
 #include <Quest_generated.h>
 #include <Dungeon_generated.h>
 #include <Trigger_generated.h>
+#include <Family_generated.h>
+#include <Pet_generated.h>
+#include <Fishing_generated.h>
+#include <Secondary_generated.h>
 #include <PacketType_generated.h>
 #include <algorithm>
 #include <string>
@@ -92,6 +96,7 @@ void GameScreen::Enter() {
     if (!state_->offline_mode && network_ && network_->IsConnected()) {
         SetupQuestNetworkCallbacks();
         SetupDungeonNetworkCallbacks();
+        SetupSecondaryNetworkCallbacks();
         RequestQuestList();
     }
 }
@@ -353,6 +358,59 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         ApplyTriggerNotify(resp);
         return true;
     }
+    case luna::protocol::PacketType_MP_FAMILY_INFO_ACK:
+    case luna::protocol::PacketType_MP_FAMILY_CREATE_ACK:
+    case luna::protocol::PacketType_MP_FAMILY_CREATE_NACK:
+    case luna::protocol::PacketType_MP_FAMILY_PROPOSE_ACK:
+    case luna::protocol::PacketType_MP_FAMILY_PROPOSE_NACK:
+    case luna::protocol::PacketType_MP_FAMILY_ACCEPT_ACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::FamilyResponse>(payload.data());
+        ApplyFamilyResponse(resp);
+        return true;
+    }
+    case luna::protocol::PacketType_MP_PET_INFO_ACK:
+    case luna::protocol::PacketType_MP_PET_ACTION_ACK:
+    case luna::protocol::PacketType_MP_PET_ACTION_NACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::PetResponse>(payload.data());
+        ApplyPetResponse(resp);
+        return true;
+    }
+    case luna::protocol::PacketType_MP_FISHING_CAST_ACK:
+    case luna::protocol::PacketType_MP_FISHING_CAST_NACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::FishingCastResponse>(payload.data());
+        ApplyFishingResponse(resp);
+        return true;
+    }
+    case luna::protocol::PacketType_MP_SIEGE_INFO_ACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::SiegeInfoResponse>(payload.data());
+        ApplySiegeInfoResponse(resp);
+        return true;
+    }
+    case luna::protocol::PacketType_MP_TOURNAMENT_LIST_ACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::TournamentListResponse>(payload.data());
+        ApplyTournamentListResponse(resp);
+        return true;
+    }
+    case luna::protocol::PacketType_MP_TOURNAMENT_REGISTER_ACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::TournamentRegisterResponse>(payload.data());
+        ApplyTournamentRegisterResponse(resp);
+        return true;
+    }
+    case luna::protocol::PacketType_MP_HOUSING_INFO_ACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::HousingInfoResponse>(payload.data());
+        ApplyHousingInfoResponse(resp);
+        return true;
+    }
+    case luna::protocol::PacketType_MP_CASHSHOP_LIST_ACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::CashShopListResponse>(payload.data());
+        ApplyCashShopListResponse(resp);
+        return true;
+    }
+    case luna::protocol::PacketType_MP_CASHSHOP_BUY_ACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::CashShopBuyResponse>(payload.data());
+        ApplyCashShopBuyResponse(resp);
+        return true;
+    }
     default: return false;
     }
 }
@@ -366,7 +424,12 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
     else if (key == 83 || key == 264) { hero_.ClearWaypoint(); state_->player_z += speed; hero_.Move(0, speed); }
     else if (key == 65 || key == 263) { hero_.ClearWaypoint(); state_->player_x -= speed; hero_.Move(-speed, 0); }
     else if (key == 68 || key == 262) { hero_.ClearWaypoint(); state_->player_x += speed; hero_.Move(speed, 0); }
-    else if (key == 32) SpawnRandomMonster();
+    else if (key == 32) {
+        if (state_->fishing_open && !state_->offline_mode && network_ && network_->IsConnected())
+            SendFishingCast(0);
+        else
+            SpawnRandomMonster();
+    }
     else if (key >= 49 && key <= 57) CastHotbarSkill(key - 49);
     else if (key == 48) CastHotbarSkill(9);
     else if (key == 80) {
@@ -491,16 +554,20 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
         state_->fishing_open = !state_->fishing_open;
         if (state_->fishing_open) {
             fishing_dlg_.Open(state_, &wm_);
-            fishing_dlg_.SetResultCallback([this](bool success, int fish_type) {
-                (void)fish_type;
-                if (success) {
-                    state_->gold += 15;
-                    state_->chat_messages.push_back("Caught a fish! +15 gold");
-                } else {
-                    state_->chat_messages.push_back("Fish got away!");
-                }
-                state_->fishing_open = false;
-            });
+            if (!state_->offline_mode && network_ && network_->IsConnected()) {
+                fishing_dlg_.SetCastCallback([this]() { SendFishingCast(0); });
+            } else {
+                fishing_dlg_.SetResultCallback([this](bool success, int fish_type) {
+                    (void)fish_type;
+                    if (success) {
+                        state_->gold += 15;
+                        state_->chat_messages.push_back("Caught a fish! +15 gold");
+                    } else {
+                        state_->chat_messages.push_back("Fish got away!");
+                    }
+                    state_->fishing_open = false;
+                });
+            }
         }
         if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_UI, "window_open1.wav");
     }
@@ -523,7 +590,11 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
     }
     else if (key == 81) { // Q key - Cash Shop
         state_->cashshop_open = !state_->cashshop_open;
-        if (state_->cashshop_open) cash_shop_dlg_.Open(state_, &wm_, &cash_shop_);
+        if (state_->cashshop_open) {
+            cash_shop_dlg_.Open(state_, &wm_, &cash_shop_);
+            if (!state_->offline_mode && network_ && network_->IsConnected())
+                RequestCashShopList();
+        }
         if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_UI, "window_open1.wav");
     }
     else if (key == 262) { // Right Arrow key - Key Bindings
@@ -534,13 +605,11 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
     else if (key == 291) { // F3 key - Pets
         state_->pet_open = !state_->pet_open;
         if (state_->pet_open) {
-    pet_.Init("Fluffy", 1);
-    // Demo buffs
-    CharacterStats dummy;
-    buff_sys_.Apply(BuffSystem::MakeStatBuff("ATK Boost", 120.0f, "attack", 20.0f), dummy);
-    buff_sys_.Apply(BuffSystem::MakeStatBuff("DEF Boost", 90.0f, "defense", 10.0f), dummy);
-    buff_sys_.Apply(BuffSystem::MakeStatBuff("Move Speed", 60.0f, "move_speed", 0.3f, true), dummy);
+            if (state_->offline_mode)
+                pet_.Init("Fluffy", 1);
             pet_dlg_.Open(state_, &wm_, &pet_);
+            if (!state_->offline_mode && network_ && network_->IsConnected())
+                RequestPetInfo();
         }
         if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_UI, "window_open1.wav");
     }
@@ -556,7 +625,11 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
     }
     else if (key == 294) { // F6 key - Tournament
         state_->tournament_open = !state_->tournament_open;
-        if (state_->tournament_open) tournament_dlg_.Open(state_, &wm_, &tournament_sys_);
+        if (state_->tournament_open) {
+            tournament_dlg_.Open(state_, &wm_, &tournament_sys_);
+            if (!state_->offline_mode && network_ && network_->IsConnected())
+                RequestTournamentList();
+        }
         if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_UI, "window_open1.wav");
     }
     else if (key == 295) { // F7 key - Avatar Customization
@@ -589,12 +662,20 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
     }
     else if (key == 82) { // R key - Housing
         state_->housing_open = !state_->housing_open;
-        if (state_->housing_open) housing_dlg_.Open(state_, &wm_);
+        if (state_->housing_open) {
+            housing_dlg_.Open(state_, &wm_);
+            if (!state_->offline_mode && network_ && network_->IsConnected())
+                RequestHousingInfo();
+        }
         if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_UI, "window_open1.wav");
     }
     else if (key == 76) { // L key - Family & Couple
         state_->family_open = !state_->family_open;
-        if (state_->family_open) family_dlg_.Open(state_, &wm_, &family_);
+        if (state_->family_open) {
+            family_dlg_.Open(state_, &wm_, &family_);
+            if (!state_->offline_mode && network_ && network_->IsConnected())
+                RequestFamilyInfo();
+        }
         if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_UI, "window_open1.wav");
     }
     else if (key == 78) {
@@ -2674,5 +2755,334 @@ void GameScreen::ApplyTriggerNotify(const luna::protocol::TriggerNotify* resp) {
     if (msg.empty())
         msg = "Trigger #" + std::to_string(resp->trigger_id()) + " activated";
     state_->chat_messages.push_back("[Trigger] " + msg);
+    if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
+}
+
+void GameScreen::SetupSecondaryNetworkCallbacks() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) {
+        family_dlg_.SetNetworkCallbacks({}, {}, {}, {});
+        pet_dlg_.SetNetworkCallbacks({}, {}, {}, {}, {});
+        fishing_dlg_.SetCastCallback({});
+        cash_shop_dlg_.SetNetworkCallbacks({}, {});
+        return;
+    }
+    family_dlg_.SetNetworkCallbacks(
+        [this](const std::string& name) { SendFamilyCreate(name); },
+        [this](uint32_t id, const std::string& nm) { SendFamilyPropose(id, nm); },
+        [this]() { SendFamilyAccept(); },
+        [this]() { RequestFamilyInfo(); });
+    pet_dlg_.SetNetworkCallbacks(
+        [this]() { SendPetAction(0); },
+        [this]() { SendPetAction(1); },
+        [this]() { SendPetAction(2); },
+        [this]() { SendPetAction(3); },
+        [this]() { RequestPetInfo(); });
+    fishing_dlg_.SetCastCallback([this]() { SendFishingCast(0); });
+    cash_shop_dlg_.SetNetworkCallbacks(
+        [this](uint32_t item_id) { SendCashShopBuy(item_id); },
+        [this]() { RequestCashShopList(); });
+}
+
+void GameScreen::RequestFamilyInfo() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateFamilyInfoRequest(fbb, GetSelectedCharId());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_FAMILY_INFO_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendFamilyCreate(const std::string& name) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateFamilyCreateRequestDirect(
+        fbb, GetSelectedCharId(), name.c_str());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_FAMILY_CREATE_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendFamilyPropose(uint32_t target_id, const std::string& target_name) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateFamilyProposeRequestDirect(
+        fbb, GetSelectedCharId(), target_id, target_name.c_str());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_FAMILY_PROPOSE_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendFamilyAccept() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateFamilyAcceptRequest(fbb, GetSelectedCharId());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_FAMILY_ACCEPT_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::RequestPetInfo() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreatePetInfoRequest(fbb, GetSelectedCharId());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_PET_INFO_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendPetAction(uint8_t action) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreatePetActionRequest(fbb, GetSelectedCharId(), action);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_PET_ACTION_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendFishingCast(uint32_t spot_id) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateFishingCastRequest(fbb, GetSelectedCharId(), spot_id);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_FISHING_CAST_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::RequestSiegeInfo() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateSiegeInfoRequest(fbb, GetSelectedCharId());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_SIEGE_INFO_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::RequestTournamentList() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateTournamentListRequest(fbb, GetSelectedCharId());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_TOURNAMENT_LIST_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendTournamentRegister(uint32_t tournament_id) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateTournamentRegisterRequest(
+        fbb, GetSelectedCharId(), tournament_id, state_->guild_id);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_TOURNAMENT_REGISTER_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::RequestHousingInfo() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateHousingInfoRequest(fbb, GetSelectedCharId());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_HOUSING_INFO_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::RequestCashShopList() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateCashShopListRequest(fbb, GetSelectedCharId());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_CASHSHOP_LIST_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendCashShopBuy(uint32_t item_id) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateCashShopBuyRequest(fbb, GetSelectedCharId(), item_id);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_CASHSHOP_BUY_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SyncFamilyFromNetwork() {
+    if (state_->network_family_members.empty()) return;
+    for (const auto& m : state_->network_family_members) {
+        if (m.character_id != GetSelectedCharId()) continue;
+        if (m.relation == 2)
+            family_.Propose(GetSelectedCharId(), m.name, m.partner_id, m.partner_name);
+        else if (m.relation == 3)
+            family_.AcceptProposal(GetSelectedCharId());
+        if (state_->network_family_id && !state_->network_family_name.empty())
+            family_.CreateFamily(GetSelectedCharId(), state_->network_family_name);
+        break;
+    }
+}
+
+void GameScreen::SyncPetFromNetwork() {
+    const auto& p = state_->network_pet;
+    if (p.pet_id == 0 && p.name.empty()) return;
+    pet_.Init(p.name.empty() ? "Fluffy" : p.name, p.pet_id ? p.pet_id : 1);
+    if (p.summoned) pet_.Summon();
+    else pet_.Dismiss();
+}
+
+void GameScreen::ApplyFamilyResponse(const luna::protocol::FamilyResponse* resp) {
+    if (!resp) return;
+    if (resp->message()) {
+        std::string msg = resp->message()->str();
+        if (!msg.empty()) state_->chat_messages.push_back(msg);
+    }
+    if (resp->family()) {
+        state_->network_family_id = resp->family()->family_id();
+        state_->network_family_name = resp->family()->family_name()
+            ? resp->family()->family_name()->str() : "";
+        state_->network_family_members.clear();
+        if (resp->family()->members()) {
+            for (auto m : *resp->family()->members()) {
+                GameState::NetworkFamilyMember entry;
+                entry.character_id = m->character_id();
+                entry.name = m->name() ? m->name()->str() : "";
+                entry.relation = m->relation();
+                entry.partner_id = m->partner_id();
+                entry.partner_name = m->partner_name() ? m->partner_name()->str() : "";
+                state_->network_family_members.push_back(std::move(entry));
+            }
+        }
+        SyncFamilyFromNetwork();
+    }
+    if (state_->family_open) family_dlg_.UpdateFromState(state_);
+    if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
+}
+
+void GameScreen::ApplyPetResponse(const luna::protocol::PetResponse* resp) {
+    if (!resp) return;
+    if (resp->message()) {
+        std::string msg = resp->message()->str();
+        if (!msg.empty()) state_->chat_messages.push_back(msg);
+    }
+    if (resp->pet()) {
+        state_->network_pet.pet_id = resp->pet()->pet_id();
+        state_->network_pet.template_id = resp->pet()->template_id();
+        state_->network_pet.name = resp->pet()->name() ? resp->pet()->name()->str() : "Fluffy";
+        state_->network_pet.level = resp->pet()->level();
+        state_->network_pet.hp = resp->pet()->hp();
+        state_->network_pet.max_hp = resp->pet()->max_hp();
+        state_->network_pet.satiation = resp->pet()->satiation();
+        state_->network_pet.summoned = resp->pet()->summoned();
+        SyncPetFromNetwork();
+    }
+    if (state_->pet_open) pet_dlg_.UpdateFromState(state_);
+    if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
+}
+
+void GameScreen::ApplyFishingResponse(const luna::protocol::FishingCastResponse* resp) {
+    if (!resp) return;
+    std::string msg = resp->message() ? resp->message()->str() : "";
+    if (resp->result() == 0) {
+        if (msg.empty()) msg = "Caught " + (resp->fish_name() ? resp->fish_name()->str() : "a fish") + "!";
+        state_->chat_messages.push_back(msg);
+        fishing_dlg_.Close();
+        state_->fishing_open = false;
+    } else {
+        state_->chat_messages.push_back(msg.empty() ? "Fishing failed" : msg);
+    }
+    if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
+}
+
+void GameScreen::ApplySiegeInfoResponse(const luna::protocol::SiegeInfoResponse* resp) {
+    if (!resp || resp->result() != 0) return;
+    state_->network_siege_territories.clear();
+    if (resp->territories()) {
+        for (auto t : *resp->territories()) {
+            GameState::NetworkSiegeTerritory entry;
+            entry.territory_id = t->territory_id();
+            entry.name = t->name() ? t->name()->str() : "";
+            entry.owner_guild_id = t->owner_guild_id();
+            entry.owner_guild_name = t->owner_guild_name() ? t->owner_guild_name()->str() : "";
+            entry.tax_rate = t->tax_rate();
+            state_->network_siege_territories.push_back(std::move(entry));
+            if (t->owner_guild_id())
+                siege_.ConquerTerritory(static_cast<int>(t->territory_id()),
+                    t->owner_guild_id(), entry.owner_guild_name);
+        }
+    }
+    if (state_->guild_open) guild_dlg_.Open(&wm_, &siege_);
+}
+
+void GameScreen::ApplyTournamentListResponse(const luna::protocol::TournamentListResponse* resp) {
+    if (!resp || resp->result() != 0) return;
+    state_->network_tournaments.clear();
+    if (resp->tournaments()) {
+        for (auto t : *resp->tournaments()) {
+            GameState::NetworkTournamentEntry entry;
+            entry.tournament_id = t->tournament_id();
+            entry.name = t->name() ? t->name()->str() : "";
+            entry.state = t->state();
+            entry.registered = t->registered_teams();
+            entry.max_teams = t->max_teams();
+            entry.prize_gold = t->prize_gold();
+            state_->network_tournaments.push_back(std::move(entry));
+        }
+    }
+    if (state_->tournament_open) tournament_dlg_.UpdateFromState(state_);
+}
+
+void GameScreen::ApplyTournamentRegisterResponse(
+    const luna::protocol::TournamentRegisterResponse* resp) {
+    if (!resp) return;
+    std::string msg = resp->message() ? resp->message()->str() : "";
+    state_->chat_messages.push_back(msg.empty() ? "Tournament registration updated" : msg);
+    RequestTournamentList();
+    if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
+}
+
+void GameScreen::ApplyHousingInfoResponse(const luna::protocol::HousingInfoResponse* resp) {
+    if (!resp || resp->result() != 0) return;
+    state_->network_houses.clear();
+    if (resp->houses()) {
+        for (auto h : *resp->houses()) {
+            GameState::NetworkHouseInfo entry;
+            entry.house_id = h->house_id();
+            entry.map_id = h->map_id();
+            entry.pos_x = h->pos_x();
+            entry.pos_y = h->pos_y();
+            entry.house_type = h->house_type();
+            entry.furniture_count = h->furniture_count();
+            state_->network_houses.push_back(std::move(entry));
+        }
+    }
+    if (state_->housing_open) housing_dlg_.UpdateFromState(state_);
+}
+
+void GameScreen::ApplyCashShopListResponse(const luna::protocol::CashShopListResponse* resp) {
+    if (!resp || resp->result() != 0) return;
+    state_->network_cashshop_items.clear();
+    if (resp->items()) {
+        for (auto i : *resp->items()) {
+            GameState::NetworkCashShopItem entry;
+            entry.item_id = i->item_id();
+            entry.name = i->name() ? i->name()->str() : "";
+            entry.price = i->price();
+            entry.category = i->category() ? i->category()->str() : "Misc";
+            state_->network_cashshop_items.push_back(std::move(entry));
+        }
+    }
+    if (state_->cashshop_open) cash_shop_dlg_.UpdateFromState(state_);
+}
+
+void GameScreen::ApplyCashShopBuyResponse(const luna::protocol::CashShopBuyResponse* resp) {
+    if (!resp) return;
+    std::string msg = resp->message() ? resp->message()->str() : "";
+    if (resp->result() == 0) {
+        state_->chat_messages.push_back(msg.empty() ? "Purchase complete" : msg);
+        for (const auto& i : state_->network_cashshop_items) {
+            if (i.item_id == resp->item_id()) {
+                state_->gold = std::max(0, state_->gold - static_cast<int>(i.price));
+                break;
+            }
+        }
+    } else {
+        state_->chat_messages.push_back(msg.empty() ? "Purchase failed" : msg);
+    }
+    if (state_->cashshop_open) cash_shop_dlg_.UpdateFromState(state_);
     if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
 }

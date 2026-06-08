@@ -1,6 +1,16 @@
 #include "FamilyDialog.hpp"
 #include <cstdio>
 
+void FamilyDialog::SetNetworkCallbacks(std::function<void(const std::string&)> create_fn,
+                                         std::function<void(uint32_t, const std::string&)> propose_fn,
+                                         std::function<void()> accept_fn,
+                                         std::function<void()> refresh_fn) {
+    create_fn_ = std::move(create_fn);
+    propose_fn_ = std::move(propose_fn);
+    accept_fn_ = std::move(accept_fn);
+    refresh_fn_ = std::move(refresh_fn);
+}
+
 void FamilyDialog::Open(GameState* state, WindowManager* wm, FamilySystem* family) {
     (void)status_label_;
     family_ = family;
@@ -29,7 +39,9 @@ void FamilyDialog::Open(GameState* state, WindowManager* wm, FamilySystem* famil
     propose_btn->SetColors({80,40,80,220}, {130,80,130,220}, {50,30,50,220});
     propose_btn->OnEvent([this, state](const UIEvent& e) {
         if (e.type == UIEvent::Click) {
-            if (family_) {
+            if (propose_fn_) {
+                propose_fn_(999, "NPC_Sweetheart");
+            } else if (family_) {
                 family_->Propose(state->selected_char, state->name, 999, "NPC_Sweetheart");
                 state->chat_messages.push_back("Proposal sent to NPC_Sweetheart!");
                 Refresh(state);
@@ -41,7 +53,9 @@ void FamilyDialog::Open(GameState* state, WindowManager* wm, FamilySystem* famil
     accept_btn->SetColors({40,80,40,220}, {80,130,80,220}, {30,50,30,220});
     accept_btn->OnEvent([this, state](const UIEvent& e) {
         if (e.type == UIEvent::Click) {
-            if (family_ && family_->IsEngaged(state->selected_char)) {
+            if (accept_fn_) {
+                accept_fn_();
+            } else if (family_ && family_->IsEngaged(state->selected_char)) {
                 family_->AcceptProposal(state->selected_char);
                 state->chat_messages.push_back("You are now married! Congratulations!");
                 Refresh(state);
@@ -73,9 +87,33 @@ void FamilyDialog::Open(GameState* state, WindowManager* wm, FamilySystem* famil
 }
 
 void FamilyDialog::Refresh(GameState* state) {
-    if (!family_) return;
-
+    if (!state) return;
     char buf[512];
+
+    if (!state->network_family_members.empty()) {
+        for (const auto& m : state->network_family_members) {
+            if (m.character_id != static_cast<uint32_t>(state->selected_char)) continue;
+            snprintf(buf, sizeof(buf),
+                "Status: relation=%u\nPartner: %s (ID: %u)\nFamily: %s (ID: %u)",
+                m.relation,
+                m.partner_name.empty() ? "None" : m.partner_name.c_str(),
+                m.partner_id,
+                state->network_family_name.empty() ? "None" : state->network_family_name.c_str(),
+                state->network_family_id);
+            if (tab1_label_) tab1_label_->SetText(buf);
+            break;
+        }
+        if (tab2_label_) {
+            std::string ml;
+            for (const auto& m : state->network_family_members)
+                ml += m.name + "\n";
+            tab2_label_->SetText(ml.empty() ? "No family members" : ml);
+        }
+        if (refresh_fn_) refresh_fn_();
+        return;
+    }
+
+    if (!family_) return;
 
     // Tab 0: My Status
     auto* me = family_->GetMember(state->selected_char);

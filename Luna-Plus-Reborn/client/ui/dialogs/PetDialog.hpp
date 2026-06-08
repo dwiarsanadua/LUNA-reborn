@@ -7,6 +7,7 @@
 #include <ui/widgets/Button.hpp>
 #include <ui/widgets/ProgressBar.hpp>
 #include <ui/widgets/TabPanel.hpp>
+#include <functional>
 
 class PetDialog {
 public:
@@ -14,6 +15,11 @@ public:
     void Open(GameState* state, WindowManager* wm, Pet* pet);
     void Close() { window_ = nullptr; }
     void UpdateFromState(GameState* state);
+    void SetNetworkCallbacks(std::function<void()> summon_fn,
+                             std::function<void()> dismiss_fn,
+                             std::function<void()> feed_fn,
+                             std::function<void()> evolve_fn,
+                             std::function<void()> refresh_fn);
 
 private:
     Window* window_ = nullptr;
@@ -22,5 +28,10 @@ private:
     ProgressBar* hunger_bar_ = nullptr;
     ProgressBar* exp_bar_ = nullptr;
     Pet* pet_ = nullptr;
+    std::function<void()> summon_fn_;
+    std::function<void()> dismiss_fn_;
+    std::function<void()> feed_fn_;
+    std::function<void()> evolve_fn_;
+    std::function<void()> refresh_fn_;
     void Refresh();
 };

@@ -1,0 +1,96 @@
+include "Types.fbs";
+
+namespace luna.protocol;
+
+table SiegeTerritoryInfo {
+    territory_id: uint32;
+    name: string;
+    owner_guild_id: uint32;
+    owner_guild_name: string;
+    tax_rate: uint16;
+    siege_time: uint64;
+}
+
+table SiegeInfoRequest {
+    character_id: uint32;
+}
+
+table SiegeInfoResponse {
+    result: uint8;
+    territories: [SiegeTerritoryInfo];
+}
+
+table TournamentEntryInfo {
+    tournament_id: uint32;
+    name: string;
+    state: uint8;
+    registered_teams: uint16;
+    max_teams: uint16;
+    prize_gold: uint32;
+}
+
+table TournamentListRequest {
+    character_id: uint32;
+}
+
+table TournamentListResponse {
+    result: uint8;
+    tournaments: [TournamentEntryInfo];
+}
+
+table TournamentRegisterRequest {
+    character_id: uint32;
+    tournament_id: uint32;
+    guild_id: uint32;
+}
+
+table TournamentRegisterResponse {
+    result: uint8;
+    tournament_id: uint32;
+    message: string;
+}
+
+table HousingInfo {
+    house_id: uint32;
+    map_id: uint16;
+    pos_x: float;
+    pos_y: float;
+    house_type: uint8;
+    furniture_count: uint16;
+}
+
+table HousingInfoRequest {
+    character_id: uint32;
+}
+
+table HousingInfoResponse {
+    result: uint8;
+    houses: [HousingInfo];
+}
+
+table CashShopItemInfo {
+    item_id: uint32;
+    name: string;
+    price: uint32;
+    category: string;
+}
+
+table CashShopListRequest {
+    character_id: uint32;
+}
+
+table CashShopListResponse {
+    result: uint8;
+    items: [CashShopItemInfo];
+}
+
+table CashShopBuyRequest {
+    character_id: uint32;
+    item_id: uint32;
+}
+
+table CashShopBuyResponse {
+    result: uint8;
+    item_id: uint32;
+    message: string;
+}

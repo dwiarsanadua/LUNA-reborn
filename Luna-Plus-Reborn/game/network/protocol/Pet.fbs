@@ -1,0 +1,29 @@
+include "Types.fbs";
+
+namespace luna.protocol;
+
+table PetInfo {
+    pet_id: uint32;
+    template_id: uint32;
+    name: string;
+    level: uint16;
+    hp: uint16;
+    max_hp: uint16;
+    satiation: uint16;
+    summoned: bool;
+}
+
+table PetInfoRequest {
+    character_id: uint32;
+}
+
+table PetActionRequest {
+    character_id: uint32;
+    action: uint8;
+}
+
+table PetResponse {
+    result: uint8;
+    pet: PetInfo;
+    message: string;
+}

@@ -8,6 +8,7 @@
 #include <ui/widgets/TabPanel.hpp>
 #include <ui/widgets/ProgressBar.hpp>
 #include <gameobjects/CashShopSystem.hpp>
+#include <functional>
 
 class CashShopDialog {
 public:
@@ -15,6 +16,8 @@ public:
     void Open(GameState* state, WindowManager* wm, CashShopSystem* shop);
     void Close() { window_ = nullptr; }
     void UpdateFromState(GameState* state);
+    void SetNetworkCallbacks(std::function<void(uint32_t)> buy_fn,
+                             std::function<void()> refresh_fn);
 
 private:
     Window* window_ = nullptr;
@@ -25,6 +28,8 @@ private:
     Label* bp_content_ = nullptr;
     ProgressBar* bp_bar_ = nullptr;
     CashShopSystem* shop_ = nullptr;
+    std::function<void(uint32_t)> buy_fn_;
+    std::function<void()> refresh_fn_;
     void RefreshShop(int category_idx);
     void RefreshBattlePass(GameState* state);
 };

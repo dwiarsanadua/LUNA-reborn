@@ -249,4 +249,64 @@ struct GameState {
     uint32_t dungeon_elapsed_sec = 0;
     bool dungeon_boss_active = false;
     std::string last_trigger_message;
+
+    struct NetworkFamilyMember {
+        uint32_t character_id = 0;
+        std::string name;
+        uint8_t relation = 1;
+        uint32_t partner_id = 0;
+        std::string partner_name;
+    };
+    uint32_t network_family_id = 0;
+    std::string network_family_name;
+    std::vector<NetworkFamilyMember> network_family_members;
+
+    struct NetworkPetInfo {
+        uint32_t pet_id = 0;
+        uint32_t template_id = 0;
+        std::string name;
+        uint16_t level = 1;
+        uint16_t hp = 100;
+        uint16_t max_hp = 100;
+        uint16_t satiation = 100;
+        bool summoned = false;
+    };
+    NetworkPetInfo network_pet;
+
+    struct NetworkSiegeTerritory {
+        uint32_t territory_id = 0;
+        std::string name;
+        uint32_t owner_guild_id = 0;
+        std::string owner_guild_name;
+        uint16_t tax_rate = 10;
+    };
+    std::vector<NetworkSiegeTerritory> network_siege_territories;
+
+    struct NetworkTournamentEntry {
+        uint32_t tournament_id = 0;
+        std::string name;
+        uint8_t state = 0;
+        uint16_t registered = 0;
+        uint16_t max_teams = 8;
+        uint32_t prize_gold = 0;
+    };
+    std::vector<NetworkTournamentEntry> network_tournaments;
+
+    struct NetworkHouseInfo {
+        uint32_t house_id = 0;
+        uint16_t map_id = 51;
+        float pos_x = 0;
+        float pos_y = 0;
+        uint8_t house_type = 0;
+        uint16_t furniture_count = 0;
+    };
+    std::vector<NetworkHouseInfo> network_houses;
+
+    struct NetworkCashShopItem {
+        uint32_t item_id = 0;
+        std::string name;
+        uint32_t price = 0;
+        std::string category;
+    };
+    std::vector<NetworkCashShopItem> network_cashshop_items;
 };
