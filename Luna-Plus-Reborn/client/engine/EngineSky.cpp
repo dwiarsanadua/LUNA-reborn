@@ -168,25 +168,7 @@ void EngineSky::Render(UIRenderer& ui, const glm::mat4& view, const glm::mat4& p
 
     bgfx::ViewId sky_view = static_cast<bgfx::ViewId>(ViewId::Sky);
 
-    // Ensure sky renders first (behind everything)
-    {
-        const bgfx::ViewId order[] = {
-            sky_view,
-            static_cast<bgfx::ViewId>(ViewId::Shadow),
-            static_cast<bgfx::ViewId>(ViewId::Terrain),
-            static_cast<bgfx::ViewId>(ViewId::Props),
-            static_cast<bgfx::ViewId>(ViewId::Character),
-            static_cast<bgfx::ViewId>(ViewId::Particle),
-            static_cast<bgfx::ViewId>(ViewId::UI),
-            static_cast<bgfx::ViewId>(ViewId::Debug),
-            static_cast<bgfx::ViewId>(ViewId::Scene),
-            static_cast<bgfx::ViewId>(ViewId::PostFX),
-            static_cast<bgfx::ViewId>(ViewId::PostFX2),
-            static_cast<bgfx::ViewId>(ViewId::PostFX3),
-            static_cast<bgfx::ViewId>(ViewId::PostFX4),
-        };
-        bgfx::setViewOrder(0, sizeof(order) / sizeof(order[0]), order);
-    }
+    // View order is set in GraphicEngine::BeginFrame
 
     glm::mat4 invView = glm::inverse(view);
     glm::vec3 cam_pos(invView[3]);
@@ -196,7 +178,7 @@ void EngineSky::Render(UIRenderer& ui, const glm::mat4& view, const glm::mat4& p
     uint32_t clear_col = ((uint32_t)(fog.r * 255) << 24) |
                          ((uint32_t)(fog.g * 255) << 16) |
                          ((uint32_t)(fog.b * 255) << 8) | 0xff;
-    bgfx::setViewClear(sky_view, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, clear_col, 1.0f, 0);
+    bgfx::setViewClear(sky_view, BGFX_CLEAR_DEPTH, clear_col, 1.0f, 0);
     bgfx::setViewRect(sky_view, 0, 0, bgfx::BackbufferRatio::Equal);
     bgfx::setViewTransform(sky_view, glm::value_ptr(view), glm::value_ptr(proj));
 

@@ -13,6 +13,24 @@ void GraphicEngine::Init(uint16_t fb_width, uint16_t fb_height) {
 }
 
 void GraphicEngine::BeginFrame(const glm::mat4& view, const glm::mat4& proj) {
+    // Set view order every frame — must run before any view clears color
+    const bgfx::ViewId order[] = {
+        static_cast<bgfx::ViewId>(ViewId::Sky),
+        static_cast<bgfx::ViewId>(ViewId::Shadow),
+        static_cast<bgfx::ViewId>(ViewId::Terrain),
+        static_cast<bgfx::ViewId>(ViewId::Props),
+        static_cast<bgfx::ViewId>(ViewId::Character),
+        static_cast<bgfx::ViewId>(ViewId::Particle),
+        static_cast<bgfx::ViewId>(ViewId::UI),
+        static_cast<bgfx::ViewId>(ViewId::Debug),
+        static_cast<bgfx::ViewId>(ViewId::Scene),
+        static_cast<bgfx::ViewId>(ViewId::PostFX),
+        static_cast<bgfx::ViewId>(ViewId::PostFX2),
+        static_cast<bgfx::ViewId>(ViewId::PostFX3),
+        static_cast<bgfx::ViewId>(ViewId::PostFX4),
+    };
+    bgfx::setViewOrder(0, sizeof(order) / sizeof(order[0]), order);
+
     scene_.Render(view, proj);
 }
 

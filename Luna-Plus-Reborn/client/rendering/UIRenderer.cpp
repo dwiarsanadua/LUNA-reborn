@@ -432,10 +432,15 @@ void UIRenderer::BuildTextureAtlas() {
 
 void UIRenderer::Init() {
     ui_prog_ = ShaderUtils::LoadProgram("shaders/vs_ui.bin", "shaders/fs_ui.bin");
-    if (!bgfx::isValid(ui_prog_))
-        spdlog::error("UIRenderer: Program UI GAGAL di Metal macOS! Shader tidak kompatibel.");
-    else
+    if (!bgfx::isValid(ui_prog_)) {
+        spdlog::error("UIRenderer: vs_ui+fs_ui failed, fallback to vs_default+fs_ui");
+        ui_prog_ = ShaderUtils::LoadProgram("shaders/vs_default.bin", "shaders/fs_ui.bin");
+    }
+    if (!bgfx::isValid(ui_prog_)) {
+        spdlog::error("UIRenderer: all UI shader fallbacks failed — UI will not render");
+    } else {
         spdlog::info("UIRenderer: Program UI valid (handle={})", ui_prog_.idx);
+    }
     s_tex_ = bgfx::createUniform("s_texColor", bgfx::UniformType::Sampler);
     uint32_t white = 0xffffffff; white_tex_ = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::makeRef(&white, 4));
     CreateFont();
