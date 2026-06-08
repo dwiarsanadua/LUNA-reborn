@@ -2,17 +2,18 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <vector>
 #include <functional>
 #include <memory>
 
 class LuaEngine;
 
 enum class FSMState : uint8_t {
-    IDLE = 0,
-    RUNNING = 1,
-    CONDITION_CHECK = 2,
-    REWARD = 3,
-    COMPLETE = 4
+    IDLE = 0,           // NOT_STARTED
+    RUNNING = 1,        // IN_PROGRESS
+    CONDITION_CHECK = 2, // COMPLETE (objectives done, waiting turn-in)
+    REWARD = 3,         // turning in
+    COMPLETE = 4        // REWARDED (terminal)
 };
 
 enum class FSMTrigger : uint8_t {
@@ -46,6 +47,16 @@ struct FSMInstance {
                        const std::string& condition = "",
                        const std::string& action = "");
     bool EvaluateTransition(FSMTrigger trigger, LuaEngine* lua);
+
+    // Quest state helpers
+    bool IsInProgress() const { return current_state == FSMState::RUNNING; }
+    bool IsComplete() const { return current_state >= FSMState::CONDITION_CHECK && !completed; }
+};
+
+struct QuestConditionDesc {
+    std::string type;   // "kill", "collect", "talk", "level"
+    uint32_t target_id = 0;
+    uint16_t count = 1;
 };
 
 class FSMEngine {
@@ -56,6 +67,9 @@ public:
     void SetLuaEngine(LuaEngine* lua);
 
     uint32_t CreateInstance(const std::string& name);
+    uint32_t CreateQuestInstance(const std::string& name,
+                                  const std::vector<QuestConditionDesc>& conditions,
+                                  uint32_t npc_start_id, uint32_t npc_complete_id);
     bool RemoveInstance(uint32_t id);
     FSMInstance* GetInstance(uint32_t id);
 

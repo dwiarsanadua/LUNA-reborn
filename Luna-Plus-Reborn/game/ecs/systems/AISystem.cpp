@@ -229,11 +229,19 @@ void AISystem::HandleBossAI(entt::registry& reg, entt::entity e,
         stats.hp = std::min(stats.hp + static_cast<int32_t>(stats.max_hp * 0.05f), stats.max_hp);
         spdlog::info("Boss {} entered phase {} (HP: {:.1f}%)",
                      static_cast<uint32_t>(e), new_phase, hp_pct);
+        if (new_phase == 2) {
+            ai.special_attack_cooldown = 8.0f;
+            spdlog::info("Boss {} summons 2 adds! Special attack every 8s.", static_cast<uint32_t>(e));
+        }
+        if (new_phase == 3) {
+            ai.enrage_timer = 0.0f;
+            spdlog::warn("Boss {} enrage timer STARTED! ({:.0f}s)", static_cast<uint32_t>(e), ai.enrage_threshold);
+        }
     }
 
-    // --- Enrage countdown ---
+    // --- Enrage countdown (starts ticking from phase 3 onward) ---
     bool enraged = false;
-    if (ai.enrage_threshold > 0.0f) {
+    if (ai.enrage_threshold > 0.0f && ai.boss_phase >= 3) {
         ai.enrage_timer += dt;
         if (ai.enrage_timer >= ai.enrage_threshold) {
             enraged = true;
@@ -251,12 +259,12 @@ void AISystem::HandleBossAI(entt::registry& reg, entt::entity e,
             cd_mult = 1.0f;
             break;
         case 2:
-            cd_mult = 0.9f;
+            cd_mult = 1.0f;
             break;
         case 3: {
-            cd_mult = 0.8f;
-            atk_mult = 1.15f;
-            if (!enraged && static_cast<int>(ai.special_attack_timer * 10) % 8 == 0) {
+            cd_mult = 0.85f;
+            atk_mult = 1.20f;
+            if (!enraged && static_cast<int>(ai.special_attack_timer) >= 8) {
                 // AOE attack every 8s in phase 3
                 auto boss_view = reg.view<Transform, CharacterStats, TagPlayer>();
                 for (auto player : boss_view) {
@@ -269,12 +277,13 @@ void AISystem::HandleBossAI(entt::registry& reg, entt::entity e,
                         spdlog::debug("Boss AOE hits player {} for {}", static_cast<uint32_t>(player), aoe_dmg);
                     }
                 }
+                ai.special_attack_timer = 0.0f;
             }
             break;
         }
         case 4:
-            cd_mult = 0.7f;
-            atk_mult = 1.50f;
+            cd_mult = 0.75f;
+            speed_mult = 1.50f;
             def_mult = 0.50f;
             break;
         case 5:
@@ -296,6 +305,7 @@ void AISystem::HandleBossAI(entt::registry& reg, entt::entity e,
     stats.physic_defense = stats.physic_defense * (1.0f - (1.0f - def_mult) * dt * 0.1f);
     stats.magic_attack = stats.magic_attack * (1.0f + (atk_mult - 1.0f) * dt * 0.1f);
     stats.magic_defense = stats.magic_defense * (1.0f - (1.0f - def_mult) * dt * 0.1f);
+    stats.move_speed = stats.move_speed * (1.0f + (speed_mult - 1.0f) * dt * 0.1f);
 
     // --- Determine boss type from monster_id via boss_definitions_ ---
     std::string boss_type;

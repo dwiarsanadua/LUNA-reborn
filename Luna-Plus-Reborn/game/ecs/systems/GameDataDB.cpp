@@ -889,7 +889,7 @@ void GameDataDB::Initialize(const std::string& json_dir) {
     LoadItemTemplates(json_dir + "items.json");
     LoadMonsterTemplates(json_dir + "monsters.json");
     LoadSkillTemplates(json_dir + "skills.json");
-    LoadQuestTemplates(json_dir + "quests.json");
+    LoadQuestDataFull(json_dir + "quests_full.json");
     LoadNPCTemplates(json_dir + "npcs.json");
 }
 
@@ -1036,40 +1036,135 @@ void GameDataDB::LoadQuestTemplates(const std::string& json_path) {
     }
     JsonParser parser(content);
     auto root = parser.parse();
-    if (root.type != JsonVal::ARRAY) {
-        spdlog::error("LoadQuestTemplates(JSON): expected array at root");
-        return;
-    }
     int count = 0;
-    for (auto& elem : root.arr_val) {
-        if (elem.type != JsonVal::OBJECT) continue;
+    auto process_quest = [&](const JsonVal& elem) {
+        if (elem.type != JsonVal::OBJECT) return;
         QuestTemplate t;
         t.id = jsonUint(elem, "id");
-        t.name = jsonStr(elem, "title");
+        t.name = jsonStr(elem, "name");
+        if (t.name.empty()) t.name = jsonStr(elem, "title");
         t.level_required = static_cast<uint16_t>(jsonUint(elem, "level_required"));
-        t.npc_start_id = jsonUint(elem, "giver_npc_id");
-        t.npc_complete_id = jsonUint(elem, "completer_npc_id");
+        t.npc_start_id = jsonUint(elem, "npc_start_id");
+        if (t.npc_start_id == 0) t.npc_start_id = jsonUint(elem, "giver_npc_id");
+        t.npc_complete_id = jsonUint(elem, "npc_complete_id");
+        if (t.npc_complete_id == 0) t.npc_complete_id = jsonUint(elem, "completer_npc_id");
+        t.reward_exp = jsonUint(elem, "reward_exp");
+        t.reward_gold = jsonUint(elem, "reward_gold");
         t.dialog_start = jsonStr(elem, "dialog_start");
         t.dialog_progress = jsonStr(elem, "dialog_progress");
         t.dialog_complete = jsonStr(elem, "dialog_complete");
 
+        auto prereqs = jsonArray(elem, "prerequisites");
+        for (auto& p : prereqs) {
+            if (p.type == JsonVal::NUMBER) t.prerequisites.push_back(static_cast<uint32_t>(p.num_val));
+        }
+
+        auto conds = jsonArray(elem, "conditions");
+        for (auto& c : conds) {
+            if (c.type != JsonVal::OBJECT) continue;
+            QuestConditionTemplate ct;
+            ct.type = jsonStr(c, "type", "kill");
+            ct.target_id = jsonUint(c, "target_id", 0);
+            if (ct.target_id == 0) ct.target_id = jsonUint(c, "npc_id", 0);
+            ct.count = static_cast<uint16_t>(jsonUint(c, "count", 1));
+            t.conditions.push_back(ct);
+        }
+
+        quests_json_[t.id] = t;
+        count++;
+    };
+
+    if (root.type == JsonVal::ARRAY) {
+        for (auto& elem : root.arr_val) process_quest(elem);
+    } else if (root.type == JsonVal::OBJECT) {
+        auto arr = jsonArray(root, "quests");
+        for (auto& elem : arr) process_quest(elem);
+    }
+    spdlog::info("LoadQuestTemplates(JSON): {} quests loaded from {}", count, json_path);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  LoadQuestDataFull  — reads quests_full.json (Agent Q format)
+// ═══════════════════════════════════════════════════════════════════════
+
+void GameDataDB::LoadQuestDataFull(const std::string& json_path) {
+    quests_json_.clear();
+    auto content = readFile(json_path);
+    if (content.empty()) {
+        spdlog::warn("LoadQuestDataFull: cannot read {}", json_path);
+        return;
+    }
+    JsonParser parser(content);
+    auto root = parser.parse();
+    if (root.type != JsonVal::OBJECT) {
+        spdlog::error("LoadQuestDataFull: expected object at root");
+        return;
+    }
+
+    auto quests_arr = jsonArray(root, "quests");
+    if (quests_arr.empty()) {
+        spdlog::warn("LoadQuestDataFull: no quests array in {}", json_path);
+        return;
+    }
+
+    int count = 0;
+    for (auto& elem : quests_arr) {
+        if (elem.type != JsonVal::OBJECT) continue;
+        QuestTemplate t;
+        t.id = jsonUint(elem, "id");
+        t.name = jsonStr(elem, "name");
+        t.level_required = static_cast<uint16_t>(jsonUint(elem, "level_required"));
+        t.npc_start_id = jsonUint(elem, "npc_start_id");
+        t.npc_complete_id = jsonUint(elem, "npc_complete_id");
+        t.reward_exp = jsonUint(elem, "reward_exp", 0);
+        t.reward_gold = jsonUint(elem, "reward_gold", 0);
+        t.dialog_start = jsonStr(elem, "dialog_start");
+        t.dialog_progress = jsonStr(elem, "dialog_progress");
+        t.dialog_complete = jsonStr(elem, "dialog_complete");
+
+        // Prerequisites
+        auto prereqs = jsonArray(elem, "prerequisites");
+        for (auto& p : prereqs) {
+            if (p.type == JsonVal::NUMBER)
+                t.prerequisites.push_back(static_cast<uint32_t>(p.num_val));
+        }
+
         // Conditions
         auto conds = jsonArray(elem, "conditions");
         for (auto& c : conds) {
-            if (c.type == JsonVal::OBJECT) {
-                t.conditions.push_back(jsonUint(c, "target_id"));
-            }
+            if (c.type != JsonVal::OBJECT) continue;
+            QuestConditionTemplate ct;
+            ct.type = jsonStr(c, "type", "kill");
+            ct.target_id = jsonUint(c, "target_id", 0);
+            if (ct.target_id == 0) ct.target_id = jsonUint(c, "npc_id", 0);
+            ct.count = static_cast<uint16_t>(jsonUint(c, "count", 1));
+            t.conditions.push_back(ct);
         }
 
-        // Rewards
-        t.rewards.push_back(jsonUint(elem, "reward_exp"));
-        t.rewards.push_back(jsonUint(elem, "reward_gold"));
-        t.rewards.push_back(jsonUint(elem, "reward_item_id"));
+        // Rewards items
+        auto rew_obj = JsonVal{};
+        for (auto& [k, v] : elem.obj_val) {
+            if (k == "rewards" && v.type == JsonVal::OBJECT) {
+                rew_obj = v;
+                break;
+            }
+        }
+        if (rew_obj.type == JsonVal::OBJECT) {
+            auto items_arr = jsonArray(rew_obj, "items");
+            for (auto& it : items_arr) {
+                if (it.type != JsonVal::OBJECT) continue;
+                QuestRewardItem ri;
+                ri.item_id = jsonUint(it, "item_id");
+                ri.count = static_cast<uint16_t>(jsonUint(it, "count", 1));
+                t.reward_items.push_back(ri);
+            }
+        }
 
         quests_json_[t.id] = t;
         count++;
     }
-    spdlog::info("LoadQuestTemplates(JSON): {} quests loaded from {}", count, json_path);
+
+    spdlog::info("LoadQuestDataFull: {} quests loaded from {}", count, json_path);
 }
 
 void GameDataDB::LoadNPCTemplates(const std::string& json_path) {
@@ -1206,6 +1301,16 @@ std::vector<NPCPosition> GameDataDB::GetNPCPositions(uint32_t map_id) const {
 std::vector<ShopEntry> GameDataDB::GetNPCShop(uint32_t npc_id) const {
     auto it = npc_shop_.find(npc_id);
     return it != npc_shop_.end() ? it->second : std::vector<ShopEntry>{};
+}
+
+std::vector<uint32_t> GameDataDB::GetQuestIDsForNPC(uint32_t npc_id) const {
+    std::vector<uint32_t> result;
+    for (auto& [id, q] : quests_json_) {
+        if (q.npc_start_id == npc_id || q.npc_complete_id == npc_id) {
+            result.push_back(id);
+        }
+    }
+    return result;
 }
 
 std::vector<QuestCondition> GameDataDB::GetQuestConditions(uint32_t quest_id) const {

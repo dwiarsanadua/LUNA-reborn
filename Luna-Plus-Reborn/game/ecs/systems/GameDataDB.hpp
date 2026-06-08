@@ -87,6 +87,17 @@ struct DropEntry {
     uint32_t drop_table_id;
 };
 
+struct QuestConditionTemplate {
+    std::string type;
+    uint32_t target_id = 0;
+    uint16_t count = 1;
+};
+
+struct QuestRewardItem {
+    uint32_t item_id = 0;
+    uint16_t count = 1;
+};
+
 struct ShopEntry {
     uint32_t item_id;
     uint32_t price;
@@ -228,8 +239,11 @@ struct QuestTemplate {
     uint16_t level_required = 0;
     uint32_t npc_start_id = 0;
     uint32_t npc_complete_id = 0;
-    std::vector<uint32_t> conditions;
-    std::vector<uint32_t> rewards;
+    std::vector<uint32_t> prerequisites;
+    std::vector<QuestConditionTemplate> conditions;
+    uint32_t reward_exp = 0;
+    uint32_t reward_gold = 0;
+    std::vector<QuestRewardItem> reward_items;
     std::string dialog_start;
     std::string dialog_progress;
     std::string dialog_complete;
@@ -251,6 +265,11 @@ public:
     bool Open(const std::string& path);
     void Close();
 
+    static GameDataDB& Instance() {
+        static GameDataDB inst;
+        return inst;
+    }
+
     // Legacy DB (game_data_legacy.db) — in-memory loaders
     bool OpenLegacy(const std::string& path);
     void CloseLegacy();
@@ -270,6 +289,7 @@ public:
     void LoadMonsterTemplates(const std::string& json_path);
     void LoadSkillTemplates(const std::string& json_path);
     void LoadQuestTemplates(const std::string& json_path);
+    void LoadQuestDataFull(const std::string& json_path);
     void LoadNPCTemplates(const std::string& json_path);
 
     // Accessors (primary game_data.db)
@@ -294,6 +314,7 @@ public:
     std::vector<DropEntry> GetMonsterDrops(uint32_t monster_id) const;
     std::vector<NPCPosition> GetNPCPositions(uint32_t map_id) const;
     std::vector<ShopEntry> GetNPCShop(uint32_t npc_id) const;
+    std::vector<uint32_t> GetQuestIDsForNPC(uint32_t npc_id) const;
     std::vector<QuestCondition> GetQuestConditions(uint32_t quest_id) const;
     std::vector<MapWarp> GetMapWarps(uint32_t map_id) const;
     std::vector<MonsterSpawn> GetMonsterSpawns(uint32_t map_id) const;

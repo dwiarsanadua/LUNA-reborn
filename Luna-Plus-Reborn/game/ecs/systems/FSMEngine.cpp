@@ -47,21 +47,71 @@ uint32_t FSMEngine::CreateInstance(const std::string& name) {
     inst.completed = false;
 
     inst.AddTransition(FSMState::IDLE, FSMState::RUNNING, FSMTrigger::TIMER);
-
     inst.AddTransition(FSMState::RUNNING, FSMState::CONDITION_CHECK, FSMTrigger::KILL);
     inst.AddTransition(FSMState::RUNNING, FSMState::CONDITION_CHECK, FSMTrigger::ITEM);
     inst.AddTransition(FSMState::RUNNING, FSMState::CONDITION_CHECK, FSMTrigger::LEVEL);
     inst.AddTransition(FSMState::RUNNING, FSMState::CONDITION_CHECK, FSMTrigger::TALK);
     inst.AddTransition(FSMState::RUNNING, FSMState::CONDITION_CHECK, FSMTrigger::TIMER);
-
     inst.AddTransition(FSMState::CONDITION_CHECK, FSMState::REWARD, FSMTrigger::CUSTOM, "true");
     inst.AddTransition(FSMState::CONDITION_CHECK, FSMState::RUNNING, FSMTrigger::CUSTOM);
-
     inst.AddTransition(FSMState::REWARD, FSMState::COMPLETE, FSMTrigger::CUSTOM, "true");
     inst.AddTransition(FSMState::REWARD, FSMState::RUNNING, FSMTrigger::CUSTOM);
 
     instances_[id] = inst;
     spdlog::info("FSMEngine: created instance '{}' (id={})", name, id);
+    return id;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  CreateQuestInstance — sets up FSM transitions matching quest conditions
+//  States: IDLE(NOT_STARTED) → RUNNING(IN_PROGRESS) → CONDITION_CHECK(COMPLETE)
+//          → REWARD → COMPLETE(REWARDED)
+// ═══════════════════════════════════════════════════════════════════════
+
+uint32_t FSMEngine::CreateQuestInstance(const std::string& name,
+                                         const std::vector<QuestConditionDesc>& conditions,
+                                         uint32_t npc_start_id, uint32_t npc_complete_id) {
+    uint32_t id = next_id_++;
+    FSMInstance inst;
+    inst.id = id;
+    inst.name = name;
+    inst.current_state = FSMState::IDLE; // NOT_STARTED
+    inst.completed = false;
+
+    // NOT_STARTED(IDLE) → IN_PROGRESS(RUNNING) via TALK to start NPC
+    inst.AddTransition(FSMState::IDLE, FSMState::RUNNING, FSMTrigger::TALK,
+                       "", "variables['accepted'] = 1");
+
+    // IN_PROGRESS(RUNNING) → COMPLETE(CONDITION_CHECK) via each condition type
+    for (auto& c : conditions) {
+        FSMTrigger trig = FSMTrigger::CUSTOM;
+        if (c.type == "kill") trig = FSMTrigger::KILL;
+        else if (c.type == "collect") trig = FSMTrigger::ITEM;
+        else if (c.type == "talk") trig = FSMTrigger::TALK;
+        else if (c.type == "level") trig = FSMTrigger::LEVEL;
+
+        // Set variable for target tracking
+        inst.variables[c.type + "_target_" + std::to_string(c.target_id)] = c.count;
+        inst.variables[c.type + "_current_" + std::to_string(c.target_id)] = 0;
+
+        inst.AddTransition(FSMState::RUNNING, FSMState::CONDITION_CHECK, trig,
+                           "", "variables['" + c.type + "_done'] = 1");
+    }
+
+    // COMPLETE(CONDITION_CHECK) → REWARD via TALK to complete NPC
+    inst.AddTransition(FSMState::CONDITION_CHECK, FSMState::REWARD, FSMTrigger::TALK,
+                       "", "variables['reward_ready'] = 1");
+
+    // REWARD → COMPLETE(REWARDED) — auto-transition after reward given
+    inst.AddTransition(FSMState::REWARD, FSMState::COMPLETE, FSMTrigger::CUSTOM, "true",
+                       "variables['rewarded'] = 1");
+
+    // Fallback: RUNNING → CONDITION_CHECK on any progress trigger
+    inst.AddTransition(FSMState::RUNNING, FSMState::CONDITION_CHECK, FSMTrigger::CUSTOM,
+                       "variables['all_done'] == 1", "");
+
+    instances_[id] = inst;
+    spdlog::info("FSMEngine: created quest FSM '{}' (id={}) with {} conditions", name, id, conditions.size());
     return id;
 }
 
