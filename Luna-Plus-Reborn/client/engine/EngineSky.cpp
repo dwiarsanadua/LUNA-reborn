@@ -33,12 +33,12 @@ void EngineSky::Init() {
     }
 
     // Load sky texture — try multiple possible paths
-    sky_tex_ = LoadSkyTexture(VFS::Resolve("assets/textures/unpacked/map/01_human_sky.png"));
-    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture(VFS::Resolve("assets/textures/unpacked/map/60_sky.png")); }
-    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture(VFS::Resolve("assets_converted/mod_objs/01_human_sky.png")); }
-    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture(VFS::Resolve("assets_converted/mod_objs/60_sky.png")); }
-    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture(VFS::Resolve("assets/textures/01_human_sky.png")); }
-    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture(VFS::Resolve("assets/textures/60_sky.png")); }
+    sky_tex_ = LoadSkyTexture(VFS::Find("assets/textures/unpacked/map/01_human_sky.png"));
+    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture(VFS::Find("assets/textures/unpacked/map/60_sky.png")); }
+    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture(VFS::Find("assets_converted/mod_objs/01_human_sky.png")); }
+    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture(VFS::Find("assets_converted/mod_objs/60_sky.png")); }
+    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture(VFS::Find("assets/textures/01_human_sky.png")); }
+    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture(VFS::Find("assets/textures/60_sky.png")); }
 
     BuildDomeMesh();
 }

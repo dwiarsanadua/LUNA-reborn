@@ -108,10 +108,15 @@ void CharRenderer_SetFBSize(uint16_t w, uint16_t h) {
 }
 
 uint32_t CharRenderer_LoadModel(const std::string& path) {
-    if (g_models.count(path)) return 1;
+    std::string resolved = path;
+    if (!g_models.count(resolved)) {
+        std::string found = VFS::Find(path);
+        if (!found.empty()) resolved = found;
+    }
+    if (g_models.count(resolved)) return 1;
 
     LoadedModel lm;
-    if (!lm.model.LoadFromGLB(path)) {
+    if (!lm.model.LoadFromGLB(resolved)) {
         spdlog::error("CharRenderer: failed to load model {}", path);
         return 0;
     }
@@ -138,14 +143,15 @@ uint32_t CharRenderer_LoadModel(const std::string& path) {
         }
     }
 
-    g_models[path] = std::move(lm);
+    g_models[resolved] = std::move(lm);
 
     // Auto-load animation clips
     AnimationState as;
-    std::string base_path = path.substr(0, path.find_last_of('.'));
+    std::string base_path = resolved.substr(0, resolved.find_last_of('.'));
     const char* clip_names[] = {"idle", "walk", "run", "attack", "die"};
     for (auto* name : clip_names) {
-        std::string json_path = base_path + "_" + name + ".anm.json";
+        std::string json_path = VFS::Find(base_path + "_" + name + ".anm.json");
+        if (json_path.empty()) json_path = base_path + "_" + name + ".anm.json";
         AnimClip clip;
         if (as.anim_sys.LoadFromJson(json_path, clip)) {
             clip.name = name;
@@ -154,7 +160,8 @@ uint32_t CharRenderer_LoadModel(const std::string& path) {
             spdlog::debug("CharRenderer: loaded anim clip '{}' from {}", name, json_path);
         } else {
             // Fallback to .anm binary
-            std::string anm_path = base_path + "_" + name + ".anm";
+            std::string anm_path = VFS::Find(base_path + "_" + name + ".anm");
+            if (anm_path.empty()) anm_path = base_path + "_" + name + ".anm";
             if (as.anim_sys.LoadFromAnm(anm_path, clip)) {
                 clip.name = name;
                 clip.loop = (std::string(name) != "die");
@@ -170,7 +177,7 @@ uint32_t CharRenderer_LoadModel(const std::string& path) {
         as.anim_sys.Play(&it->second, true, 0.0f);
     }
     as.current_anim = CHAR_IDLE;
-    g_anim_states[path] = std::move(as);
+    g_anim_states[resolved] = std::move(as);
 
     return 1;
 }
@@ -178,7 +185,8 @@ uint32_t CharRenderer_LoadModel(const std::string& path) {
 void CharRenderer_Spawn(uint32_t id, const std::string& model, float x, float y, float z, uint32_t color) {
     CharRenderer_LoadModel(model);
     RenderInstance inst;
-    inst.model_key = model;
+    std::string found = VFS::Find(model);
+    inst.model_key = found.empty() ? model : found;
     inst.pos = {x, y, z};
     inst.color = color;
     g_instances[id] = inst;

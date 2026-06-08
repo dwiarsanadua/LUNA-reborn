@@ -30,6 +30,7 @@ public:
     void PlaySFX(const std::string& name);
     void PlaySFXByCategory(Category cat, const std::string& name);
     void PlaySFXInst(const std::string& name, float x, float y, float z);
+    bool CanPlaySFX(const std::string& name) const;
 
     // 3D Audio Spatial
     int Play3D(const std::string& name, float x, float y, float z);
@@ -81,6 +82,7 @@ private:
     std::unordered_map<int, SoundInstance> active_sounds_;
 
     int CalculateAttenuation(const SoundInstance& snd) const;
+    std::string FindAudioPath(const std::string& name) const;
 
     // Crossfade state
     struct CrossfadeState {

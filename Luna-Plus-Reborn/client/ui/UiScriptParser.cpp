@@ -1,18 +1,21 @@
 #include "UiScriptParser.hpp"
+#include <engine/gx_render/VFS.h>
 #include <spdlog/spdlog.h>
 #include <iostream>
 
 UiElement UiScriptParser::ParseFile(const std::string& path) {
     ParseContext ctx;
-    ctx.file.open(path);
+    std::string resolved = VFS::Find(path);
+    if (resolved.empty()) resolved = path;
+    ctx.file.open(resolved);
     if (!ctx.file.is_open()) {
-        std::string alt = path;
+        std::string alt = resolved;
         if (alt.size() > 4 && alt.substr(alt.size() - 4) == ".txt")
             alt = alt.substr(0, alt.size() - 4);
         ctx.file.open(alt);
     }
     if (!ctx.file.is_open()) {
-        spdlog::error("UiScriptParser: Failed to open {}", path);
+        spdlog::error("UiScriptParser: Failed to open {} (resolved: {})", path, resolved);
         return {};
     }
     return ParseStream(ctx);

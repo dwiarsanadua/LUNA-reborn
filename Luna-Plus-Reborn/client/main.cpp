@@ -31,6 +31,8 @@
 #include <input/UserInput.hpp>
 #include <input/MouseCursor.hpp>
 #include <config/ConfigManager.hpp>
+#include <config/Paths.hpp>
+#include <engine/gx_render/VFS.h>
 #include <config/KeyBindings.hpp>
 #include <ui/skin/UiSkinManager.hpp>
 #include <ui/UiFunctionRegistry.hpp>
@@ -72,7 +74,6 @@ int main() {
     Mouse::Init();
     MouseCursor::Init();
     UserInput::Init();
-    UiSkinManager::Init();
 
     // --- NEW: Register Legacy UI Functions ---
     auto& ui_reg = Luna::UiFunctionRegistry::Get();
@@ -85,20 +86,22 @@ int main() {
 
     signal(SIGINT, signal_handler); signal(SIGTERM, signal_handler);
 
-    // 3. AudioManager (before render device so BGM can start early)
-    AudioManager audio;
-    g_audio = &audio;
-    if (!audio.Initialize()) {
-        spdlog::warn("AudioManager: init failed, continuing without audio");
-    }
-
-    // 4. RenderDevice
+    // 3. RenderDevice (initializes VFS from executable location first)
     RenderDeviceConfig config{};
     config.width = 1280; config.height = 720;
     config.title = "LUNA Plus Reborn";
     config.vsync = false;
     RenderDevice device;
     if (!device.Init(config)) return 1;
+    Paths::Init();
+    UiSkinManager::Init();
+
+    // 4. AudioManager (after Paths/VFS so audio files resolve correctly)
+    AudioManager audio;
+    g_audio = &audio;
+    if (!audio.Initialize()) {
+        spdlog::warn("AudioManager: init failed, continuing without audio");
+    }
     spdlog::info("Window Size: {}x{} | Framebuffer: {}x{}", config.width, config.height, device.GetWidth(), device.GetHeight());
 
     // 5. SceneRenderer (via GraphicEngine)
@@ -124,14 +127,24 @@ int main() {
     map.SetRegistry(&registry);
     // GameDataDB — init before map load so EngineMap uses external DB
     GameDataDB gamedb;
-    if (gamedb.Open("assets/data/game_data.db")) {
+    const std::string legacy_db = VFS::Find("assets/data/game_data_legacy.db");
+    if (!legacy_db.empty() && gamedb.OpenLegacy(legacy_db)) {
+        gamedb.LoadMonsterTemplates();
+        gamedb.LoadNPCTemplates();
+        gamedb.LoadMapData();
+        const std::string monsters_json = VFS::Find("assets/data/monsters.json");
+        if (!monsters_json.empty())
+            gamedb.LoadMonsterTemplates(monsters_json);
+        map.SetGameDataDB(&gamedb);
+        spdlog::info("GameDataDB: legacy DB loaded from {}", legacy_db);
+    } else if (gamedb.Open(Paths::GameDataDb().c_str())) {
         gamedb.LoadMonsterTemplates();
         gamedb.LoadNPCTemplates();
         gamedb.LoadMapData();
         map.SetGameDataDB(&gamedb);
-        spdlog::info("GameDataDB: initialized");
+        spdlog::info("GameDataDB: opened {}", Paths::GameDataDb());
     } else {
-        spdlog::warn("GameDataDB: failed to open data/game_data.db, using internal fallback");
+        spdlog::warn("GameDataDB: no database found, using internal fallback");
     }
     // Initial map load from state
     if (g_state.map_id != 0) {
@@ -152,6 +165,7 @@ int main() {
     // 10. UIRenderer
     UIRenderer ui; ui.Init();
     g_ui = &ui;
+    sky.SetSampler(ui.GetSampler(), ui.GetWhiteTexture());
     ui.width = (float)device.GetWidth();
     ui.height = (float)device.GetHeight();
     ui.logicalWidth = (float)device.GetLogicalWidth();
@@ -166,7 +180,7 @@ int main() {
     ParticleRenderer particles; particles.Init();
 
     if (g_audio) {
-        std::string bgm_path = ASSETS_PATH + std::string("audio/BGM/BGM_Login.mp3");
+        std::string bgm_path = Paths::Asset("audio/BGM/BGM_Login.mp3");
         struct stat bgm_stat;
         if (::stat(bgm_path.c_str(), &bgm_stat) == 0) {
             audio.PlayBGM("BGM_Login");
@@ -230,6 +244,7 @@ int main() {
     gameScreen->SetAudio(&audio);
     gameScreen->SetMap(&map);
     gameScreen->SetUI(&ui);
+    gameScreen->SetGameDataDB(&gamedb);
     screenManager.Register("game", std::move(gameScreen));
 
     // 12. Enter Login Screen
@@ -355,6 +370,8 @@ int main() {
 
         // --- GAME STATE UPDATE BEFORE RENDER ---
         screenManager.Update(dt);
+        sky.Update(dt);
+        if (g_audio) g_audio->Update();
 
         // Periodic auto-save
         persistence.Update(dt);
@@ -362,15 +379,19 @@ int main() {
             persistence.SaveGameState(g_state);
         }
 
-        // --- RENDERING ---
+        // --- RENDERING (update already applied this frame) ---
+        const glm::mat4& view = cam.GetViewMatrix();
+        const glm::mat4& proj = cam.GetProjectionMatrix();
         {
-            gfx.BeginFrame(cam.GetViewMatrix(), cam.GetProjectionMatrix(), sky.GetLightDirection());
-            ambient.Update(dt, 51, 0.5f, g_state.player_x, 0, g_state.player_z);
-            gfx.Render(&terrain, &props, nullptr, cam.GetViewMatrix(), cam.GetProjectionMatrix());
-            gfx.RenderCharacters(time, cam.GetViewMatrix(), cam.GetProjectionMatrix());
+            gfx.BeginFrame(view, proj, sky.GetLightDirection());
+            ambient.Update(dt, g_state.map_id ? g_state.map_id : 51, sky.GetTimeOfDay(),
+                           g_state.player_x, 0, g_state.player_z);
+            sky.Render(ui, view, proj);
+            gfx.Render(&terrain, &props, nullptr, view, proj);
+            gfx.RenderCharacters(time, view, proj);
         }
         ui.BeginFrame();
-        screenManager.Render(ui, cam.GetViewMatrix(), cam.GetProjectionMatrix());
+        screenManager.Render(ui, view, proj);
 
         if (frame % 30 == 0) fps = 1.0f / dt;
         // Hanya tampil fps di game screen, bukan login/charselect

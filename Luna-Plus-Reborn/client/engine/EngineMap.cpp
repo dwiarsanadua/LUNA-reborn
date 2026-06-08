@@ -16,13 +16,13 @@ bool EngineMap::Load(const std::string& map_id) {
     if (!terrain_ || !props_) { spdlog::error("EngineMap: terrain/props not set"); return false; }
     InitBGMMap();
     
-    std::string hgt_path = VFS::Resolve("assets/maps/" + map_id + ".hgt");
+    std::string hgt_path = VFS::Find("assets/maps/" + map_id + ".hgt");
     if (!terrain_->LoadFromHGT(hgt_path.c_str(), 0.04f)) {  // tile=400, object_factor=0.0001, 400*0.0001=0.04
         terrain_->Init(100, 12.0f);
         spdlog::info("EngineMap: procedural terrain for map {}", map_id);
     }
     
-    std::string json_path = VFS::Resolve("assets/maps/" + map_id + ".json");
+    std::string json_path = VFS::Find("assets/maps/" + map_id + ".json");
     LoadSceneObjects(json_path);
     
     // Parse environment data from JSON
@@ -53,9 +53,12 @@ bool EngineMap::Load(const std::string& map_id) {
         audio_->SmoothBGMTransition(bgm, 1.0f);
     }
 
-    // Load JSON-based spawn data and spawn monsters for this map
+    // Load spawn data (flat spawns.json preferred, monsters.json fallback)
     if (spawn_sys_) {
-        spawn_sys_->LoadSpawnData(VFS::Resolve("assets/data/monsters.json").c_str());
+        std::string spawn_path = VFS::Find("assets/data/spawns.json");
+        if (!std::ifstream(spawn_path).good())
+            spawn_path = VFS::Find("assets/data/monsters.json");
+        spawn_sys_->LoadSpawnData(spawn_path);
         try {
             int mid = std::stoi(map_id);
             spawn_sys_->SpawnMonstersForMap(*registry_, mid);
@@ -72,7 +75,7 @@ bool EngineMap::Load(const std::string& map_id) {
             GameDataDB* db = gamedb_;
             GameDataDB local_db;
             if (!db) {
-                if (local_db.Open(VFS::Resolve("assets/data/game_data.db").c_str())) {
+                if (local_db.Open(VFS::Find("assets/data/game_data.db").c_str())) {
                     local_db.LoadMonsterTemplates();
                     local_db.LoadNPCTemplates();
                     local_db.LoadMapData();

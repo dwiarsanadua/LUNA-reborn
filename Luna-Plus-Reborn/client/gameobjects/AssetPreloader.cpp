@@ -1,4 +1,5 @@
 #include "AssetPreloader.hpp"
+#include <config/Paths.hpp>
 #include <rendering/UIRenderer.hpp>
 #include <audio/AudioManager.hpp>
 #include <spdlog/spdlog.h>
@@ -44,12 +45,12 @@ void AssetPreloader::ScanAssets() {
     
     std::vector<std::string> textureFiles, interfaceFiles, modelFiles;
     
-    ScanDirectory(ASSETS_PATH + std::string("textures"), textureFiles);
-    ScanDirectory(ASSETS_PATH + std::string("textures/ui"), interfaceFiles);
-    ScanDirectory(ASSETS_PATH + std::string("interface"), interfaceFiles);
-    
-    // Count model files
-    ScanDirectory(ASSETS_PATH + std::string("unpacked"), modelFiles);
+    const std::string& assets = Paths::Assets();
+    ScanDirectory(assets + "textures", textureFiles);
+    ScanDirectory(assets + "textures/ui", interfaceFiles);
+    ScanDirectory(assets + "interface", interfaceFiles);
+    ScanDirectory(assets + "models", modelFiles);
+    ScanDirectory(assets + "audio", modelFiles);
     
     std::sort(textureFiles.begin(), textureFiles.end());
     textureFiles.erase(std::unique(textureFiles.begin(), textureFiles.end()), textureFiles.end());

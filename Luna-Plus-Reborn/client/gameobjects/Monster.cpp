@@ -1,4 +1,6 @@
 #include "Monster.hpp"
+#include <config/ModelResolver.hpp>
+#include <engine/gx_render/VFS.h>
 #include <rendering/UIRenderer.hpp>
 #include <rendering/CharacterRenderer.hpp>
 #include <engine/physics/PhysicsWorld.h>
@@ -7,7 +9,8 @@
 #include <cstdio>
 #include <algorithm>
 
-Monster::Monster(uint32_t id, const std::string& name, float x, float z, int level, MonsterType type)
+Monster::Monster(uint32_t id, const std::string& name, float x, float z, int level,
+                 MonsterType type, const std::string& model_path)
     : id_(id), name_(name), x_(x), z_(z), level_(level), type_(type) {
     
     switch (type_) {
@@ -44,8 +47,11 @@ Monster::Monster(uint32_t id, const std::string& name, float x, float z, int lev
     
     uint32_t colors[] = {0xff44cc44, 0xffcc4444, 0xffcccc44, 0xff44cccc, 0xffcc44cc};
     if (type_ == MonsterType::Normal) color_ = colors[id % 5];
-    
-    CharRenderer_Spawn(id_, "assets/models/monster_placeholder.glb", x_, 0, z_, color_);
+
+    model_path_ = model_path;
+    if (model_path_.empty()) model_path_ = ModelResolver::ResolveMonsterModel("m224.chx");
+    if (model_path_.empty()) model_path_ = VFS::Find("assets/models/monster/monster_placeholder.glb");
+    CharRenderer_Spawn(id_, model_path_, x_, 0, z_, color_);
 }
 
 float Monster::GetDistance(float px, float pz) const {
@@ -273,5 +279,5 @@ void Monster::Respawn(float new_x, float new_z) {
     for (auto& p : phases_) p.enraged = false;
     current_phase_ = 0;
     is_enraged_ = false;
-    CharRenderer_Spawn(id_, "assets/models/monster_placeholder.glb", x_, 0, z_, color_);
+    CharRenderer_Spawn(id_, model_path_, x_, 0, z_, color_);
 }

@@ -30,7 +30,8 @@ struct BossPhase {
 class Monster {
 public:
     Monster() = default;
-    Monster(uint32_t id, const std::string& name, float x, float z, int level, MonsterType type = MonsterType::Normal);
+    Monster(uint32_t id, const std::string& name, float x, float z, int level,
+            MonsterType type = MonsterType::Normal, const std::string& model_path = "");
     
     void Update(float dt, float player_x = 0, float player_z = 0);
     void RenderOverhead(UIRenderer& ui);
@@ -102,6 +103,7 @@ private:
     float patrol_timer_ = 0;
     float patrol_x_ = 0, patrol_z_ = 0;
     uint32_t color_ = 0xff44cc44;
+    std::string model_path_;
     
     // Flee behavior
     int flee_hp_pct_ = 15;          // Flee at 15% HP

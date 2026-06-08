@@ -2,6 +2,9 @@
 #include <network/NetworkClient.hpp>
 #include <rendering/CharacterRenderer.hpp>
 #include <ecs/systems/GameDataDB.hpp>
+#include <config/ModelResolver.hpp>
+#include <config/Paths.hpp>
+#include <engine/gx_render/VFS.h>
 #include <gameobjects/DurabilitySystem.hpp>
 #include <flatbuffers/flatbuffers.h>
 #include <Login_generated.h>
@@ -56,6 +59,7 @@ void GameScreen::Enter() {
     consignment_.ListItem(2, 103, 3, 150, 350);
     consignment_.ListItem(4, 301, 1, 5000, 12000);
     if (ui_) sky_.SetSampler(ui_->GetSampler(), ui_->GetWhiteTexture());
+    SpawnMonstersFromMap();
 }
 
 void GameScreen::Exit() {
@@ -82,18 +86,7 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         state_->connecting = true;
         CharRenderer_Spawn(0, "assets/models/d_man.glb",
                            state_->player_x, state_->player_y, state_->player_z, 0xffffffff);
-        GameDataDB gdb;
-        if (gdb.Open(GAME_DATA_PATH)) {
-            auto mobs = gdb.GetAllMonsters();
-            for (int i = 0; i < 5 && i < (int)mobs.size(); i++) {
-                float x = (float)(rand() % 80) - 40;
-                float z = (float)(rand() % 80) - 40;
-                uint32_t mid = state_->next_entity_id++;
-                Monster mob(mid, mobs[i].name, x, z, mobs[i].level);
-                monsters_.push_back(mob);
-            }
-            gdb.Close();
-        }
+        SpawnMonstersFromMap();
         return true;
     }
     case 0x0501: {
@@ -128,11 +121,10 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         if (spawn->position()) { e.x = spawn->position()->x(); e.y = spawn->position()->y(); e.z = spawn->position()->z(); }
         state_->entities.push_back(e);
         
-        std::string modelPath = spawn->model_id() ? spawn->model_id()->str() : "monster_placeholder.glb";
-        // Logic to find real asset path
-        if (modelPath.find("/") == std::string::npos) {
-            modelPath = "assets/models/" + modelPath;
-        }
+        std::string modelPath = spawn->model_id() ? spawn->model_id()->str() : "m224.chx";
+        modelPath = ModelResolver::ResolveMonsterModel(modelPath);
+        if (modelPath.empty())
+            modelPath = VFS::Find("assets/models/monster/monster_placeholder.glb");
         
         uint32_t colors[] = {0xff44cc44, 0xffcc4444, 0xffcccc44, 0xff44cccc, 0xffcc44cc};
         CharRenderer_Spawn(e.id, modelPath, e.x, e.y, e.z, colors[state_->next_entity_id++ % 5]);
@@ -816,12 +808,57 @@ void GameScreen::DoLevelUp() {
     if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_UI, "button_ok.wav");
 }
 
+void GameScreen::SpawnMonstersFromMap() {
+    if (!gamedb_) return;
+
+    uint32_t map_id = state_->map_id ? state_->map_id : 51;
+    monsters_.clear();
+
+    auto spawns = gamedb_->GetMonsterSpawns(map_id);
+    for (const auto& s : spawns) {
+        const MonsterData* tmpl = gamedb_->GetMonsterLegacy(s.monster_id);
+        if (!tmpl) continue;
+        std::string model = ModelResolver::ResolveMonsterModel(tmpl->model_file);
+        for (uint16_t i = 0; i < s.count && monsters_.size() < 24; ++i) {
+            float ox = (static_cast<float>(rand() % 200) - 100.0f) * s.spawn_radius / 100.0f;
+            float oz = (static_cast<float>(rand() % 200) - 100.0f) * s.spawn_radius / 100.0f;
+            uint32_t id = state_->next_entity_id++;
+            monsters_.emplace_back(id, tmpl->name, ox, oz, tmpl->level, MonsterType::Normal, model);
+        }
+    }
+
+    if (monsters_.empty() && map_id == 51) {
+        struct DemoSpawn { uint32_t monster_id; float x, z; } demos[] = {
+            {798, 18.0f, 22.0f}, {798, 5.0f, -15.0f}, {107, -12.0f, 28.0f},
+        };
+        for (const auto& d : demos) {
+            const MonsterData* tmpl = gamedb_->GetMonsterLegacy(d.monster_id);
+            if (!tmpl) continue;
+            std::string model = ModelResolver::ResolveMonsterModel(tmpl->model_file);
+            uint32_t id = state_->next_entity_id++;
+            monsters_.emplace_back(id, tmpl->name, d.x, d.z, tmpl->level, MonsterType::Normal, model);
+        }
+    }
+
+    spdlog::info("GameScreen: {} monsters spawned for map {}", monsters_.size(), map_id);
+}
+
 void GameScreen::SpawnRandomMonster() {
     uint32_t id = state_->next_entity_id++;
     float x = (float)(rand() % 80) - 40, z = (float)(rand() % 80) - 40;
+    std::string name = "Slime";
     int level = 1 + (rand() % 20);
-    const char* names[] = {"Goblin", "Wolf", "Bear", "Slime", "Orc", "Skeleton", "Bat", "Spider"};
-    monsters_.emplace_back(id, names[rand() % 8], x, z, level);
+    std::string model;
+    if (gamedb_) {
+        auto all = gamedb_->GetAllMonsters();
+        if (!all.empty()) {
+            const auto& m = all[rand() % all.size()];
+            name = m.name;
+            level = m.level;
+            model = ModelResolver::ResolveMonsterModel(m.model_file);
+        }
+    }
+    monsters_.emplace_back(id, name, x, z, level, MonsterType::Normal, model);
 }
 
 void GameScreen::Render(UIRenderer& ui) {
@@ -829,23 +866,15 @@ void GameScreen::Render(UIRenderer& ui) {
 }
 
 void GameScreen::Render(UIRenderer& ui, const glm::mat4& view, const glm::mat4& proj) {
-    // Build environment data from day/night cycle + map data
-    EnvData env;
-    env.light_dir = glm::vec4(sky_.GetLightDirection(), 0.0f);
-    env.fog_color = glm::vec4(sky_.GetFogColor(), 1.0f);
-    env.fog_data  = glm::vec4(50.0f, 500.0f, 0.4f, 0.0f);  // further fog = better atmosphere
-
-    // Sky dome (background, view 0)
-    sky_.Render(ui, view, proj);
-
-    // 3D scene rendering with environment lighting
-    if (terrain_) terrain_->Render(view, proj, env);
-    if (props_) props_->Render(view, proj, env);
-    CharRenderer_Render(view, proj, 0, env);
-
-    // Particles
-    std::vector<glm::vec3> ppos; std::vector<uint32_t> pcol; std::vector<float> psiz;
-    for (auto& p : particleSys_.GetActiveParticles()) { ppos.push_back(p.position); pcol.push_back(p.color); psiz.push_back(p.size); }
+    // 3D world + sky rendered in main.cpp before this call.
+    std::vector<glm::vec3> ppos;
+    std::vector<uint32_t> pcol;
+    std::vector<float> psiz;
+    for (auto& p : particleSys_.GetActiveParticles()) {
+        ppos.push_back(p.position);
+        pcol.push_back(p.color);
+        psiz.push_back(p.size);
+    }
     if (particles_) particles_->Render(view, proj, ppos, pcol, psiz);
 
     RenderUI(ui);

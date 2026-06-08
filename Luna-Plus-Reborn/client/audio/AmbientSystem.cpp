@@ -26,28 +26,29 @@ void AmbientSystem::Update(float dt, int map_id, float time_of_day, float px, fl
             [](auto& s) { return !s.active; }),
         active_sounds_.end());
     
-    // Wind (always active)
+    // Ambient one-shots only when matching audio files exist (legacy had no Bird_*.wav assets).
     wind_timer_ -= dt;
-    if (wind_timer_ <= 0) {
+    if (wind_timer_ <= 0 && g_audio && g_audio->CanPlaySFX("Wind.wav")) {
         wind_timer_ = 5.0f + (float)(rand() % 10);
         PlayWind(current_map_.wind_intensity);
+    } else if (wind_timer_ <= 0) {
+        wind_timer_ = 10.0f;
     }
-    
-    // Birds (daytime only)
-    if (time_of_day > 0.25f && time_of_day < 0.75f && current_map_.has_birds) {
-        if (rand() % 300 == 0) SpawnBird();
+
+    if (time_of_day > 0.25f && time_of_day < 0.75f && current_map_.has_birds && g_audio) {
+        if (rand() % 300 == 0 && g_audio->CanPlaySFX("Bird_1.wav")) SpawnBird();
     }
-    
-    // Insects (night/dusk)
-    if ((time_of_day < 0.25f || time_of_day > 0.75f) && current_map_.has_insects) {
-        if (rand() % 200 == 0) SpawnInsect();
+
+    if ((time_of_day < 0.25f || time_of_day > 0.75f) && current_map_.has_insects && g_audio) {
+        if (rand() % 200 == 0 && g_audio->CanPlaySFX("Insect_1.wav")) SpawnInsect();
     }
     
     // Thunder (random during any time)
     thunder_timer_ -= dt;
     if (thunder_timer_ <= 0) {
         thunder_timer_ = 30.0f + (float)(rand() % 120);
-        if ((float)(rand() % 1000) / 1000.0f < current_map_.thunder_chance * dt * 100) {
+        if (g_audio && g_audio->CanPlaySFX("Thunder.wav") &&
+            (float)(rand() % 1000) / 1000.0f < current_map_.thunder_chance * dt * 100) {
             PlayThunder(0);
         }
     }

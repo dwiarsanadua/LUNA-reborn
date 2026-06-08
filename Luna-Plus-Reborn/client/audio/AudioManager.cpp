@@ -1,4 +1,5 @@
 #include "AudioManager.hpp"
+#include <config/Paths.hpp>
 #include <lib/soundlib/SoundLib.h>
 #include <spdlog/spdlog.h>
 #include <unordered_map>
@@ -44,8 +45,25 @@ void AudioManager::Shutdown() {
     active_sounds_.clear();
 }
 
+std::string AudioManager::FindAudioPath(const std::string& name) const {
+    const char* folders[] = {
+        "SFX", "Character", "Monster", "Effect", "Interface", "Weapon", "BGM"
+    };
+    for (const char* folder : folders) {
+        std::string path = Paths::Asset(std::string("audio/") + folder + "/" + name);
+        if (std::filesystem::exists(path)) return path;
+    }
+    std::string direct = Paths::FindAsset("audio/" + name);
+    if (std::filesystem::exists(direct)) return direct;
+    return {};
+}
+
+bool AudioManager::CanPlaySFX(const std::string& name) const {
+    return !FindAudioPath(name).empty();
+}
+
 void AudioManager::PlayBGM(const std::string& map_id) {
-    std::string path = ASSETS_PATH + std::string("audio/BGM/") + map_id + ".mp3";
+    std::string path = Paths::Asset("audio/BGM/" + map_id + ".mp3");
     if (!std::filesystem::exists(path)) {
         spdlog::warn("BGM: file not found, skipping: {}", path);
         return;
@@ -84,7 +102,7 @@ void AudioManager::SmoothBGMTransition(const std::string& new_bgm, float duratio
     if (new_bgm == current_bgm_) return;
     if (!sound_lib_) return;
 
-    std::string path = ASSETS_PATH + std::string("audio/BGM/") + new_bgm + ".mp3";
+    std::string path = Paths::Asset("audio/BGM/" + new_bgm + ".mp3");
     if (!std::filesystem::exists(path)) {
         spdlog::warn("BGM: transition file not found: {}", path);
         return;
@@ -116,10 +134,8 @@ void AudioManager::SmoothBGMTransition(const std::string& new_bgm, float duratio
 }
 
 void AudioManager::PlaySFX(const std::string& name) {
-    std::string path = ASSETS_PATH + std::string("audio/SFX/") + name;
-    FILE* f = fopen(path.c_str(), "rb");
-    if (!f) return;
-    fclose(f);
+    std::string path = FindAudioPath(name);
+    if (path.empty()) return;
     int id = sound_lib_->LoadSFX(path.c_str());
     if (id >= 0) {
         sound_lib_->PlaySFX(id);
@@ -140,10 +156,11 @@ void AudioManager::PlaySFXByCategory(Category cat, const std::string& name) {
         case SFX_Footstep: folder = "Character"; break;
         default: break;
     }
-    std::string path = ASSETS_PATH + std::string("audio/") + folder + "/" + name;
-    FILE* f = fopen(path.c_str(), "rb");
-    if (!f) return;
-    fclose(f);
+    std::string path = Paths::Asset("audio/" + folder + "/" + name);
+    if (!std::filesystem::exists(path)) {
+        path = FindAudioPath(name);
+        if (path.empty()) return;
+    }
     int id = sound_lib_->LoadSFX(path.c_str());
     if (id >= 0) {
         sound_lib_->PlaySFX(id);
@@ -156,11 +173,8 @@ void AudioManager::PlaySFXInst(const std::string& name, float x, float y, float 
 }
 
 int AudioManager::Play3D(const std::string& name, float x, float y, float z) {
-    std::string path = ASSETS_PATH + std::string("audio/SFX/") + name;
-    // Check file exists before attempting load, to avoid log flood
-    FILE* f = fopen(path.c_str(), "rb");
-    if (!f) return -1;
-    fclose(f);
+    std::string path = FindAudioPath(name);
+    if (path.empty()) return -1;
     int lib_id = sound_lib_->LoadSFX(path.c_str());
     if (lib_id < 0) return -1;
 
@@ -298,7 +312,7 @@ void AudioManager::ScanAudioDirectory() {
     sfx_count_ = 0;
     std::string folders[] = {"Interface", "Weapon", "Character", "Monster", "SFX"};
     for (auto& f : folders) {
-        std::string p = ASSETS_PATH + std::string("audio/") + f + "/";
+        std::string p = Paths::Asset(std::string("audio/") + f + "/");
         if (std::filesystem::exists(p)) {
             for (auto const& dir_entry : std::filesystem::directory_iterator{p}) {
                 if (dir_entry.is_regular_file()) sfx_count_++;
