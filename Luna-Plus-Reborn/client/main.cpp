@@ -414,6 +414,9 @@ int main(int argc, char** argv) {
         input_sys.Update(dt);
         Mouse::Update();
 
+        // --- PROCESS NETWORK EVENTS (thread-safe) ---
+        g_network.ProcessEvents();
+
         {
             bool is_login = (screenManager.CurrentName() == "login" || 
                             screenManager.CurrentName() == "charselect");
@@ -431,9 +434,6 @@ int main(int argc, char** argv) {
         }
         cam.SetShake(g_state.shake_x, g_state.shake_y);
         cam.Update(dt);
-        
-        // --- PROCESS NETWORK EVENTS (thread-safe) ---
-        g_network.ProcessEvents();
 
         // --- GAME STATE UPDATE BEFORE RENDER ---
         ClientFlow::Update(g_state, dt);

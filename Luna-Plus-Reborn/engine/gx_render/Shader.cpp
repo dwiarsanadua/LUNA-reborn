@@ -79,7 +79,7 @@ const bgfx::Memory* ShaderUtils::LoadShaderBin(const std::string& name) {
         name,
         "../" + name,
         "shaders/" + name,
-        "assets/shaders/" + name,
+        VFS::Resolve("assets/shaders/" + name),
         VFS::Resolve("assets/" + name),
     };
 
