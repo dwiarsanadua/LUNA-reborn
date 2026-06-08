@@ -11,6 +11,12 @@ table PetInfo {
     max_hp: uint16;
     satiation: uint16;
     summoned: bool;
+    evolution: uint8;
+    exp: uint32;
+    exp_to_next: uint32;
+    feed_cost: uint32;
+    evolve_cost: uint32;
+    can_summon: bool;
 }
 
 table PetInfoRequest {

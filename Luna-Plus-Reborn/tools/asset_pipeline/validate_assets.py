@@ -166,12 +166,18 @@ def check_phase6_server() -> dict:
     pkt = (reborn / "game/network/protocol/PacketType.fbs").read_text()
     for token in (
         "MP_FAMILY_INFO_SYN",
+        "MP_FAMILY_ACTION_SYN",
         "MP_PET_INFO_SYN",
+        "MP_PET_ACTION_SYN",
         "MP_FISHING_CAST_SYN",
         "MP_SIEGE_INFO_SYN",
+        "MP_SIEGE_ACTION_SYN",
         "MP_TOURNAMENT_LIST_SYN",
+        "MP_TOURNAMENT_ACTION_SYN",
         "MP_HOUSING_INFO_SYN",
+        "MP_HOUSING_ACTION_SYN",
         "MP_CASHSHOP_LIST_SYN",
+        "MP_CASHSHOP_BUY_SYN",
         "MP_FARM_INFO_SYN",
         "MP_FARM_ACTION_SYN",
     ):
@@ -190,12 +196,36 @@ def check_phase6_server() -> dict:
             "phase6_fish_types",
             "phase6_territories",
             "phase6_shop_items",
+            "phase6_tournaments",
+            "phase6_tournament_registrations",
+            "phase6_tournament_matches",
+            "phase6_house_templates",
+            "phase6_furniture_catalog",
             "player_family",
             "player_pet",
             "player_farm_plot",
+            "player_cash_shop",
+            "player_cashshop_purchases",
         ):
             if needed not in names:
                 issues.append(f"Phase6: luna_map.db missing {needed} (run bootstrap_phase6.py)")
+        min_rows = (
+            ("phase6_fish_types", 3),
+            ("phase6_shop_items", 5),
+            ("phase6_territories", 3),
+            ("phase6_house_templates", 3),
+            ("phase6_furniture_catalog", 8),
+            ("phase6_tournaments", 2),
+        )
+        for table, minimum in min_rows:
+            if table not in names:
+                continue
+            count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            if count < minimum:
+                issues.append(
+                    f"Phase6: {table} has {count} rows, expected >= {minimum} "
+                    "(run bootstrap_phase6.py)"
+                )
         conn.close()
     else:
         issues.append("Phase6: missing assets/data/luna_map.db (run bootstrap_phase6.py)")

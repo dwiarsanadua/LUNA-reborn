@@ -175,3 +175,41 @@ std::string FamilySystem::GetRelationName(FamilyRelation r) const {
     default: return "Unknown";
     }
 }
+
+std::string FamilySystem::GetRelationName(uint8_t relation) {
+    switch (relation) {
+    case 2: return "Engaged";
+    case 3: return "Married";
+    case 4: return "Divorced";
+    default: return "Single";
+    }
+}
+
+void FamilySystem::SyncFromNetwork(uint32_t self_id, uint32_t family_id,
+                                   const std::string& family_name, uint32_t master_id,
+                                   const std::vector<NetworkFamilyMemberView>& net_members) {
+    (void)self_id;
+    members_.clear();
+    pending_proposals_.clear();
+    uint32_t max_fid = next_family_id_;
+    for (const auto& nm : net_members) {
+        FamilyMember m;
+        m.character_id = nm.character_id;
+        m.name = nm.name;
+        switch (nm.relation) {
+        case 2: m.relation = FamilyRelation::Engaged; break;
+        case 3: m.relation = FamilyRelation::Married; break;
+        case 4: m.relation = FamilyRelation::Divorced; break;
+        default: m.relation = FamilyRelation::Single; break;
+        }
+        m.partner_id = nm.partner_id;
+        m.partner_name = nm.partner_name;
+        m.married_date = static_cast<time_t>(nm.married_date);
+        m.family_id = family_id;
+        m.family_name = family_name;
+        if (nm.is_master) (void)master_id;
+        if (family_id >= max_fid) max_fid = family_id + 1;
+        members_.push_back(std::move(m));
+    }
+    if (family_id) next_family_id_ = std::max(next_family_id_, max_fid);
+}

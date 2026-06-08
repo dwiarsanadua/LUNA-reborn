@@ -48,6 +48,34 @@ struct Tournament {
     std::function<void(uint32_t winner_id, uint32_t runner_up_id)> on_complete;
 };
 
+struct NetworkTournamentTeamView {
+    uint32_t tournament_id = 0;
+    uint32_t guild_id = 0;
+    std::string guild_name;
+    uint16_t seed = 0;
+    bool eliminated = false;
+};
+
+struct NetworkTournamentMatchView {
+    uint32_t tournament_id = 0;
+    uint8_t round = 0;
+    uint8_t match_index = 0;
+    uint32_t team1_guild_id = 0;
+    uint32_t team2_guild_id = 0;
+    uint32_t winner_guild_id = 0;
+    bool completed = false;
+};
+
+struct NetworkTournamentView {
+    uint32_t tournament_id = 0;
+    std::string name;
+    uint8_t state = 0;
+    uint16_t registered = 0;
+    uint16_t max_teams = 8;
+    uint32_t prize_gold = 0;
+    uint8_t current_round = 0;
+};
+
 class TournamentSystem {
 public:
     void Init();
@@ -66,6 +94,10 @@ public:
     Tournament* GetTournament(uint32_t tournament_id);
     std::vector<Tournament> GetActiveTournaments() const;
     std::vector<Tournament> GetGuildTournaments(uint32_t guild_id) const;
+
+    void SyncFromNetwork(const std::vector<NetworkTournamentView>& tournaments,
+                         const std::vector<NetworkTournamentTeamView>& teams,
+                         const std::vector<NetworkTournamentMatchView>& matches);
     
     int GetActiveCount() const { return (int)tournaments_.size(); }
 

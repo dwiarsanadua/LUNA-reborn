@@ -33,5 +33,7 @@ private:
     std::function<void()> feed_fn_;
     std::function<void()> evolve_fn_;
     std::function<void()> refresh_fn_;
-    void Refresh();
+    Button* feed_btn_ = nullptr;
+    Button* evolve_btn_ = nullptr;
+    void Refresh(GameState* state = nullptr);
 };

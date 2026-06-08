@@ -22,6 +22,66 @@ def apply_sql(conn: sqlite3.Connection, sql_path: Path) -> None:
     conn.executescript(sql_path.read_text(encoding="utf-8"))
 
 
+def ensure_map_column_migrations(conn: sqlite3.Connection) -> None:
+    """Add columns introduced after initial Phase 6 deploy."""
+    rows = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='player_pet'"
+    ).fetchall()
+    if not rows:
+        return
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(player_pet)")}
+    if "evolution" not in cols:
+        conn.execute("ALTER TABLE player_pet ADD COLUMN evolution INTEGER DEFAULT 1")
+    if "exp" not in cols:
+        conn.execute("ALTER TABLE player_pet ADD COLUMN exp INTEGER DEFAULT 0")
+    rows = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='player_family'"
+    ).fetchall()
+    if rows:
+        fam_cols = {r[1] for r in conn.execute("PRAGMA table_info(player_family)")}
+        if "married_date" not in fam_cols:
+            conn.execute("ALTER TABLE player_family ADD COLUMN married_date INTEGER DEFAULT 0")
+    terr_rows = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='phase6_territories'"
+    ).fetchall()
+    if terr_rows:
+        terr_cols = {r[1] for r in conn.execute("PRAGMA table_info(phase6_territories)")}
+        additions = [
+            ("siege_time", "INTEGER DEFAULT 0"),
+            ("attacker_guild_id", "INTEGER DEFAULT 0"),
+            ("attacker_guild_name", "TEXT DEFAULT ''"),
+            ("is_castle", "INTEGER DEFAULT 0"),
+            ("defense_bonus", "INTEGER DEFAULT 0"),
+            ("tax_accumulated", "INTEGER DEFAULT 0"),
+        ]
+        for col, typedef in additions:
+            if col not in terr_cols:
+                conn.execute(f"ALTER TABLE phase6_territories ADD COLUMN {col} {typedef}")
+    t_rows = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='phase6_tournaments'"
+    ).fetchall()
+    if t_rows:
+        t_cols = {r[1] for r in conn.execute("PRAGMA table_info(phase6_tournaments)")}
+        if "prize_claimed" not in t_cols:
+            conn.execute("ALTER TABLE phase6_tournaments ADD COLUMN prize_claimed INTEGER DEFAULT 0")
+    shop_rows = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='phase6_shop_items'"
+    ).fetchall()
+    if shop_rows:
+        shop_cols = {r[1] for r in conn.execute("PRAGMA table_info(phase6_shop_items)")}
+        shop_additions = [
+            ("description", "TEXT DEFAULT ''"),
+            ("currency_type", "INTEGER DEFAULT 0"),
+            ("stack_count", "INTEGER DEFAULT 1"),
+            ("max_purchase", "INTEGER DEFAULT 99"),
+            ("on_sale", "INTEGER DEFAULT 0"),
+            ("sale_price", "INTEGER DEFAULT 0"),
+        ]
+        for col, typedef in shop_additions:
+            if col not in shop_cols:
+                conn.execute(f"ALTER TABLE phase6_shop_items ADD COLUMN {col} {typedef}")
+
+
 def migrate_database(label: str, db_path: Path) -> int:
     DATA.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
@@ -36,6 +96,7 @@ def migrate_database(label: str, db_path: Path) -> int:
     apply_sql(conn, SCHEMA_GAME)
     if label == "map" and SCHEMA_MAP.is_file():
         apply_sql(conn, SCHEMA_MAP)
+        ensure_map_column_migrations(conn)
     tables = conn.execute(
         "SELECT COUNT(*) FROM sqlite_master WHERE type='table'"
     ).fetchone()[0]

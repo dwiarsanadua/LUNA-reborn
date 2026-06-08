@@ -256,10 +256,20 @@ struct GameState {
         uint8_t relation = 1;
         uint32_t partner_id = 0;
         std::string partner_name;
+        uint64_t married_date = 0;
+        bool is_master = false;
     };
     uint32_t network_family_id = 0;
     std::string network_family_name;
+    uint32_t network_family_master_id = 0;
     std::vector<NetworkFamilyMember> network_family_members;
+    bool network_can_accept_marriage = false;
+    bool network_can_reject_proposal = false;
+    bool network_can_divorce = false;
+    bool network_can_leave_family = false;
+    bool network_can_create_family = true;
+    uint32_t network_engaged_partner_id = 0;
+    std::string network_engaged_partner_name;
 
     struct NetworkPetInfo {
         uint32_t pet_id = 0;
@@ -270,6 +280,12 @@ struct GameState {
         uint16_t max_hp = 100;
         uint16_t satiation = 100;
         bool summoned = false;
+        uint8_t evolution = 1;
+        uint32_t exp = 0;
+        uint32_t exp_to_next = 50;
+        uint32_t feed_cost = 50;
+        uint32_t evolve_cost = 500;
+        bool can_summon = true;
     };
     NetworkPetInfo network_pet;
 
@@ -279,8 +295,33 @@ struct GameState {
         uint32_t owner_guild_id = 0;
         std::string owner_guild_name;
         uint16_t tax_rate = 10;
+        uint64_t siege_time = 0;
+        bool is_castle = false;
+        uint8_t defense_bonus = 0;
+        uint32_t attacker_guild_id = 0;
+        std::string attacker_guild_name;
+        uint32_t seconds_until_siege = 0;
+        uint32_t tax_accumulated = 0;
+        bool owned_by_player_guild = false;
+        bool can_attack = false;
+        bool can_manage_tax = false;
+    };
+    struct NetworkSiegeSchedule {
+        uint32_t territory_id = 0;
+        std::string territory_name;
+        uint32_t attacker_guild_id = 0;
+        std::string attacker_guild_name;
+        uint32_t defender_guild_id = 0;
+        std::string defender_guild_name;
+        uint64_t siege_time = 0;
+        uint32_t seconds_until = 0;
     };
     std::vector<NetworkSiegeTerritory> network_siege_territories;
+    std::vector<NetworkSiegeSchedule> network_siege_schedules;
+    uint32_t network_siege_player_guild_id = 0;
+    std::string network_siege_player_guild_name;
+    bool network_can_declare_siege = false;
+    bool network_can_set_tax = false;
 
     struct NetworkTournamentEntry {
         uint32_t tournament_id = 0;
@@ -289,26 +330,92 @@ struct GameState {
         uint16_t registered = 0;
         uint16_t max_teams = 8;
         uint32_t prize_gold = 0;
+        uint64_t registration_end = 0;
+        uint8_t current_round = 0;
+        uint8_t min_team_size = 1;
+        uint8_t max_team_size = 6;
+        uint32_t winner_guild_id = 0;
+        bool player_registered = false;
+        bool can_register = false;
+        bool can_unregister = false;
+        bool can_claim_prize = false;
+        uint32_t seconds_until_start = 0;
+    };
+    struct NetworkTournamentTeam {
+        uint32_t tournament_id = 0;
+        uint32_t guild_id = 0;
+        std::string guild_name;
+        uint16_t seed = 0;
+        bool eliminated = false;
+    };
+    struct NetworkTournamentMatch {
+        uint32_t tournament_id = 0;
+        uint8_t round = 0;
+        uint8_t match_index = 0;
+        uint32_t team1_guild_id = 0;
+        uint32_t team2_guild_id = 0;
+        uint32_t winner_guild_id = 0;
+        bool completed = false;
     };
     std::vector<NetworkTournamentEntry> network_tournaments;
+    std::vector<NetworkTournamentTeam> network_tournament_teams;
+    std::vector<NetworkTournamentMatch> network_tournament_matches;
+    uint32_t network_tournament_player_guild_id = 0;
 
+    struct NetworkHousingFurniture {
+        uint32_t furniture_id = 0;
+        uint32_t item_id = 0;
+        std::string name;
+        float pos_x = 0;
+        float pos_y = 0;
+        float rot_y = 0;
+    };
     struct NetworkHouseInfo {
         uint32_t house_id = 0;
+        uint32_t owner_id = 0;
+        std::string name;
         uint16_t map_id = 51;
         float pos_x = 0;
         float pos_y = 0;
         uint8_t house_type = 0;
         uint16_t furniture_count = 0;
+        uint16_t max_furniture = 16;
+        bool is_owner = false;
+        bool can_enter = false;
+        std::vector<NetworkHousingFurniture> furniture;
+    };
+    struct NetworkHouseTemplate {
+        uint8_t template_id = 0;
+        std::string name;
+        uint32_t price = 0;
+        uint16_t max_furniture = 16;
+        uint16_t map_id = 51;
     };
     std::vector<NetworkHouseInfo> network_houses;
+    std::vector<NetworkHouseTemplate> network_house_templates;
+    uint32_t network_selected_house_id = 0;
+    bool network_can_buy_house = false;
 
     struct NetworkCashShopItem {
         uint32_t item_id = 0;
         std::string name;
+        std::string description;
         uint32_t price = 0;
         std::string category;
+        uint8_t currency_type = 0;
+        uint16_t stack_count = 1;
+        uint16_t max_purchase = 99;
+        uint16_t purchased_count = 0;
+        bool can_afford = false;
+        bool on_sale = false;
     };
     std::vector<NetworkCashShopItem> network_cashshop_items;
+    int luna_points = 0;
+    uint16_t network_battle_pass_level = 1;
+    uint32_t network_battle_pass_xp = 0;
+    uint32_t network_battle_pass_max_xp = 1000;
+    bool network_battle_pass_active = false;
+    std::string network_season_name;
 
     struct NetworkFarmPlot {
         uint8_t plot_id = 0;
@@ -317,8 +424,19 @@ struct GameState {
         uint8_t growth_stage = 0;
         uint8_t max_stages = 4;
         uint8_t growth_pct = 0;
+        float growth_timer = 0;
+        float growth_time = 60;
         bool watered = false;
         bool harvested = false;
+        bool ready = false;
     };
     std::vector<NetworkFarmPlot> network_farm_plots;
+
+    struct NetworkFarmSeed {
+        uint32_t seed_id = 0;
+        std::string name;
+        uint16_t growth_time_sec = 0;
+        uint32_t harvest_item_id = 0;
+    };
+    std::vector<NetworkFarmSeed> network_farm_seeds;
 };

@@ -2,6 +2,8 @@ include "Types.fbs";
 
 namespace luna.protocol;
 
+// relation: 1=Single, 2=Engaged, 3=Married, 4=Divorced
+
 table FamilyMemberInfo {
     character_id: uint32;
     name: string;
@@ -10,6 +12,8 @@ table FamilyMemberInfo {
     partner_name: string;
     family_id: uint32;
     family_name: string;
+    married_date: uint64;
+    is_master: bool;
 }
 
 table FamilyInfo {
@@ -17,6 +21,13 @@ table FamilyInfo {
     family_name: string;
     master_id: uint32;
     members: [FamilyMemberInfo];
+    can_accept_marriage: bool;
+    can_reject_proposal: bool;
+    can_divorce: bool;
+    can_leave_family: bool;
+    can_create_family: bool;
+    engaged_partner_id: uint32;
+    engaged_partner_name: string;
 }
 
 table FamilyInfoRequest {
@@ -36,6 +47,12 @@ table FamilyProposeRequest {
 
 table FamilyAcceptRequest {
     character_id: uint32;
+}
+
+// action: 0=divorce, 1=reject proposal, 2=leave family
+table FamilyActionRequest {
+    character_id: uint32;
+    action: uint8;
 }
 
 table FamilyResponse {

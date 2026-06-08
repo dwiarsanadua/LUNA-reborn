@@ -191,3 +191,50 @@ std::vector<Tournament> TournamentSystem::GetGuildTournaments(uint32_t guild_id)
     }
     return result;
 }
+
+void TournamentSystem::SyncFromNetwork(const std::vector<NetworkTournamentView>& net_tours,
+                                       const std::vector<NetworkTournamentTeamView>& net_teams,
+                                       const std::vector<NetworkTournamentMatchView>& net_matches) {
+    tournaments_.clear();
+    for (const auto& nt : net_tours) {
+        Tournament t;
+        t.id = nt.tournament_id;
+        t.name = nt.name;
+        t.max_teams = nt.max_teams;
+        t.prize_gold = nt.prize_gold;
+        t.current_round = nt.current_round;
+        switch (nt.state) {
+        case 1: t.state = TournamentState::InProgress; break;
+        case 2: t.state = TournamentState::Completed; break;
+        case 3: t.state = TournamentState::Cancelled; break;
+        default: t.state = TournamentState::Registration; break;
+        }
+        tournaments_.push_back(std::move(t));
+    }
+    for (const auto& nt : net_teams) {
+        for (auto& t : tournaments_) {
+            if (t.id != nt.tournament_id) continue;
+            TournamentTeam team;
+            team.guild_id = nt.guild_id;
+            team.guild_name = nt.guild_name;
+            team.seed = nt.seed;
+            team.eliminated = nt.eliminated;
+            t.teams.push_back(std::move(team));
+            break;
+        }
+    }
+    for (const auto& nm : net_matches) {
+        for (auto& t : tournaments_) {
+            if (t.id != nm.tournament_id) continue;
+            TournamentMatch m;
+            m.round = nm.round;
+            m.match_index = nm.match_index;
+            m.team1_id = nm.team1_guild_id;
+            m.team2_id = nm.team2_guild_id;
+            m.winner_id = nm.winner_guild_id;
+            m.completed = nm.completed;
+            t.matches.push_back(std::move(m));
+            break;
+        }
+    }
+}

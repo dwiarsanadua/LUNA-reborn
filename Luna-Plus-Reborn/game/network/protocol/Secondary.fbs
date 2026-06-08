@@ -9,6 +9,26 @@ table SiegeTerritoryInfo {
     owner_guild_name: string;
     tax_rate: uint16;
     siege_time: uint64;
+    is_castle: bool;
+    defense_bonus: uint8;
+    attacker_guild_id: uint32;
+    attacker_guild_name: string;
+    seconds_until_siege: uint32;
+    tax_accumulated: uint32;
+    owned_by_player_guild: bool;
+    can_attack: bool;
+    can_manage_tax: bool;
+}
+
+table SiegeScheduleInfo {
+    territory_id: uint32;
+    territory_name: string;
+    attacker_guild_id: uint32;
+    attacker_guild_name: string;
+    defender_guild_id: uint32;
+    defender_guild_name: string;
+    siege_time: uint64;
+    seconds_until: uint32;
 }
 
 table SiegeInfoRequest {
@@ -17,7 +37,45 @@ table SiegeInfoRequest {
 
 table SiegeInfoResponse {
     result: uint8;
+    message: string;
     territories: [SiegeTerritoryInfo];
+    schedules: [SiegeScheduleInfo];
+    player_guild_id: uint32;
+    player_guild_name: string;
+    can_declare_siege: bool;
+    can_set_tax: bool;
+}
+
+// action: 0=declare siege, 1=set tax rate, 2=collect tax, 3=cancel siege
+table SiegeActionRequest {
+    character_id: uint32;
+    action: uint8;
+    territory_id: uint32;
+    param: uint32;
+}
+
+table SiegeActionResponse {
+    result: uint8;
+    message: string;
+    info: SiegeInfoResponse;
+}
+
+table TournamentTeamInfo {
+    tournament_id: uint32;
+    guild_id: uint32;
+    guild_name: string;
+    seed: uint16;
+    eliminated: bool;
+}
+
+table TournamentMatchInfo {
+    tournament_id: uint32;
+    round: uint8;
+    match_index: uint8;
+    team1_guild_id: uint32;
+    team2_guild_id: uint32;
+    winner_guild_id: uint32;
+    completed: bool;
 }
 
 table TournamentEntryInfo {
@@ -27,6 +85,16 @@ table TournamentEntryInfo {
     registered_teams: uint16;
     max_teams: uint16;
     prize_gold: uint32;
+    registration_end: uint64;
+    current_round: uint8;
+    min_team_size: uint8;
+    max_team_size: uint8;
+    winner_guild_id: uint32;
+    player_registered: bool;
+    can_register: bool;
+    can_unregister: bool;
+    can_claim_prize: bool;
+    seconds_until_start: uint32;
 }
 
 table TournamentListRequest {
@@ -35,7 +103,11 @@ table TournamentListRequest {
 
 table TournamentListResponse {
     result: uint8;
+    message: string;
     tournaments: [TournamentEntryInfo];
+    teams: [TournamentTeamInfo];
+    matches: [TournamentMatchInfo];
+    player_guild_id: uint32;
 }
 
 table TournamentRegisterRequest {
@@ -48,15 +120,52 @@ table TournamentRegisterResponse {
     result: uint8;
     tournament_id: uint32;
     message: string;
+    list: TournamentListResponse;
+}
+
+// action: 0=unregister, 1=claim prize
+table TournamentActionRequest {
+    character_id: uint32;
+    action: uint8;
+    tournament_id: uint32;
+}
+
+table TournamentActionResponse {
+    result: uint8;
+    message: string;
+    list: TournamentListResponse;
+}
+
+table HousingFurnitureInfo {
+    furniture_id: uint32;
+    item_id: uint32;
+    name: string;
+    pos_x: float;
+    pos_y: float;
+    rot_y: float;
+}
+
+table HousingTemplateInfo {
+    template_id: uint8;
+    name: string;
+    price: uint32;
+    max_furniture: uint16;
+    map_id: uint16;
 }
 
 table HousingInfo {
     house_id: uint32;
+    owner_id: uint32;
+    name: string;
     map_id: uint16;
     pos_x: float;
     pos_y: float;
     house_type: uint8;
     furniture_count: uint16;
+    max_furniture: uint16;
+    is_owner: bool;
+    can_enter: bool;
+    furniture: [HousingFurnitureInfo];
 }
 
 table HousingInfoRequest {
@@ -65,14 +174,43 @@ table HousingInfoRequest {
 
 table HousingInfoResponse {
     result: uint8;
+    message: string;
     houses: [HousingInfo];
+    templates: [HousingTemplateInfo];
+    player_gold: uint32;
+    selected_house_id: uint32;
+    can_buy: bool;
+}
+
+table HousingActionRequest {
+    character_id: uint32;
+    action: uint8;
+    house_id: uint32;
+    template_id: uint8;
+    furniture_item_id: uint32;
+    pos_x: float;
+    pos_y: float;
+}
+
+table HousingActionResponse {
+    result: uint8;
+    action: uint8;
+    message: string;
+    info: HousingInfoResponse;
 }
 
 table CashShopItemInfo {
     item_id: uint32;
     name: string;
+    description: string;
     price: uint32;
     category: string;
+    currency_type: uint8;
+    stack_count: uint16;
+    max_purchase: uint16;
+    purchased_count: uint16;
+    can_afford: bool;
+    on_sale: bool;
 }
 
 table CashShopListRequest {
@@ -81,7 +219,14 @@ table CashShopListRequest {
 
 table CashShopListResponse {
     result: uint8;
+    message: string;
     items: [CashShopItemInfo];
+    player_gold: uint32;
+    player_luna_points: uint32;
+    battle_pass_level: uint16;
+    battle_pass_xp: uint32;
+    battle_pass_max_xp: uint32;
+    season_name: string;
 }
 
 table CashShopBuyRequest {
@@ -93,4 +238,5 @@ table CashShopBuyResponse {
     result: uint8;
     item_id: uint32;
     message: string;
+    list: CashShopListResponse;
 }

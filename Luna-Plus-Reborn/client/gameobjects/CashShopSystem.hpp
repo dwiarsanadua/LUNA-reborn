@@ -23,7 +23,10 @@ public:
     std::vector<CashItem> GetItems(const std::string& category = "") const;
     std::vector<std::string> GetCategories() const;
     
-    // Purchase
+    void SyncFromNetwork(const std::vector<CashItem>& items, int luna_points,
+                         int bp_level, int bp_xp, int bp_max_xp, bool bp_active,
+                         const std::string& season_name);
+    
     bool CanAfford(int luna_points, uint32_t price) const { return luna_points >= (int)price; }
     bool PurchaseItem(int& luna_points, uint32_t item_id);
     
@@ -42,6 +45,7 @@ public:
     // Season pass rotation
     int GetCurrentSeason() const { return season_; }
     std::string GetSeasonName() const;
+    const std::string& GetNetworkSeasonName() const { return season_name_; }
     time_t GetSeasonEndTime() const { return season_end_; }
     int GetSeasonDaysRemaining() const;
     void AdvanceSeason();
@@ -53,6 +57,7 @@ private:
     int battle_pass_level_ = 1;
     int battle_pass_xp_ = 0;
     bool battle_pass_active_ = false;
+    std::string season_name_;
     int season_ = 1;
     time_t season_end_ = 0;
     float season_timer_ = 0;

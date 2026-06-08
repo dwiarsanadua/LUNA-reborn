@@ -9,8 +9,18 @@ table FarmPlotInfo {
     growth_stage: uint8;
     max_stages: uint8;
     growth_pct: uint8;
+    growth_timer: float;
+    growth_time: float;
     watered: bool;
     harvested: bool;
+    ready: bool;
+}
+
+table FarmSeedInfo {
+    seed_id: uint32;
+    name: string;
+    growth_time_sec: uint16;
+    harvest_item_id: uint32;
 }
 
 table FarmInfoRequest {
@@ -27,6 +37,7 @@ table FarmActionRequest {
 table FarmResponse {
     result: uint8;
     plots: [FarmPlotInfo];
+    seeds: [FarmSeedInfo];
     harvest_item_id: uint32;
     harvest_count: uint16;
     message: string;

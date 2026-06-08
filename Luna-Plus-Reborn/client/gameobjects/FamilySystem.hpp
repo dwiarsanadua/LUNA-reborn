@@ -25,6 +25,16 @@ struct FamilyMember {
     std::vector<uint32_t> children_ids;
 };
 
+struct NetworkFamilyMemberView {
+    uint32_t character_id = 0;
+    std::string name;
+    uint8_t relation = 1;
+    uint32_t partner_id = 0;
+    std::string partner_name;
+    uint64_t married_date = 0;
+    bool is_master = false;
+};
+
 class FamilySystem {
 public:
     void Init();
@@ -53,6 +63,9 @@ public:
     int GetFamilyCount() const;
     
     std::string GetRelationName(FamilyRelation r) const;
+    static std::string GetRelationName(uint8_t relation);
+    void SyncFromNetwork(uint32_t self_id, uint32_t family_id, const std::string& family_name,
+                         uint32_t master_id, const std::vector<NetworkFamilyMemberView>& members);
 
 private:
     std::vector<FamilyMember> members_;

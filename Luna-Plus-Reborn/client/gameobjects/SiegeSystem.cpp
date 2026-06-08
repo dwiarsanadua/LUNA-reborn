@@ -156,3 +156,31 @@ bool SiegeSystem::IsAtWar(uint32_t guild1, uint32_t guild2) const {
     }
     return false;
 }
+
+void SiegeSystem::SyncFromNetwork(const std::vector<NetworkSiegeTerritoryView>& net_territories,
+                                  const std::vector<NetworkSiegeScheduleView>& net_schedules) {
+    territories_.clear();
+    active_sieges_.clear();
+    for (const auto& nt : net_territories) {
+        Territory t;
+        t.id = static_cast<int>(nt.territory_id);
+        t.name = nt.name;
+        t.owner_guild_id = nt.owner_guild_id;
+        t.owner_guild_name = nt.owner_guild_name;
+        t.tax_rate = nt.tax_rate;
+        t.is_castle = nt.is_castle;
+        t.defense_bonus = nt.defense_bonus;
+        t.total_tax_collected = nt.tax_accumulated;
+        territories_.push_back(std::move(t));
+    }
+    for (const auto& ns : net_schedules) {
+        SiegeSchedule s;
+        s.territory_id = static_cast<int>(ns.territory_id);
+        s.siege_time = time(nullptr) + static_cast<time_t>(ns.seconds_until);
+        s.attacker_guild_id = ns.attacker_guild_id;
+        s.attacker_name = ns.attacker_guild_name;
+        s.defender_guild_id = ns.defender_guild_id;
+        s.defender_name = ns.defender_guild_name;
+        active_sieges_.push_back(std::move(s));
+    }
+}

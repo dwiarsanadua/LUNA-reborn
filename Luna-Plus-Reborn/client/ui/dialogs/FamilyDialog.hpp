@@ -5,6 +5,7 @@
 #include <ui/widgets/Label.hpp>
 #include <ui/widgets/Button.hpp>
 #include <ui/widgets/TabPanel.hpp>
+#include <ui/widgets/InputField.hpp>
 #include <gameobjects/FamilySystem.hpp>
 #include <functional>
 
@@ -17,19 +18,28 @@ public:
     void SetNetworkCallbacks(std::function<void(const std::string&)> create_fn,
                              std::function<void(uint32_t, const std::string&)> propose_fn,
                              std::function<void()> accept_fn,
+                             std::function<void()> reject_fn,
+                             std::function<void()> divorce_fn,
+                             std::function<void()> leave_fn,
                              std::function<void()> refresh_fn);
 
 private:
     Window* window_ = nullptr;
     TabPanel* tabs_ = nullptr;
-    Label* status_label_ = nullptr;
     Label* tab1_label_ = nullptr;
     Label* tab2_label_ = nullptr;
     Label* tab3_label_ = nullptr;
+    InputField* family_name_input_ = nullptr;
+    InputField* partner_id_input_ = nullptr;
+    InputField* partner_name_input_ = nullptr;
     FamilySystem* family_ = nullptr;
     std::function<void(const std::string&)> create_fn_;
     std::function<void(uint32_t, const std::string&)> propose_fn_;
     std::function<void()> accept_fn_;
+    std::function<void()> reject_fn_;
+    std::function<void()> divorce_fn_;
+    std::function<void()> leave_fn_;
     std::function<void()> refresh_fn_;
     void Refresh(GameState* state);
+    static const char* RelationLabel(uint8_t relation);
 };

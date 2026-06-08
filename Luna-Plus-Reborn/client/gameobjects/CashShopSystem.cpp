@@ -80,6 +80,18 @@ std::vector<std::string> CashShopSystem::GetCategories() const {
     return cats;
 }
 
+void CashShopSystem::SyncFromNetwork(const std::vector<CashItem>& items, int luna_points,
+                                     int bp_level, int bp_xp, int bp_max_xp, bool bp_active,
+                                     const std::string& season_name) {
+    items_ = items;
+    battle_pass_level_ = bp_level;
+    battle_pass_xp_ = bp_xp;
+    battle_pass_active_ = bp_active;
+    season_name_ = season_name;
+    (void)luna_points;
+    (void)bp_max_xp;
+}
+
 bool CashShopSystem::PurchaseItem(int& luna_points, uint32_t item_id) {
     for (auto& i : items_) {
         if (i.id == item_id) {

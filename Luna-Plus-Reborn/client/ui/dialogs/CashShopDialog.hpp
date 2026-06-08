@@ -9,6 +9,8 @@
 #include <ui/widgets/ProgressBar.hpp>
 #include <gameobjects/CashShopSystem.hpp>
 #include <functional>
+#include <string>
+#include <vector>
 
 class CashShopDialog {
 public:
@@ -30,8 +32,13 @@ private:
     CashShopSystem* shop_ = nullptr;
     std::function<void(uint32_t)> buy_fn_;
     std::function<void()> refresh_fn_;
-    void RefreshShop(int category_idx);
+    int selected_index_ = 0;
+    std::string category_filter_;
+    bool online_mode_ = false;
+    void RefreshShop(GameState* state);
     void RefreshBattlePass(GameState* state);
+    uint32_t SelectedItemId(GameState* state) const;
+    void ClampSelection(GameState* state);
+    std::vector<const GameState::NetworkCashShopItem*> FilteredNetworkItems(
+        const GameState* state) const;
 };
-
-

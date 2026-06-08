@@ -1021,7 +1021,7 @@ void MapServer::HandlePacket(uint16_t type, const uint8_t* payload, size_t len) 
         return;
     }
 
-    if (type >= PacketType_MP_FAMILY_INFO_SYN && type <= PacketType_MP_FAMILY_ACCEPT_ACK) {
+    if (type >= PacketType_MP_FAMILY_INFO_SYN && type <= PacketType_MP_FAMILY_ACTION_NACK) {
         MapPlayerContext ctx;
         ctx.character_id = static_cast<uint32_t>(connected_player_.id);
         ctx.name = connected_player_.name;

@@ -27,6 +27,30 @@ struct SiegeSchedule {
     uint32_t winner_guild_id = 0;
 };
 
+struct NetworkSiegeTerritoryView {
+    uint32_t territory_id = 0;
+    std::string name;
+    uint32_t owner_guild_id = 0;
+    std::string owner_guild_name;
+    uint16_t tax_rate = 10;
+    bool is_castle = false;
+    uint8_t defense_bonus = 0;
+    uint32_t attacker_guild_id = 0;
+    std::string attacker_guild_name;
+    uint32_t seconds_until_siege = 0;
+    uint32_t tax_accumulated = 0;
+};
+
+struct NetworkSiegeScheduleView {
+    uint32_t territory_id = 0;
+    std::string territory_name;
+    uint32_t attacker_guild_id = 0;
+    std::string attacker_guild_name;
+    uint32_t defender_guild_id = 0;
+    std::string defender_guild_name;
+    uint32_t seconds_until = 0;
+};
+
 class SiegeSystem {
 public:
     void Init();
@@ -54,6 +78,9 @@ public:
     bool DeclareWar(uint32_t from_guild, uint32_t to_guild);
     bool EndWar(uint32_t guild1, uint32_t guild2);
     bool IsAtWar(uint32_t guild1, uint32_t guild2) const;
+
+    void SyncFromNetwork(const std::vector<NetworkSiegeTerritoryView>& territories,
+                         const std::vector<NetworkSiegeScheduleView>& schedules);
     
     int GetTerritoryCount() const { return (int)territories_.size(); }
     int GetActiveSieges() const { return (int)active_sieges_.size(); }
