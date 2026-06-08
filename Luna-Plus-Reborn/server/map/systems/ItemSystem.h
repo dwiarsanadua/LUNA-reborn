@@ -3,56 +3,61 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <entt/entt.hpp>
+#include <ecs/components/Inventory.hpp>
+#include <ecs/components/Equipment.hpp>
+#include <ecs/components/CharacterStats.hpp>
+#include <ecs/components/Transform.hpp>
 
-struct ItemInstance {
-    uint32_t uid = 0;
-    uint32_t template_id = 0;
-    uint32_t count = 1;
-    int slot = -1;
-    int enchant = 0;
-    bool equipped = false;
+struct LootTableEntry {
+    uint32_t item_id;
+    float drop_chance; // 0.0 - 100.0
+    int min_count = 1;
+    int max_count = 1;
+    int min_enchant = 0;
+    int max_enchant = 0;
+    int min_level = 1;
+    int max_level = 999;
 };
 
-struct InventoryComponent {
-    std::vector<ItemInstance> items;
-    uint32_t gold = 0;
-    int max_slots = 40;
-};
-
-struct EquipmentComponent {
-    ItemInstance weapon;
-    ItemInstance offhand;
-    ItemInstance armor;
-    ItemInstance helmet;
-    ItemInstance gloves;
-    ItemInstance boots;
-    ItemInstance ring1;
-    ItemInstance ring2;
-    ItemInstance necklace;
+struct LootTable {
+    uint32_t table_id;
+    std::vector<LootTableEntry> entries;
+    int gold_min = 0;
+    int gold_max = 0;
 };
 
 class ItemSystem {
 public:
     ItemSystem();
+    void LoadLootTables(const std::string& db_path);
 
     // Inventory
-    bool AddItem(entt::entity entity, const ItemInstance& item);
-    bool RemoveItem(entt::entity entity, int slot, uint32_t count = 1);
-    bool MoveItem(entt::entity entity, int from_slot, int to_slot);
-    bool SplitStack(entt::entity entity, int slot, uint32_t count);
+    bool AddItem(entt::registry& registry, entt::entity entity, const ItemSlot& item);
+    bool RemoveItem(entt::registry& registry, entt::entity entity, size_t slot, uint16_t count = 1);
+    bool MoveItem(entt::registry& registry, entt::entity entity, size_t from_slot, size_t to_slot);
+    bool SplitStack(entt::registry& registry, entt::entity entity, size_t slot, uint16_t count);
 
     // Equipment
-    bool EquipItem(entt::entity entity, int slot);
-    bool UnequipItem(entt::entity entity, int equip_slot);
+    bool EquipItem(entt::registry& registry, entt::entity entity, size_t inv_slot);
+    bool UnequipItem(entt::registry& registry, entt::entity entity, uint8_t equip_slot);
 
-    // Drop
-    ItemInstance GenerateDrop(int template_id, int monster_level);
-    void SpawnLoot(glm::vec3 position, const std::vector<ItemInstance>& items);
+    // Drop / Loot
+    std::vector<ItemSlot> RollLootTable(uint32_t table_id, int monster_level);
+    std::vector<ItemSlot> GenerateDrop(int monster_template_id, int monster_level);
+    void SpawnLoot(entt::registry& registry, glm::vec3 position, const std::vector<ItemSlot>& items);
 
     // Upgrade
-    bool UpgradeItem(ItemInstance& item);
+    bool UpgradeItem(ItemSlot& item);
     int GetUpgradeSuccessRate(int current_enchant);
 
+    // Effects
+    void UseItem(entt::registry& registry, entt::entity entity, size_t slot);
+
     void Update(entt::registry& registry, float dt);
+
+private:
+    std::mt19937 rng_;
+    std::unordered_map<uint32_t, LootTable> loot_tables_;
 };

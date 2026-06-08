@@ -6,14 +6,64 @@
 MovementSystem::MovementSystem() = default;
 
 void MovementSystem::Update(entt::registry& registry, float dt) {
-    auto view = registry.view<MovementComponent>();
+    // Process player movement from input
+    auto view = registry.view<Transform, Movement, MovementBroadcast>();
     for (auto entity : view) {
-        auto& move = view.get<MovementComponent>(entity);
+        auto& xform = view.get<Transform>(entity);
+        auto& move = view.get<Movement>(entity);
+        auto& bc = view.get<MovementBroadcast>(entity);
+
         if (!move.is_moving) continue;
 
-        // Move toward target position using linear interpolation
-        // In production, would have actual Transform component
-        move.last_update_time += dt;
+        // Record history for interpolation
+        bc.history.push_back({xform.position, bc.broadcast_timer});
+        if (bc.history.size() > 10) bc.history.erase(bc.history.begin());
+
+        // Server-authoritative position update
+        glm::vec3 prev = xform.position;
+
+        // Apply velocity
+        if (glm::length(move.direction) > 0.1f) {
+            glm::vec3 dir = glm::normalize(move.direction);
+            float speed = move.current_speed * dt;
+            xform.position += dir * speed;
+        }
+
+        // Validate position
+        if (!ValidatePosition(xform.position, prev, speed_limit_)) {
+            spdlog::warn("Movement: speed limit exceeded for entity {}",
+                         static_cast<uint32_t>(entity));
+            xform.position = prev;
+        }
+        if (DetectTeleport(xform.position, prev, teleport_threshold_)) {
+            spdlog::warn("Movement: teleport detected for entity {}",
+                         static_cast<uint32_t>(entity));
+            xform.position = prev;
+        }
+
+        // Broadcast timer (10 Hz)
+        bc.broadcast_timer += dt;
+        if (bc.broadcast_timer >= bc.broadcast_interval) {
+            bc.broadcast_timer = 0.0f;
+
+            // In production, would send position update to network layer
+            // for broadcast to all nearby players in same chunk
+            if (registry.all_of<TagPlayer>(entity)) {
+                // BroadcastTransform(entity, xform.position);
+            }
+        }
+    }
+
+    // Interpolate monster movement
+    auto mon_view = registry.view<MovementBroadcast>();
+    for (auto entity : mon_view) {
+        auto& bc = mon_view.get<MovementBroadcast>(entity);
+        if (bc.history.size() >= 2) {
+            bc.interpolation_time += dt;
+            float t = bc.interpolation_time / bc.broadcast_interval;
+            auto& xform = registry.get<Transform>(entity);
+            xform.position = InterpolatePosition(bc.history, std::min(t, 1.0f));
+        }
     }
 }
 
@@ -24,9 +74,13 @@ bool MovementSystem::ValidatePosition(const glm::vec3& pos, const glm::vec3& pre
 
 bool MovementSystem::DetectTeleport(const glm::vec3& pos, const glm::vec3& prev_pos, float max_distance) {
     float dist = glm::distance(pos, prev_pos);
-    if (dist > max_distance) {
-        spdlog::warn("Movement: teleport detected - distance={}", dist);
-        return true;
-    }
-    return false;
+    return dist > max_distance;
+}
+
+glm::vec3 MovementSystem::InterpolatePosition(const std::vector<PositionHistory>& history, float t) {
+    if (history.size() < 2) return history.empty() ? glm::vec3(0) : history.back().position;
+    size_t idx = static_cast<size_t>((history.size() - 1) * t);
+    idx = std::min(idx, history.size() - 2);
+    float local_t = (history.size() - 1) * t - static_cast<float>(idx);
+    return glm::mix(history[idx].position, history[idx + 1].position, local_t);
 }

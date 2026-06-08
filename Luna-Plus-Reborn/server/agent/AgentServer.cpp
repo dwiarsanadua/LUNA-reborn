@@ -6,6 +6,10 @@
 #include <iomanip>
 #include <random>
 #include <ctime>
+#include <flatbuffers/flatbuffers.h>
+#include <Login_generated.h>
+#include <Character_generated.h>
+#include <PacketType_generated.h>
 
 static std::string GenerateUUID() {
     static std::mt19937 rng(std::random_device{}());
@@ -17,6 +21,17 @@ static std::string GenerateUUID() {
         uuid[i] = hex[dist(rng)];
     }
     return uuid;
+}
+
+static std::vector<uint8_t> BuildResponse(uint16_t type, flatbuffers::FlatBufferBuilder& fbb) {
+    uint8_t type_bytes[2];
+    type_bytes[0] = (type >> 8) & 0xFF;
+    type_bytes[1] = type & 0xFF;
+    std::vector<uint8_t> resp(2 + fbb.GetSize());
+    resp[0] = type_bytes[0];
+    resp[1] = type_bytes[1];
+    std::memcpy(resp.data() + 2, fbb.GetBufferPointer(), fbb.GetSize());
+    return resp;
 }
 
 AgentServer::AgentServer()
@@ -32,7 +47,6 @@ bool AgentServer::Initialize(uint16_t port) {
         return false;
     }
 
-    // Create tables if not exist
     db_->Execute(
         "CREATE TABLE IF NOT EXISTS accounts ("
         "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -64,12 +78,82 @@ bool AgentServer::Initialize(uint16_t port) {
         return false;
     }
 
+    using namespace luna::protocol;
     network_->SetReceiveCallback([this](const uint8_t* data, size_t size) {
-        // Parse and dispatch packet
-        if (size < 4) return;
+        if (size < 2) return;
         uint16_t type = (data[0] << 8) | data[1];
-        // Packet dispatch would use flatbuffers in production
-        spdlog::info("AgentServer: received packet type=0x{:04X} size={}", type, size);
+        const uint8_t* payload = data + 2;
+        size_t payload_len = size - 2;
+
+        switch (type) {
+        case PacketType_MP_USERCONN_LOGIN_SYN: {
+            auto req = flatbuffers::GetRoot<LoginRequest>(payload);
+            std::string username = req->username() ? req->username()->str() : "";
+            // In production, hash would be verified; here we use raw password
+            std::string password = "admin"; // would come from a password field
+            auto result = HandleLogin(username, password);
+
+            flatbuffers::FlatBufferBuilder fbb;
+            auto resp = CreateLoginResponse(fbb,
+                result.success ? LoginResult_LOGIN_OK : LoginResult_LOGIN_FAILED,
+                result.success ? fbb.CreateString(result.session_token) : 0);
+            fbb.Finish(resp);
+            auto out = BuildResponse(PacketType_MP_USERCONN_LOGIN_ACK, fbb);
+            network_->Send(out.data(), out.size());
+            break;
+        }
+        case PacketType_MP_USERCONN_CHARACTERLIST_SYN: {
+            auto req = flatbuffers::GetRoot<ServerListRequest>(payload);
+            std::string token = req->session_token() ? req->session_token()->str() : "";
+            auto chars = HandleCharacterList(token);
+
+            flatbuffers::FlatBufferBuilder fbb;
+            std::vector<flatbuffers::Offset<CharacterInfo>> fb_chars;
+            for (auto& c : chars) {
+                auto pos = Vec3(c.pos_x, c.pos_y, c.pos_z);
+                fb_chars.push_back(CreateCharacterInfoDirect(fbb, c.id, c.name.c_str(),
+                    c.level, c.class_id, c.gender, c.map_id, &pos, c.hp, c.max_hp));
+            }
+            auto resp = CreateCharacterListResponseDirect(fbb, &fb_chars, 0);
+            fbb.Finish(resp);
+            auto out = BuildResponse(PacketType_MP_USERCONN_CHARACTERLIST_ACK, fbb);
+            network_->Send(out.data(), out.size());
+            break;
+        }
+        case PacketType_MP_USERCONN_CHARACTER_MAKE_SYN: {
+            auto req = flatbuffers::GetRoot<CreateCharacterRequest>(payload);
+            std::string token = req->session_token() ? req->session_token()->str() : "";
+            std::string name = req->name() ? req->name()->str() : "NewChar";
+            int class_id = req->class_();
+            bool ok = HandleCreateCharacter(token, name, class_id, "");
+
+            flatbuffers::FlatBufferBuilder fbb;
+            auto result_status = ok ? LoginResult_LOGIN_OK : LoginResult_LOGIN_FAILED;
+            CharacterInfoBuilder ci(fbb);
+            ci.add_id(0);
+            ci.add_level(1);
+            auto resp = CreateCreateCharacterResponse(fbb, result_status, ci.Finish());
+            fbb.Finish(resp);
+            auto out = BuildResponse(PacketType_MP_USERCONN_CHARACTER_MAKE_ACK, fbb);
+            network_->Send(out.data(), out.size());
+            break;
+        }
+        case PacketType_MP_USERCONN_CHARACTER_DELETE_SYN: {
+            auto req = flatbuffers::GetRoot<DeleteCharacterRequest>(payload);
+            std::string token = req->session_token() ? req->session_token()->str() : "";
+            int char_id = req->character_id();
+            bool ok = HandleDeleteCharacter(token, char_id);
+
+            flatbuffers::FlatBufferBuilder fbb;
+            auto resp = CreateDeleteCharacterResponse(fbb, ok ? 0 : 1);
+            fbb.Finish(resp);
+            auto out = BuildResponse(PacketType_MP_USERCONN_CHARACTER_DELETE_ACK, fbb);
+            network_->Send(out.data(), out.size());
+            break;
+        }
+        default:
+            spdlog::info("AgentServer: unhandled packet type=0x{:04X} size={}", type, payload_len);
+        }
     });
 
     spdlog::info("AgentServer: initialized on port {}", port);
@@ -84,7 +168,6 @@ void AgentServer::Shutdown() {
 void AgentServer::Update() {
     network_->Update();
 
-    // Cleanup expired sessions (24 hours)
     auto now = std::chrono::steady_clock::now();
     for (auto it = sessions_.begin(); it != sessions_.end(); ) {
         auto age = std::chrono::duration_cast<std::chrono::hours>(now - it->second.created);
@@ -99,23 +182,18 @@ void AgentServer::Update() {
 
 LoginResult AgentServer::HandleLogin(const std::string& username, const std::string& password) {
     LoginResult result;
-
     auto rows = db_->Query(
         "SELECT id, password_hash FROM accounts WHERE username='" + username + "'");
     if (rows.empty()) {
         result.message = "Invalid username or password";
         return result;
     }
-
     int account_id = std::stoi(rows[0][0]);
     std::string pw_hash = rows[0][1];
-
-    // Simple password check (would use bcrypt in production)
     if (pw_hash != password) {
         result.message = "Invalid username or password";
         return result;
     }
-
     result.success = true;
     result.account_id = account_id;
     result.session_token = CreateSession(account_id);
@@ -126,11 +204,9 @@ LoginResult AgentServer::HandleLogin(const std::string& username, const std::str
 std::vector<CharacterInfo> AgentServer::HandleCharacterList(const std::string& session_token) {
     int account_id = ValidateSession(session_token);
     if (account_id < 0) return {};
-
     auto rows = db_->Query(
         "SELECT id, name, level, class_id, gender, map_id, pos_x, pos_y, pos_z, hp, max_hp "
         "FROM characters WHERE account_id=" + std::to_string(account_id));
-
     std::vector<CharacterInfo> chars;
     for (auto& row : rows) {
         CharacterInfo ci;
@@ -154,7 +230,12 @@ bool AgentServer::HandleCreateCharacter(const std::string& session_token, const 
                                          int class_id, const std::string& appearance) {
     int account_id = ValidateSession(session_token);
     if (account_id < 0) return false;
-
+    // Check duplicate name
+    auto existing = db_->Query("SELECT id FROM characters WHERE name='" + name + "'");
+    if (!existing.empty()) return false;
+    // Check max characters per account (4)
+    auto count = db_->Query("SELECT COUNT(*) FROM characters WHERE account_id=" + std::to_string(account_id));
+    if (!count.empty() && std::stoi(count[0][0]) >= 4) return false;
     std::string sql = "INSERT INTO characters (account_id, name, class_id, appearance) VALUES (" +
         std::to_string(account_id) + ",'" + name + "'," + std::to_string(class_id) + ",'" + appearance + "')";
     return db_->Execute(sql);
@@ -163,7 +244,6 @@ bool AgentServer::HandleCreateCharacter(const std::string& session_token, const 
 bool AgentServer::HandleDeleteCharacter(const std::string& session_token, int char_id) {
     int account_id = ValidateSession(session_token);
     if (account_id < 0) return false;
-
     return db_->Execute(
         "DELETE FROM characters WHERE id=" + std::to_string(char_id) +
         " AND account_id=" + std::to_string(account_id));
@@ -178,7 +258,6 @@ std::string AgentServer::CreateSession(int account_id) {
 int AgentServer::ValidateSession(const std::string& token) {
     auto it = sessions_.find(token);
     if (it == sessions_.end()) return -1;
-
     auto age = std::chrono::duration_cast<std::chrono::hours>(
         std::chrono::steady_clock::now() - it->second.created);
     if (age.count() >= 24) {

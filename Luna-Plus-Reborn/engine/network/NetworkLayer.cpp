@@ -125,31 +125,155 @@ static void KeyExpansion(const uint8_t* key, uint32_t* rk) {
 }
 
 static AesCtx g_aes_ctx;
-static uint8_t g_aes_ctr[16];
-static int g_aes_ctr_idx = 16;
 
 static void InitCipher() {
     uint8_t key[32];
     for (size_t i = 0; i < 32; i++) key[i] = 0x4C + (uint8_t)(i * 0x55);
     KeyExpansion(key, g_aes_ctx.rk);
     g_aes_ctx.nr = 14;
-    std::memset(g_aes_ctr, 0, 16);
-    g_aes_ctr_idx = 16;
 }
 
-static void XorStream(uint8_t* data, size_t size) {
-    for (size_t i = 0; i < size; i++) {
-        if (g_aes_ctr_idx >= 16) {
-            // increment counter
-            for (int j = 15; j >= 0; j--) {
-                if (++g_aes_ctr[j]) break;
-            }
-            AesEncryptBlock(g_aes_ctr, g_aes_ctr, g_aes_ctx.rk, g_aes_ctx.nr);
-            g_aes_ctr_idx = 0;
+// GHASH for GCM authentication tag
+static void GHASH(uint8_t out[16], const uint8_t* aad, size_t aad_len,
+                  const uint8_t* ct, size_t ct_len, const uint8_t h[16]) {
+    uint8_t y[16] = {0};
+    auto inc = [](uint8_t* v, const uint8_t* x, int n) {
+        uint16_t carry = 0;
+        for (int i = n-1; i >= 0; i--) {
+            uint16_t s = v[i] + x[i] + carry;
+            v[i] = s & 0xFF;
+            carry = s >> 8;
         }
-        data[i] ^= g_aes_ctr[g_aes_ctr_idx++];
+    };
+    auto mul_h = [&](uint8_t* x) {
+        uint8_t z[16] = {0}, v[16];
+        std::memcpy(v, h, 16);
+        for (int i = 0; i < 128; i++) {
+            if (x[i/8] & (0x80 >> (i%8)))
+                inc(z, v, 16);
+            uint8_t lsb = v[15] & 1;
+            for (int j = 15; j >= 0; j--) {
+                v[j] >>= 1;
+                if (j > 0 && (v[j-1] & 1)) v[j] |= 0x80;
+            }
+            if (lsb) v[0] ^= 0xE1;
+        }
+        std::memcpy(x, z, 16);
+    };
+
+    // Process AAD
+    uint8_t block[16];
+    size_t pos = 0;
+    while (pos < aad_len) {
+        std::memset(block, 0, 16);
+        size_t copy = std::min((size_t)16, aad_len - pos);
+        std::memcpy(block, aad + pos, copy);
+        inc(y, block, 16);
+        mul_h(y);
+        pos += 16;
     }
+    // Process ciphertext
+    pos = 0;
+    while (pos < ct_len) {
+        std::memset(block, 0, 16);
+        size_t copy = std::min((size_t)16, ct_len - pos);
+        std::memcpy(block, ct + pos, copy);
+        inc(y, block, 16);
+        mul_h(y);
+        pos += 16;
+    }
+    // Length block
+    uint64_t aad_bits = (uint64_t)aad_len * 8;
+    uint64_t ct_bits = (uint64_t)ct_len * 8;
+    for (int i = 0; i < 8; i++) {
+        block[i] = (aad_bits >> (56 - i*8)) & 0xFF;
+        block[8+i] = (ct_bits >> (56 - i*8)) & 0xFF;
+    }
+    inc(y, block, 16);
+    mul_h(y);
+    std::memcpy(out, y, 16);
 }
+
+// GCM encrypt: returns ciphertext + 16-byte tag
+static std::vector<uint8_t> GcmEncrypt(const uint8_t* plain, size_t len) {
+    uint8_t iv[12];
+    static uint32_t counter = 0;
+    for (int i = 0; i < 8; i++) iv[i] = (counter >> (56 - i*8)) & 0xFF;
+    counter++;
+    std::memcpy(iv + 8, "\x00\x00\x00\x01", 4);
+
+    uint8_t j0[16], h[16] = {0};
+    AesEncryptBlock(h, h, g_aes_ctx.rk, g_aes_ctx.nr);
+    std::memcpy(j0, iv, 12);
+    j0[12] = j0[13] = j0[14] = 0; j0[15] = 1;
+
+    // CTR mode encryption
+    std::vector<uint8_t> ct(len);
+    uint8_t ctr[16];
+    std::memcpy(ctr, j0, 16);
+    for (size_t i = 0; i < len; i += 16) {
+        ctr[15]++; // increment counter
+        uint8_t ks[16];
+        AesEncryptBlock(ctr, ks, g_aes_ctx.rk, g_aes_ctx.nr);
+        for (size_t j = 0; j < 16 && i+j < len; j++)
+            ct[i+j] = plain[i+j] ^ ks[j];
+    }
+
+    // Compute GHASH tag
+    uint8_t tag[16];
+    GHASH(tag, iv, 12, ct.data(), len, h);
+
+    // XOR with E(K, J0)
+    uint8_t ek_j0[16];
+    AesEncryptBlock(j0, ek_j0, g_aes_ctx.rk, g_aes_ctx.nr);
+    for (int i = 0; i < 16; i++) tag[i] ^= ek_j0[i];
+
+    // Output: IV(8) + ciphertext + tag(16)
+    std::vector<uint8_t> result(8 + len + 16);
+    std::memcpy(result.data(), iv, 8);
+    std::memcpy(result.data() + 8, ct.data(), len);
+    std::memcpy(result.data() + 8 + len, tag, 16);
+    return result;
+}
+
+// GCM decrypt: returns plaintext on success, empty on auth failure
+static std::vector<uint8_t> GcmDecrypt(const uint8_t* data, size_t size) {
+    if (size < 24) return {}; // 8 IV + 16 tag min
+    size_t ct_len = size - 24;
+
+    uint8_t h[16] = {0};
+    AesEncryptBlock(h, h, g_aes_ctx.rk, g_aes_ctx.nr);
+
+    uint8_t j0[16];
+    std::memcpy(j0, data, 8); // IV
+    j0[8] = j0[9] = j0[10] = 0; j0[11] = 1;
+    j0[12] = j0[13] = j0[14] = 0; j0[15] = 1;
+
+    // Verify tag
+    uint8_t expected_tag[16], computed_tag[16];
+    std::memcpy(expected_tag, data + 8 + ct_len, 16);
+    GHASH(computed_tag, data, 8, data + 8, ct_len, h);
+    uint8_t ek_j0[16];
+    AesEncryptBlock(j0, ek_j0, g_aes_ctx.rk, g_aes_ctx.nr);
+    for (int i = 0; i < 16; i++) computed_tag[i] ^= ek_j0[i];
+
+    if (std::memcmp(expected_tag, computed_tag, 16) != 0) return {};
+
+    // CTR decryption
+    std::vector<uint8_t> plain(ct_len);
+    uint8_t ctr[16];
+    std::memcpy(ctr, j0, 16);
+    for (size_t i = 0; i < ct_len; i += 16) {
+        ctr[15]++;
+        uint8_t ks[16];
+        AesEncryptBlock(ctr, ks, g_aes_ctx.rk, g_aes_ctx.nr);
+        for (size_t j = 0; j < 16 && i+j < ct_len; j++)
+            plain[i+j] = data[8+i+j] ^ ks[j];
+    }
+    return plain;
+}
+
+static bool g_cipher_initialized = false;
 
 class NetworkLayer::Impl {
 public:
@@ -172,11 +296,11 @@ public:
     static constexpr int CONNECT_TIMEOUT_SEC = 30;
 
     Impl() : socket_(io_context_) {
-        InitCipher();
         read_buf_.reserve(65536);
     }
 
     bool StartServer(uint16_t port) {
+        if (!g_cipher_initialized) { InitCipher(); g_cipher_initialized = true; }
         try {
             asio::ip::tcp::endpoint ep(asio::ip::tcp::v4(), port);
             acceptor_.open(ep.protocol());
@@ -282,10 +406,15 @@ public:
                     continue;
                 }
 
-                // Decrypt payload (AES-256 CTR)
-                std::vector<uint8_t> payload(read_buf_.begin() + sizeof(PacketHeader),
-                                              read_buf_.begin() + total);
-                XorStream(payload.data(), payload.size());
+                // Decrypt payload (AES-256-GCM)
+                std::vector<uint8_t> raw(read_buf_.begin() + sizeof(PacketHeader),
+                                         read_buf_.begin() + total);
+                auto payload = GcmDecrypt(raw.data(), raw.size());
+                if (payload.empty()) {
+                    spdlog::warn("NetworkLayer: GCM auth tag mismatch, dropping packet");
+                    read_buf_.erase(read_buf_.begin(), read_buf_.begin() + total);
+                    continue;
+                }
 
                 if (recv_cb_) {
                     recv_cb_(payload.data(), payload.size());
@@ -321,14 +450,14 @@ public:
         hdr.length = static_cast<uint32_t>(size);
         hdr.type = 0;
         hdr.sequence = ++seq_send_;
-        hdr.crc32 = CalculateCRC32(data, size);
+        // Encrypt payload with AES-256-GCM (size becomes payload + 24: 8 IV + ciphertext + 16 tag)
+        auto encrypted = GcmEncrypt(data, size);
+        hdr.crc32 = CalculateCRC32(encrypted.data(), encrypted.size());
+        hdr.length = static_cast<uint32_t>(encrypted.size());
 
-        auto packet = std::make_shared<std::vector<uint8_t>>(sizeof(PacketHeader) + size);
+        auto packet = std::make_shared<std::vector<uint8_t>>(sizeof(PacketHeader) + encrypted.size());
         std::memcpy(packet->data(), &hdr, sizeof(PacketHeader));
-        std::memcpy(packet->data() + sizeof(PacketHeader), data, size);
-
-        // Encrypt payload
-        XorStream(packet->data() + sizeof(PacketHeader), size);
+        std::memcpy(packet->data() + sizeof(PacketHeader), encrypted.data(), encrypted.size());
 
         asio::post(io_context_, [this, packet]() {
             write_queue_.push_back(*packet);

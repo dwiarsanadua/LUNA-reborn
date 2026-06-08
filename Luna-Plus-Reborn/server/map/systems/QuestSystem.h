@@ -5,64 +5,44 @@
 #include <vector>
 #include <unordered_map>
 #include <entt/entt.hpp>
+#include <ecs/components/QuestLog.hpp>
+#include <ecs/components/CharacterStats.hpp>
+#include <ecs/components/Tag.hpp>
 
-enum class QuestState : uint8_t {
-    NOT_STARTED,
-    IN_PROGRESS,
-    COMPLETED,
-    REWARDED
-};
-
-enum class QuestConditionType : uint8_t {
-    KILL_COUNT,
-    ITEM_COLLECT,
-    LEVEL_CHECK,
-    NPC_TALK,
-    REACH_LOCATION
-};
-
-struct QuestCondition {
-    QuestConditionType type;
-    int target_id;
-    int required_count;
-    int current_count = 0;
-};
-
-struct QuestReward {
-    uint64_t exp = 0;
-    uint32_t gold = 0;
-    std::vector<uint32_t> item_ids;
-    int reputation = 0;
-};
-
-struct QuestObjective {
+struct QuestTemplate {
     uint32_t quest_id;
     std::string name;
     std::string description;
-    QuestState state = QuestState::NOT_STARTED;
-    std::vector<QuestCondition> conditions;
-    QuestReward reward;
-};
-
-struct QuestComponent {
-    std::vector<QuestObjective> active_quests;
-    std::vector<uint32_t> completed_quests;
+    int min_level;
+    std::vector<QuestObjective> objectives;
+    uint64_t reward_exp;
+    uint32_t reward_gold;
+    std::vector<uint32_t> reward_items;
+    std::vector<uint32_t> reward_item_counts;
+    int reward_reputation;
+    uint32_t giver_npc_id;
+    uint32_t completer_npc_id;
+    bool is_repeatable = false;
 };
 
 class QuestSystem {
 public:
     QuestSystem();
 
-    void StartQuest(entt::entity entity, uint32_t quest_id);
-    void CompleteQuest(entt::entity entity, uint32_t quest_id);
-    void ClaimReward(entt::entity entity, uint32_t quest_id);
+    void LoadQuestTemplates(const std::string& db_path);
 
-    void UpdateCondition(entt::entity entity, QuestConditionType type, int target_id, int amount = 1);
-    bool CheckConditions(const std::vector<QuestCondition>& conditions);
+    bool StartQuest(entt::registry& registry, entt::entity entity, uint32_t quest_id);
+    bool CompleteQuest(entt::registry& registry, entt::entity entity, uint32_t quest_id);
+    bool ClaimReward(entt::registry& registry, entt::entity entity, uint32_t quest_id);
 
+    void UpdateCondition(entt::registry& registry, entt::entity entity,
+                         QuestObjective::Type type, uint32_t target_id, uint16_t amount = 1);
+    bool CheckConditions(const std::vector<QuestObjective>& objectives);
+
+    bool CanStartQuest(entt::registry& registry, entt::entity entity, uint32_t quest_id);
     void Update(entt::registry& registry, float dt);
 
 private:
-    std::unordered_map<uint32_t, std::pair<std::vector<QuestCondition>, QuestReward>> quest_templates_;
-    void LoadQuestTemplates();
+    std::unordered_map<uint32_t, QuestTemplate> quest_templates_;
+    void GrantRewards(entt::registry& registry, entt::entity entity, const QuestTemplate& qt);
 };

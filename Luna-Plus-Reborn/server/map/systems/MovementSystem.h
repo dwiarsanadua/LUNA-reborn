@@ -2,13 +2,20 @@
 #pragma once
 #include <entt/entt.hpp>
 #include <glm/glm.hpp>
+#include <ecs/components/Transform.hpp>
+#include <ecs/components/Movement.hpp>
+#include <ecs/components/Tag.hpp>
 
-struct MovementComponent {
-    glm::vec3 velocity{0};
-    glm::vec3 target_position{0};
-    float speed = 5.0f;
-    bool is_moving = false;
-    float last_update_time = 0.0f;
+struct PositionHistory {
+    glm::vec3 position;
+    float timestamp;
+};
+
+struct MovementBroadcast {
+    float broadcast_timer = 0.0f;
+    float broadcast_interval = 0.1f; // 10 Hz
+    std::vector<PositionHistory> history;
+    float interpolation_time = 0.0f;
 };
 
 class MovementSystem {
@@ -18,6 +25,7 @@ public:
 
     bool ValidatePosition(const glm::vec3& pos, const glm::vec3& prev_pos, float speed_limit);
     bool DetectTeleport(const glm::vec3& pos, const glm::vec3& prev_pos, float max_distance);
+    glm::vec3 InterpolatePosition(const std::vector<PositionHistory>& history, float t);
 
 private:
     float speed_limit_ = 20.0f;
