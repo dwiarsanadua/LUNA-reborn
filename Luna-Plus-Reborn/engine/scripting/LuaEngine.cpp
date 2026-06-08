@@ -52,13 +52,13 @@ public:
             ExecuteString("setfenv(0, _SAFE_ENV)");
 
             // Remove dangerous globals
-            lua_.set("dofile", sol::nil);
-            lua_.set("loadfile", sol::nil);
-            lua_.set("require", sol::nil);
-            lua_.set("module", sol::nil);
-            lua_.set("load", sol::nil);
-            lua_.set("collectgarbage", sol::nil);
-            lua_.set("newproxy", sol::nil);
+            lua_.set("dofile", sol::lua_nil);
+            lua_.set("loadfile", sol::lua_nil);
+            lua_.set("require", sol::lua_nil);
+            lua_.set("module", sol::lua_nil);
+            lua_.set("load", sol::lua_nil);
+            lua_.set("collectgarbage", sol::lua_nil);
+            lua_.set("newproxy", sol::lua_nil);
 
             initialized_ = true;
             spdlog::info("LuaEngine: initialized with sandboxed environment");

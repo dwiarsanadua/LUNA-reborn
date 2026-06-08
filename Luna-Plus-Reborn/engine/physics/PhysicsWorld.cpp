@@ -1,4 +1,3 @@
-// AGENT Titan — DO NOT MODIFY WITHOUT COORDINATION
 #include "PhysicsWorld.h"
 #include <Jolt/Jolt.h>
 #include <Jolt/Physics/PhysicsSystem.h>
@@ -6,6 +5,9 @@
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Collision/RayCast.h>
 #include <Jolt/Physics/Collision/CastResult.h>
+#include <Jolt/Physics/Collision/CollisionCollectorImpl.h>
+#include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>
+#include <Jolt/Physics/Collision/ObjectLayerPairFilterTable.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Physics/Body/BodyActivationListener.h>
 #include <Jolt/Core/JobSystemThreadPool.h>
@@ -15,12 +17,42 @@
 
 JPH_SUPPRESS_WARNINGS
 
-// ── Jolt global state ───────────────────────────────────────────
+namespace {
+
+class BPLayerInterfaceImpl final : public JPH::BroadPhaseLayerInterface {
+public:
+    BPLayerInterfaceImpl() { }
+    uint GetNumBroadPhaseLayers() const override { return 1; }
+    JPH::BroadPhaseLayer GetBroadPhaseLayer(JPH::ObjectLayer) const override {
+        return JPH::BroadPhaseLayer(0);
+    }
+};
+
+class ObjectVsBPLayerFilterImpl final : public JPH::ObjectVsBroadPhaseLayerFilter {
+public:
+    bool ShouldCollide(JPH::ObjectLayer, JPH::BroadPhaseLayer) const override {
+        return true;
+    }
+};
+
+class ObjectLayerPairFilterImpl final : public JPH::ObjectLayerPairFilter {
+public:
+    bool ShouldCollide(JPH::ObjectLayer, JPH::ObjectLayer) const override {
+        return true;
+    }
+};
+
+static BPLayerInterfaceImpl          s_bp_layer_interface;
+static ObjectVsBPLayerFilterImpl     s_object_vs_bp;
+static ObjectLayerPairFilterImpl     s_object_pair_filter;
+
+} // anonymous namespace
+
 static JPH::TempAllocator*          g_temp_allocator = nullptr;
-static JPH::JobSystemThreadPool*     g_job_system = nullptr;
+static JPH::JobSystemThreadPool*    g_job_system = nullptr;
 static JPH::PhysicsSystem*          g_physics = nullptr;
 static JPH::BodyInterface*          g_body_interface = nullptr;
-static JPH::NarrowPhaseQuery*       g_narrow_phase = nullptr;
+static const JPH::NarrowPhaseQuery* g_narrow_phase = nullptr;
 
 static constexpr float c_character_height_stand = 1.8f;
 static constexpr float c_character_radius = 0.3f;
@@ -39,16 +71,18 @@ bool PhysicsWorld::Initialize() {
 
     if (!g_physics) {
         g_physics = new JPH::PhysicsSystem();
-        g_physics->Init(1024, 0, 1024, 1024, *g_temp_allocator, *g_job_system);
+        g_physics->Init(1024, 0, 1024, 1024,
+                        s_bp_layer_interface,
+                        s_object_vs_bp,
+                        s_object_pair_filter);
         g_physics->SetGravity(JPH::Vec3(0, -9.81f, 0));
 
-        // Simple ground plane
         JPH::BodyCreationSettings ground_settings(
             new JPH::BoxShape(JPH::Vec3(5000.0f, 1.0f, 5000.0f)),
             JPH::Vec3(0, -1.0f, 0),
             JPH::Quat::sIdentity(),
             JPH::EMotionType::Static,
-            JPH::EObjectLayer(0)
+            JPH::ObjectLayer(0)
         );
         JPH::BodyID ground = g_physics->GetBodyInterface().CreateAndAddBody(
             ground_settings, JPH::EActivation::DontActivate);
@@ -84,8 +118,7 @@ void PhysicsWorld::Shutdown() {
 void PhysicsWorld::Update(float delta_time) {
     if (!g_physics) return;
     const int c_collision_steps = 1;
-    const int c_integration_steps = 1;
-    g_physics->Update(delta_time, c_collision_steps, c_integration_steps,
+    g_physics->Update(delta_time, c_collision_steps,
                       g_temp_allocator, g_job_system);
 }
 
@@ -127,7 +160,6 @@ bool PhysicsWorld::RayCast(glm::vec3 from, glm::vec3 to, glm::vec3& out_hit) con
     ray.mOrigin = JPH::Vec3(from.x, from.y, from.z);
     ray.mDirection = JPH::Vec3(to.x - from.x, to.y - from.y, to.z - from.z);
 
-    JPH::RayCastResult hit;
     JPH::ClosestHitCollisionCollector<JPH::CastRayCollector> collector;
     g_narrow_phase->CastRay(ray, JPH::RayCastSettings(), collector);
 

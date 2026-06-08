@@ -137,7 +137,8 @@ bool Model::LoadAssimp(const std::string& path, unsigned int flags) {
     }
 
     // Fill in inverse bind matrices from actual bone data in meshes
-    for (auto& mesh : scene->mMeshes) {
+    for (unsigned int mi = 0; mi < scene->mNumMeshes; ++mi) {
+        auto* mesh = scene->mMeshes[mi];
         for (uint32_t b = 0; b < mesh->mNumBones; ++b) {
             aiBone* bone = mesh->mBones[b];
             std::string bname = bone->mName.C_Str();

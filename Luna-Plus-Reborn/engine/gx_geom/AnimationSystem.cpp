@@ -4,7 +4,9 @@
 #include <fstream>
 #include <sstream>
 #include <cstring>
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
+#include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <nlohmann/json.hpp>
 
@@ -315,7 +317,7 @@ void AnimationSystem::GetBlendedPose(const std::vector<glm::mat4>& bind_pose,
             // Decompose and blend position, rotation, scale
             glm::vec3 p0, p1, s0, s1, sk0, sk1;
             glm::quat r0, r1;
-            glm::vec3 persp0, persp1;
+            glm::vec4 persp0, persp1;
             glm::decompose(pose0[i], s0, r0, p0, sk0, persp0);
             glm::decompose(pose1[i], s1, r1, p1, sk1, persp1);
 

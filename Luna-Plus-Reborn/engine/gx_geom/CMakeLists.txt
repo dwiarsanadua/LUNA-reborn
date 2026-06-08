@@ -17,4 +17,5 @@ target_link_libraries(gx_geom PUBLIC
     spdlog::spdlog
     fmt::fmt
     glm::glm
+    assimp::assimp
 )

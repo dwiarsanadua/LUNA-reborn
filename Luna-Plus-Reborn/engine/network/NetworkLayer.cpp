@@ -430,7 +430,7 @@ public:
     void DoWrite() {
         if (write_queue_.empty()) return;
         auto& data = write_queue_.front();
-        asio::async_write(socket_, asio::buffer(*data), [this](std::error_code ec, size_t) {
+        asio::async_write(socket_, asio::buffer(data.data(), data.size()), [this](std::error_code ec, size_t) {
             if (ec) {
                 spdlog::error("NetworkLayer: write error - {}", ec.message());
                 Close();

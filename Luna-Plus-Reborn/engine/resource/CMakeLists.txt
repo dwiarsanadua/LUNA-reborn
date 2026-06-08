@@ -9,4 +9,6 @@ target_include_directories(gx_resource PUBLIC
 
 target_link_libraries(gx_resource PUBLIC
     luna_compile_options
+    spdlog::spdlog
+    fmt::fmt
 )
