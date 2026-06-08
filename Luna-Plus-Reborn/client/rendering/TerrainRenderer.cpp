@@ -130,7 +130,7 @@ bool TerrainRenderer::LoadFromHGT(const std::string& hgt_path, float world_scale
     std::ifstream f(hgt_path);
     if (!f) { spdlog::error("Terrain: cannot open {}", hgt_path); return false; }
     int w, h; f >> w >> h;
-    if (w <= 0 || h > 4096) return false;
+    if (w <= 0 || h > 65536 || w * h > 50000000) return false;
     hgt_data_.resize(w * h); hgt_min_ = 1e9f; hgt_max_ = -1e9f;
     for (int i = 0; i < w * h; i++) { f >> hgt_data_[i]; hgt_min_ = std::min(hgt_min_, hgt_data_[i]); hgt_max_ = std::max(hgt_max_, hgt_data_[i]); }
     hgt_width_ = w; hgt_height_ = h; hgt_scale_ = world_scale; use_hgt_ = true;
