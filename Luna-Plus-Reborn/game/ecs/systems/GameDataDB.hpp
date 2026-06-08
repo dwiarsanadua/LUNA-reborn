@@ -312,6 +312,7 @@ public:
     // Economy getters
     uint32_t GetExpForLevel(uint32_t level) const;
     std::vector<DropEntry> GetDropTable(uint32_t monster_id) const;
+    int32_t GetItemPrice(uint32_t item_id) const;
     int32_t GetItemBuyPrice(uint32_t item_id) const;
     int32_t GetItemSellPrice(uint32_t item_id) const;
 

@@ -1312,6 +1312,11 @@ std::vector<DropEntry> GameDataDB::GetDropTable(uint32_t monster_id) const {
     return it != drop_table_.end() ? it->second : std::vector<DropEntry>{};
 }
 
+int32_t GameDataDB::GetItemPrice(uint32_t item_id) const {
+    auto it = price_table_.find(item_id);
+    return it != price_table_.end() ? it->second.buy_price : 0;
+}
+
 int32_t GameDataDB::GetItemBuyPrice(uint32_t item_id) const {
     auto it = price_table_.find(item_id);
     return it != price_table_.end() ? it->second.buy_price : 0;

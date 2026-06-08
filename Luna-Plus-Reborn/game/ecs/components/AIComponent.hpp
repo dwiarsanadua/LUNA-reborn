@@ -9,6 +9,8 @@ struct AIComponent {
         Idle = 0, Patrol = 1, Chase = 2, Attack = 3,
         Return = 4, Flee = 5, PatrolCombat = 6,
         Stun = 7, Sleep = 8,
+        BossPhase1 = 9, BossPhase2 = 10, BossPhase3 = 11,
+        BossPhase4 = 12, BossPhase5 = 13,
     };
     State state = Idle;
     uint32_t aggro_target = 0;
@@ -22,6 +24,12 @@ struct AIComponent {
     float patrol_wait_time = 0.0f;
     float patrol_wait_timer = 0.0f;
     float enrage_timer = 0.0f;
+    float enrage_threshold = 180.0f;
+    int boss_phase = 0;
+    bool is_boss = false;
+    std::vector<float> phase_hp_thresholds;
+    float special_attack_timer = 0.0f;
+    float special_attack_cooldown = 8.0f;
     float state_timer = 0.0f;
     float skill_timer = 0.0f;
     float last_attack_time = 0.0f;
