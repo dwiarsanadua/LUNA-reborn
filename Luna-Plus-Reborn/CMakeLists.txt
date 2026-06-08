@@ -35,6 +35,33 @@ find_package(EnTT REQUIRED)
 find_package(flatbuffers REQUIRED)
 find_package(assimp REQUIRED)
 
+# Asio networking library
+find_path(ASIO_INCLUDE_DIR asio.hpp PATHS /opt/homebrew/include /usr/local/include /usr/include)
+if(ASIO_INCLUDE_DIR)
+    add_library(asio::asio INTERFACE IMPORTED)
+    set_target_properties(asio::asio PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${ASIO_INCLUDE_DIR}"
+    )
+    message(STATUS "Found asio: ${ASIO_INCLUDE_DIR}")
+else()
+    message(FATAL_ERROR "asio not found. Install with: brew install asio")
+endif()
+
+# sol2 Lua scripting (optional)
+find_package(sol2 QUIET)
+if(NOT sol2_FOUND)
+    message(WARNING "sol2 not found. Scripting engine disabled. Install with: brew install sol2")
+    add_library(sol2::sol2 INTERFACE IMPORTED)
+endif()
+
+# Jolt Physics (optional)
+find_package(Jolt QUIET)
+if(NOT Jolt_FOUND)
+    message(WARNING "Jolt Physics not found. Physics engine will be stubbed.")
+    add_library(Jolt::Jolt INTERFACE IMPORTED)
+endif()
+
+# libuv (legacy, optional)
 find_library(UV_LIBRARY uv PATHS /opt/homebrew/lib /usr/local/lib /usr/lib)
 find_path(UV_INCLUDE_DIR uv.h PATHS /opt/homebrew/include /usr/local/include /usr/include)
 if(UV_LIBRARY AND UV_INCLUDE_DIR)
@@ -45,7 +72,8 @@ if(UV_LIBRARY AND UV_INCLUDE_DIR)
     )
     message(STATUS "Found libuv: ${UV_LIBRARY}")
 else()
-    message(FATAL_ERROR "libuv not found")
+    message(WARNING "libuv not found. Legacy network code disabled.")
+    add_library(libuv::uv INTERFACE IMPORTED)
 endif()
 
 if(APPLE)
