@@ -6,7 +6,8 @@ PKManagerDlg::PKManagerDlg() {}
 
 void PKManagerDlg::Open(WindowManager* wm) {
     if (window_) return;
-    window_ = wm->Open("PK Manager", 400, 150, 400, 350);
+    window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/PKLootDlg.bin.txt",
+        "PK Manager", 400, 150, 400, 350);
     window_->SetClosable(true);
     window_->SetMovable(true);
     window_->SetTitleBarH(24);

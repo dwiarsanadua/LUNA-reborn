@@ -380,6 +380,7 @@ void Hero::Update(float dt) {
 }
 
 void Hero::Render(UIRenderer& ui) {
+    if (!render_hud_) return;
     float hx = 10, hy = 10;
     TextureInfo atlas4 = ui.LoadTexture("ui_atlas4", "b4.png");
     

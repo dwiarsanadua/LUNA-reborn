@@ -17,10 +17,13 @@ void Button::Update(float dt, float mx, float my, bool mousedown, bool mousepres
 
 void Button::Render(UIRenderer& ui) {
     if (!visible_) return;
-    
+
     TextureInfo tex = pressed_ ? tex_pressed_ : (hovered_ ? tex_hover_ : tex_normal_);
-    
-    if (bgfx::isValid(tex.handle)) {
+    UiScriptUV uv = pressed_ ? uv_pressed_ : (hovered_ ? uv_hover_ : uv_normal_);
+
+    if (use_uv_ && bgfx::isValid(tex.handle)) {
+        ui.DrawImageUV(x_, y_, w_, h_, tex.handle, uv.u1, uv.v1, uv.u2, uv.v2);
+    } else if (bgfx::isValid(tex.handle)) {
         ui.DrawNinePatch(x_, y_, w_, h_, tex, 4, 4, 4, 4);
     } else {
         UIColor c = pressed_ ? color_pressed_ : (hovered_ ? color_hover_ : color_normal_);

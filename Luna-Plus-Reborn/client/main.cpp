@@ -37,6 +37,9 @@
 #include <config/KeyBindings.hpp>
 #include <ui/skin/UiSkinManager.hpp>
 #include <ui/UiFunctionRegistry.hpp>
+#include <ui/UiCaptureMode.hpp>
+#include <util/ScreenshotCapture.hpp>
+#include <input/Keyboard.hpp>
 #include <game/network/PacketDispatcher.hpp>
 #include <spdlog/spdlog.h>
 #include <csignal>
@@ -60,7 +63,7 @@ static bool g_dragging = false;
 static ScreenManager* g_screen_mgr = nullptr;
 UIRenderer* g_ui = nullptr;
 
-int main() {
+int main(int argc, char** argv) {
     srand((unsigned int)time(nullptr));
     mkdir("logs", 0777);
 
@@ -166,6 +169,23 @@ int main() {
     // 10. UIRenderer
     UIRenderer ui; ui.Init();
     g_ui = &ui;
+
+    if (argc >= 3 && std::string(argv[1]) == "--ui-capture") {
+        ui.width = (float)device.GetWidth();
+        ui.height = (float)device.GetHeight();
+        int rc = RunUiCaptureMode(device, ui, argv[2]);
+        g_ui = nullptr;
+        CharRenderer_Shutdown();
+        map.Unload();
+        props.Shutdown();
+        terrain.Shutdown();
+        gfx.Shutdown();
+        ui.Shutdown();
+        audio.Shutdown();
+        device.Shutdown();
+        return rc;
+    }
+
     sky.SetSampler(ui.GetSampler(), ui.GetWhiteTexture());
     ui.width = (float)device.GetWidth();
     ui.height = (float)device.GetHeight();
@@ -433,11 +453,18 @@ int main() {
         screenManager.Render(ui, view, proj);
 
         if (frame % 30 == 0) fps = 1.0f / dt;
-        // Hanya tampil fps di game screen, bukan login/charselect
         if (screenManager.CurrentName() == "game") {
             char fps_buf[32]; snprintf(fps_buf, sizeof(fps_buf), "FPS: %.0f", fps);
             ui.DrawText(1200, 2, 0xff888888, "%s", fps_buf);
         }
+
+        if (Keyboard::IsActionPressed("screenshot")) {
+            char path[256];
+            snprintf(path, sizeof(path), "screenshots/manual/luna_%05d.png", frame);
+            ScreenshotCapture::Request(path);
+            spdlog::info("Screenshot saved as {}.tga", path);
+        }
+        ScreenshotCapture::Poll();
 
         device.EndFrame();
     }

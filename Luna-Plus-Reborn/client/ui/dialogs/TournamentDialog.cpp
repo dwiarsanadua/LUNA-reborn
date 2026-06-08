@@ -4,7 +4,8 @@
 
 void TournamentDialog::Open(GameState* state, WindowManager* wm, TournamentSystem* ts) {
     ts_ = ts;
-    window_ = wm->Open("Tournament Arena", 120, 40, 540, 460);
+    window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/GTBattleTable_16.bin.txt",
+        "Tournament Arena", 120, 40, 540, 460);
     window_->SetClosable(true);
     window_->SetMovable(true);
     window_->SetTitleBarH(24);

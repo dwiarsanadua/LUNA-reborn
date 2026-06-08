@@ -1,5 +1,6 @@
 #pragma once
 #include <rendering/UIRenderer.hpp>
+#include <ui/UiScriptParser.hpp>
 #include <engine/gx_render/VFS.h>
 #include <string>
 #include <unordered_map>
@@ -96,8 +97,11 @@ public:
     static void DrawSlot(UIRenderer& ui, float x, float y, float size,
                          const std::string& slot_type, bool hover = false);
 
-    // Load all window layout definitions from interface/Windows/*.txt
+    // Load all window layout definitions from interface/Windows/*.bin.txt
     static int LoadWindowLayouts(const std::string& windows_path);
+    static const UiElement* GetLayout(const std::string& layout_name);
+    static const UiElement* GetLayoutByPath(const std::string& script_path);
+    static int GetLayoutCount();
 
     // Get all loaded texture names
     static std::vector<std::string> GetLoadedTextureNames();
@@ -106,6 +110,7 @@ private:
     static std::unordered_map<std::string, bgfx::TextureHandle> textures_;
     static std::unordered_map<std::string, UISkinPart> skin_parts_;
     static std::unordered_map<std::string, WindowSkin> window_skins_;
+    static std::unordered_map<std::string, UiElement> layout_cache_;
     static ButtonSkin default_button_skin_;
     static GaugeSkin hp_gauge_skin_, mp_gauge_skin_, exp_gauge_skin_;
     static SlotSkin inventory_slot_skin_;

@@ -4,12 +4,8 @@
 
 void CharacterDialog::Open(GameState* state, WindowManager* wm) {
     if (wm) {
-        window_ = wm->LoadFromScript("assets/interface/Windows/CharInfo.bin.txt");
-    }
-
-    if (!window_) {
-        spdlog::warn("CharacterDialog: failed to load UI script, using C++ fallback");
-        window_ = wm->Open("Character", 350, 60, 400, 420);
+        window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/CharInfo.bin.txt",
+            "Character", 350, 60, 400, 420);
         window_->SetClosable(true);
         window_->SetMovable(true);
         window_->SetTitleBarH(24);

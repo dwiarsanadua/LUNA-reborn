@@ -38,7 +38,9 @@ void ListBox::Render(UIRenderer& ui) {
     ui.DrawBorder(x_, y_, w_, h_, {60, 60, 80, 150});
     
     float ly = y_;
-    int max_visible = (int)(h_ / item_h_);
+    int max_visible = max_visible_ > 0 ? max_visible_ : (int)(h_ / item_h_);
+    if (auto_scroll_ && (int)items_.size() > max_visible)
+        scroll_offset_ = (int)items_.size() - max_visible;
     for (int i = scroll_offset_; i < (int)items_.size() && i < scroll_offset_ + max_visible; i++) {
         if (i == selected_) {
             ui.DrawRect(x_ + 1, ly, w_ - 2, item_h_, {60, 60, 120, 200});

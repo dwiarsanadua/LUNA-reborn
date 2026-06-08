@@ -3,7 +3,8 @@
 
 void PetDialog::Open(GameState* state, WindowManager* wm, Pet* pet) {
     pet_ = pet;
-    window_ = wm->Open("Pet Manager", 200, 80, 380, 360);
+    window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/PetInfo.bin.txt",
+        "Pet Manager", 200, 80, 380, 360);
     window_->SetClosable(true);
     window_->SetMovable(true);
     window_->SetTitleBarH(24);

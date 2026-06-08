@@ -11,7 +11,8 @@ void MacroDialog::Open(GameState* state, WindowManager* wm) {
         {"Summon Pet", "/pet summon", 53},            // 5
     };
 
-    window_ = wm->Open("Macro Manager", 150, 60, 480, 420);
+    window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/Action_Command.bin.txt",
+        "Macro Manager", 150, 60, 480, 420);
     window_->SetClosable(true);
     window_->SetMovable(true);
     window_->SetTitleBarH(24);

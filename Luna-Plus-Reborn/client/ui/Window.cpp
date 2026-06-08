@@ -28,10 +28,8 @@ void Window::Update(float dt, float mx, float my, bool mousedown, bool mousepres
         y_ = my - drag_off_y_;
     }
     
-    // Close button (X)
-    if (closable_ && mousepressed) {
-        float cx = x_ + w_ - 18;
-        float cy = y_ + 3;
+    if (closable_ && draw_chrome_ && mousepressed) {
+        float cx = x_ + w_ - 18, cy = y_ + 3;
         if (mx >= cx && mx <= cx + 14 && my >= cy && my <= cy + 14) {
             Close();
             if (close_cb_) close_cb_();
@@ -39,43 +37,39 @@ void Window::Update(float dt, float mx, float my, bool mousedown, bool mousepres
         }
     }
     
-    // Update child widgets (reverse for top-first hit testing)
+    float child_mx = mx - x_;
+    float child_my = script_layout_ ? (my - y_) : (my - y_ - GetTitleBarH());
     for (auto it = widgets_.rbegin(); it != widgets_.rend(); ++it) {
-        (*it)->Update(dt, mx - x_, my - y_ - GetTitleBarH(), mousedown, mousepressed);
+        (*it)->Update(dt, child_mx, child_my, mousedown, mousepressed);
     }
 }
 
 void Window::Render(UIRenderer& ui) {
     if (!visible_) return;
     
-    // Window body
     if (custom_bg_cb_) {
         custom_bg_cb_(ui, x_, y_, w_, h_);
-    } else {
+    } else if (draw_chrome_) {
         ui.DrawRect(x_, y_, w_, GetTitleBarH(), title_color_);
         ui.DrawRect(x_, y_ + GetTitleBarH(), w_, h_ - GetTitleBarH(), body_color_);
         ui.DrawBorder(x_, y_, w_, h_, border_color_);
+        if (!title_.empty())
+            ui.DrawText(x_ + 6, y_ + 3, 0xffffffff, "%s", title_.c_str());
+        if (closable_) {
+            float cx = x_ + w_ - 18, cy = y_ + 3;
+            ui.DrawRect(cx, cy, 14, 14, {180, 40, 40, 200});
+            ui.DrawText(cx + 3, cy + 1, 0xffffffff, "X");
+        }
     }
     
-    // Title text
-    if (!title_.empty()) {
-        ui.DrawText(x_ + 6, y_ + 3, 0xffffffff, "%s", title_.c_str());
-    }
-    
-    // Close button (X)
-    if (closable_) {
-        float cx = x_ + w_ - 18;
-        float cy = y_ + 3;
-        ui.DrawRect(cx, cy, 14, 14, {180, 40, 40, 200});
-        ui.DrawText(cx + 3, cy + 1, 0xffffffff, "X");
-    }
-    
-    // Render child widgets
+    float ox = x_;
+    float oy = script_layout_ ? y_ : (y_ + GetTitleBarH());
     for (auto& w : widgets_) {
         if (!w->IsVisible()) continue;
-        // Save/Restore scissor to clip within client area
-        w->SetPos(w->GetX(), w->GetY());
+        float wx = w->GetX(), wy = w->GetY();
+        w->SetPos(ox + wx, oy + wy);
         w->Render(ui);
+        w->SetPos(wx, wy);
     }
 }
 

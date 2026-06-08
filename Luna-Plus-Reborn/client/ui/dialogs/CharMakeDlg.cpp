@@ -27,7 +27,8 @@ void CharMakeDlg::Open(WindowManager* wm) {
     complete_ = false;
     name_.clear();
     if (wm) {
-        window_ = wm->Open("Character Creation", 40, 20, 1200, 680);
+        window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/CharMake.bin.txt",
+            "Character Creation", 40, 20, 1200, 680);
         window_->SetClosable(false);
         window_->SetMovable(false);
         window_->SetTitleBarH(0);

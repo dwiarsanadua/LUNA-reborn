@@ -6,7 +6,8 @@ static const char* face_types[] = {"Neutral", "Smile", "Serious", "Cute", "Cool"
 static const char* skin_tones[] = {"Fair", "Light", "Tan", "Olive", "Brown", "Dark"};
 
 void AvatarDialog::Open(GameState* state, WindowManager* wm) {
-    window_ = wm->Open("Avatar Customization", 200, 60, 420, 400);
+    window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/BodyChangeDialog.bin.txt",
+        "Avatar Customization", 200, 60, 420, 400);
     window_->SetClosable(true);
     window_->SetMovable(true);
     window_->SetTitleBarH(24);

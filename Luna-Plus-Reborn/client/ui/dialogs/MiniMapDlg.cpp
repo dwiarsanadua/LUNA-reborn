@@ -12,7 +12,8 @@ MiniMapDlg::~MiniMapDlg() {
 
 void MiniMapDlg::Open(WindowManager* wm) {
     if (window_) return;
-    window_ = wm->Open("MiniMap", 1090, 10, map_w_ + 20, map_h_ + 40);
+    window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/MiniMap.bin.txt",
+        "MiniMap", 1090, 10, map_w_ + 20, map_h_ + 40);
     window_->SetClosable(true);
     window_->SetMovable(true);
     window_->SetTitleBarH(20);

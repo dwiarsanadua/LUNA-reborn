@@ -1,4 +1,7 @@
 #include "UiSkinManager.hpp"
+#include <ui/UiAtlasRegistry.hpp>
+#include <ui/UiStringTable.hpp>
+#include <ui/UiSoundIndex.hpp>
 #include <engine/gx_render/VFS.h>
 #include <fstream>
 #include <sstream>
@@ -11,6 +14,7 @@
 std::unordered_map<std::string, bgfx::TextureHandle> UiSkinManager::textures_;
 std::unordered_map<std::string, UISkinPart> UiSkinManager::skin_parts_;
 std::unordered_map<std::string, UiSkinManager::WindowSkin> UiSkinManager::window_skins_;
+std::unordered_map<std::string, UiElement> UiSkinManager::layout_cache_;
 UiSkinManager::ButtonSkin UiSkinManager::default_button_skin_;
 UiSkinManager::GaugeSkin UiSkinManager::hp_gauge_skin_;
 UiSkinManager::GaugeSkin UiSkinManager::mp_gauge_skin_;
@@ -24,6 +28,10 @@ bool UiSkinManager::initialized_ = false;
 void UiSkinManager::Init(const std::string& ui_texture_path, const std::string& interface_path) {
     if (initialized_) return;
     texture_path_ = ui_texture_path;
+
+    UiAtlasRegistry::Init(interface_path + "Windows/image_path.bin.txt");
+    UiStringTable::Init(interface_path + "Windows/InterfaceMsg.bin.txt");
+    UiSoundIndex::Init();
 
     // Register default window skins
     WindowSkin main_win;
@@ -81,6 +89,10 @@ void UiSkinManager::Shutdown() {
     textures_.clear();
     skin_parts_.clear();
     window_skins_.clear();
+    layout_cache_.clear();
+    UiAtlasRegistry::Shutdown();
+    UiStringTable::Shutdown();
+    UiSoundIndex::Shutdown();
     initialized_ = false;
 }
 
@@ -261,13 +273,43 @@ int UiSkinManager::LoadWindowLayouts(const std::string& windows_path) {
         if (!entry.is_regular_file()) continue;
         const auto name = entry.path().filename().string();
         if (name.size() > 8 && name.substr(name.size() - 8) == ".bin.txt") {
+            const std::string layout_name = name.substr(0, name.size() - 8);
+            const std::string full_path = entry.path().string();
+
             WindowSkin skin;
-            skin.name = name.substr(0, name.size() - 8);
-            window_skins_[skin.name] = skin;
+            skin.name = layout_name;
+            window_skins_[layout_name] = skin;
+
+            UiElement parsed = UiScriptParser::ParseFile(full_path);
+            if (!parsed.type.empty()) {
+                layout_cache_[layout_name] = std::move(parsed);
+                const std::string& alias = layout_cache_[layout_name].id;
+                if (!alias.empty()) layout_cache_[alias] = layout_cache_[layout_name];
+            }
             ++count;
         }
     }
+    spdlog::info("UiSkinManager: parsed {} window layouts ({} cached elements)",
+                 count, layout_cache_.size());
     return count;
+}
+
+const UiElement* UiSkinManager::GetLayout(const std::string& layout_name) {
+    auto it = layout_cache_.find(layout_name);
+    return it != layout_cache_.end() ? &it->second : nullptr;
+}
+
+const UiElement* UiSkinManager::GetLayoutByPath(const std::string& script_path) {
+    namespace fs = std::filesystem;
+    fs::path p(script_path);
+    std::string name = p.filename().string();
+    if (name.size() > 8 && name.substr(name.size() - 8) == ".bin.txt")
+        name = name.substr(0, name.size() - 8);
+    return GetLayout(name);
+}
+
+int UiSkinManager::GetLayoutCount() {
+    return (int)layout_cache_.size();
 }
 
 std::vector<std::string> UiSkinManager::GetLoadedTextureNames() {

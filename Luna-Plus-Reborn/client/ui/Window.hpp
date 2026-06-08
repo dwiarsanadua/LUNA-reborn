@@ -26,6 +26,9 @@ public:
     void SetMovable(bool m) { movable_ = m; }
     void SetModal(bool m) { modal_ = m; }
     bool IsModal() const { return modal_; }
+    void SetScriptLayout(bool v) { script_layout_ = v; }
+    bool UsesScriptLayout() const { return script_layout_; }
+    void SetDrawChrome(bool v) { draw_chrome_ = v; }
     int GetZOrder() const { return z_order_; }
     void SetZOrder(int z) { z_order_ = z; }
 
@@ -44,6 +47,8 @@ public:
         }
         return nullptr;
     }
+
+    const std::vector<std::unique_ptr<Widget>>& GetWidgets() const { return widgets_; }
 
     void Update(float dt, float mx, float my, bool mousedown, bool mousepressed);
     void Render(UIRenderer& ui);
@@ -76,6 +81,8 @@ private:
     bool closable_ = true;
     bool movable_ = true;
     bool modal_ = false;
+    bool script_layout_ = false;
+    bool draw_chrome_ = true;
     int z_order_ = 0;
     bool dragging_ = false;
     float drag_off_x_ = 0, drag_off_y_ = 0;

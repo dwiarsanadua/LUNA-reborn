@@ -1,15 +1,23 @@
 #include "WindowManager.hpp"
 #include "UiScriptParser.hpp"
 #include "UiFunctionRegistry.hpp"
-#include "widgets/Label.hpp"
+#include "UiAtlasRegistry.hpp"
+#include "UiSoundIndex.hpp"
+#include "UiScriptWidgetBuilder.hpp"
 #include "widgets/Button.hpp"
-#include "widgets/Grid.hpp"
+#include <ui/skin/UiSkinManager.hpp>
+#include <ui/UiTooltip.hpp>
+#include <ui/widgets/Widget.hpp>
+#include <audio/AudioManager.hpp>
+#include <engine/gx_render/VFS.h>
 #include <algorithm>
 #include <cstdio>
 #include <filesystem>
 #include <unordered_set>
 #include <spdlog/spdlog.h>
 namespace fs = std::filesystem;
+
+extern AudioManager* g_audio;
 
 static void CollectAtlasIDs(const UiElement& elem, std::unordered_set<int>& ids) {
     if (elem.basic_img.atlas != -1) ids.insert(elem.basic_img.atlas);
@@ -19,6 +27,11 @@ static void CollectAtlasIDs(const UiElement& elem, std::unordered_set<int>& ids)
     if (elem.dragover_bg.atlas != -1) ids.insert(elem.dragover_bg.atlas);
     for (const auto& child : elem.children)
         CollectAtlasIDs(child, ids);
+}
+
+static TextureInfo LoadScriptImage(UIRenderer& ui, const UiScriptUV& uv) {
+    if (uv.atlas < 0) return {};
+    return UiAtlasRegistry::LoadAtlasTexture(ui, uv.atlas);
 }
 
 Window* WindowManager::Open(const std::string& title, float x, float y, float w, float h) {
@@ -34,80 +47,86 @@ Window* WindowManager::Open(const std::string& title, float x, float y, float w,
 }
 
 Window* WindowManager::LoadFromScript(const std::string& path) {
-    UiElement root = UiScriptParser::ParseFile(path);
+  const UiElement* cached = UiSkinManager::GetLayoutByPath(path);
+    UiElement root = cached ? *cached : UiScriptParser::ParseFile(path);
     if (root.type.empty()) return nullptr;
 
-    Window* win = Open(root.id, root.rect.x, root.rect.y, root.rect.w, root.rect.h);
+    std::string win_id = !root.id.empty() ? root.id : UiScriptParser::WidgetTypeName(root.type);
+    if (auto* existing = Find(win_id)) {
+        BringToFront(existing);
+        return existing;
+    }
+
+    Window* win = Open(win_id, root.rect.x, root.rect.y, root.rect.w, root.rect.h);
     win->SetMovable(root.moveable);
     win->SetVisible(root.active);
+    win->SetScriptLayout(true);
+    win->SetDrawChrome(false);
+    win->SetClosable(root.close_sound >= 0 || root.children.empty());
 
-    // Apply caption rect as title bar height
     if (root.caption_rect.h > 0) win->SetTitleBarH(root.caption_rect.h);
 
-    // If it has a basic image, set it as custom background
-    if (root.basic_img.atlas != -1) {
-        win->SetCustomBackground([root](UIRenderer& ui, float x, float y, float w, float h) {
-            char atlas_name[32]; snprintf(atlas_name, 32, "b%d.tif", root.basic_img.atlas);
-            TextureInfo tex = ui.LoadTexture(atlas_name, atlas_name);
-            if (bgfx::isValid(tex.handle)) {
-                ui.DrawImageUV(x, y, w, h, tex.handle, root.basic_img.u1, root.basic_img.v1, root.basic_img.u2, root.basic_img.v2);
-            }
+    if (root.basic_img.atlas != -1 && g_ui) {
+        UiScriptUV bg_uv = root.basic_img;
+        win->SetCustomBackground([bg_uv](UIRenderer& ui, float x, float y, float w, float h) {
+            TextureInfo tex = LoadScriptImage(ui, bg_uv);
+            if (bgfx::isValid(tex.handle))
+                ui.DrawImageUV(x, y, w, h, tex.handle, bg_uv.u1, bg_uv.v1, bg_uv.u2, bg_uv.v2);
         });
     }
 
-    // Process children (widgets)
-    for (const auto& child : root.children) {
-        Widget* added_widget = nullptr;
-        if (child.type == "$STATIC") {
-            added_widget = win->AddWidget<Label>(child.text, child.rect.x, child.rect.y, child.fg_color);
-        } else if (child.type == "$BTN") {
-            added_widget = win->AddWidget<Button>(child.text, child.rect.x, child.rect.y, child.rect.w, child.rect.h);
-        } else if (child.type == "$WEAREDDLG") {
-            added_widget = win->AddWidget<Grid>(1, (int)child.icon_cells.size(), child.rect.x, child.rect.y, 34, 34);
-        }
-
-        if (added_widget) {
-            added_widget->SetID(child.id);
-            // Wire #FUNC if present
-            if (!child.func_name.empty()) {
-                auto cb = Luna::UiFunctionRegistry::Get().GetCallback(child.func_name);
-                if (cb) {
-                    added_widget->OnEvent([cb, added_widget](const UIEvent& e) {
-                        cb(added_widget, e);
-                    });
-                }
-            }
-        }
+    if (root.open_sound >= 0 && g_audio) {
+        std::string sfx = UiSoundIndex::Resolve(root.open_sound);
+        if (!sfx.empty()) g_audio->PlaySFXByCategory(AudioManager::SFX_UI, sfx);
     }
+
+    win->OnClose([root]() {
+        if (root.close_sound >= 0 && g_audio) {
+            std::string sfx = UiSoundIndex::Resolve(root.close_sound);
+            if (!sfx.empty()) g_audio->PlaySFXByCategory(AudioManager::SFX_UI, sfx);
+        }
+    });
+
+    UiScriptWidgetBuilder::AddTree(win, root);
 
     return win;
 }
 
+Window* WindowManager::LoadFromScriptOrOpen(const std::string& path, const std::string& fallback_title,
+                                            float x, float y, float w, float h) {
+    if (Window* win = LoadFromScript(path)) return win;
+    spdlog::warn("WindowManager: script load failed for {}, using fallback", path);
+    return Open(fallback_title, x, y, w, h);
+}
+
 void WindowManager::PreloadUI(const std::string& interface_path) {
-    std::string dir = interface_path + "/Windows";
+    std::string dir = VFS::Find(interface_path + "/Windows");
+    if (dir.empty()) dir = interface_path + "/Windows";
     if (!fs::is_directory(dir)) {
         spdlog::warn("PreloadUI: directory not found {}", dir);
         return;
     }
+
     std::unordered_set<int> all_atlases;
+    int files = 0;
     for (const auto& entry : fs::directory_iterator(dir)) {
-        std::string ext = entry.path().extension().string();
-        if (ext != ".txt") continue;
-        std::string path = entry.path().string();
-        UiElement root = UiScriptParser::ParseFile(path);
-        if (root.type.empty()) continue;
-        CollectAtlasIDs(root, all_atlases);
+        if (!entry.is_regular_file()) continue;
+        const std::string name = entry.path().filename().string();
+        if (name.size() <= 8 || name.substr(name.size() - 8) != ".bin.txt") continue;
+        ++files;
+
+        const UiElement* cached = UiSkinManager::GetLayout(name.substr(0, name.size() - 8));
+        if (cached) CollectAtlasIDs(*cached, all_atlases);
+        else CollectAtlasIDs(UiScriptParser::ParseFile(entry.path().string()), all_atlases);
     }
-    for (int atlas_id : all_atlases) {
-        if (preloaded_atlases_.count(atlas_id)) continue;
-        preloaded_atlases_.insert(atlas_id);
-        if (!g_ui) continue;
-        char atlas_name[32];
-        snprintf(atlas_name, sizeof(atlas_name), "b%d.tif", atlas_id);
-        g_ui->LoadTexture(atlas_name, atlas_name);
+
+    if (g_ui) {
+        for (int atlas_id : all_atlases)
+            UiAtlasRegistry::LoadAtlasTexture(*g_ui, atlas_id);
     }
-    spdlog::info("PreloadUI: pre-loaded {} atlas textures from {} files",
-        all_atlases.size(), preloaded_atlases_.size());
+
+    spdlog::info("PreloadUI: {} layout files, {} atlas textures preloaded",
+        files, all_atlases.size());
 }
 
 void WindowManager::Close(const std::string& title) {
@@ -144,32 +163,44 @@ bool WindowManager::HasModal() const {
 
 void WindowManager::BringToFront(Window* win) {
     win->SetZOrder(next_z_++);
-    // Sort by Z-order for rendering
     std::sort(windows_.begin(), windows_.end(),
         [](auto& a, auto& b) { return a->GetZOrder() < b->GetZOrder(); });
 }
 
+static void CollectTooltip(Window* win, float mx, float my) {
+    if (!win || !win->IsVisible()) return;
+    float ox = win->GetX();
+    float oy = win->UsesScriptLayout() ? win->GetY() : (win->GetY() + win->GetTitleBarH());
+    for (auto& w : win->GetWidgets()) {
+        if (!w->IsVisible() || w->GetTooltip().empty()) continue;
+        float wx = ox + w->GetX(), wy = oy + w->GetY();
+        if (mx >= wx && mx <= wx + w->GetW() && my >= wy && my <= wy + w->GetH()) {
+            UiTooltip::Set(mx, my, w->GetTooltip());
+            return;
+        }
+    }
+}
+
 void WindowManager::Update(float dt, float mx, float my, bool mousedown, bool mousepressed) {
-    // Update windows in reverse Z-order (top first for input)
+    UiTooltip::Clear();
     for (auto it = windows_.rbegin(); it != windows_.rend(); ++it) {
         if (!(*it)->IsVisible()) continue;
         if (HasModal() && !(*it)->IsModal()) continue;
         (*it)->Update(dt, mx, my, mousedown, mousepressed);
         if (mousepressed && (*it)->HitTest(mx, my)) {
             BringToFront(it->get());
-            break; // Only top window gets click
+            break;
         }
     }
+    for (auto& w : windows_) CollectTooltip(w.get(), mx, my);
 }
 
 void WindowManager::Render(UIRenderer& ui) {
-    // Render windows in Z-order (back to front)
     for (auto& w : windows_) {
         if (!w->IsVisible()) continue;
-        if (HasModal() && !w->IsModal()) {
-            // Dim background behind modal
+        if (HasModal() && !w->IsModal())
             ui.DrawRect(0, 0, 1280, 720, {0, 0, 0, 120});
-        }
         w->Render(ui);
     }
+    UiTooltip::Render(ui);
 }

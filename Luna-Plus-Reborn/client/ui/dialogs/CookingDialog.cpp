@@ -18,7 +18,8 @@ static std::vector<Recipe> GenerateRecipes() {
 
 void CookingDialog::Open(GameState* state, WindowManager* wm) {
     recipes_ = GenerateRecipes();
-    window_ = wm->Open("Cooking", 150, 60, 500, 420);
+    window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/CookDlg.bin.txt",
+        "Cooking", 150, 60, 500, 420);
     window_->SetClosable(true);
     window_->SetMovable(true);
     window_->SetTitleBarH(24);

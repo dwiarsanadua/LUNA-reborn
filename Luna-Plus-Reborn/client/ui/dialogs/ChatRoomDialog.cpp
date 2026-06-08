@@ -5,7 +5,8 @@ void ChatRoomDialog::Open(GameState* state, WindowManager* wm) {
     (void)state;
     (void)msg_display_;
     (void)active_channel_;
-    window_ = wm->Open("Chat Rooms", 100, 80, 500, 400);
+    window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/ChatRoomMainDlg.bin.txt",
+        "Chat Rooms", 100, 80, 500, 400);
     window_->SetClosable(true);
     window_->SetMovable(true);
     window_->SetTitleBarH(24);

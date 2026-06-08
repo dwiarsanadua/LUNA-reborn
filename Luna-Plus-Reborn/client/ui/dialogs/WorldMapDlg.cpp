@@ -7,7 +7,8 @@ WorldMapDlg::WorldMapDlg() {}
 
 void WorldMapDlg::Open(WindowManager* wm) {
     if (window_) return;
-    window_ = wm->Open("World Map", 0, 0, 1280, 720);
+    window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/WorldMapDlg.bin.txt",
+        "World Map", 0, 0, 1280, 720);
     window_->SetClosable(true);
     window_->SetMovable(false);
     window_->SetTitleBarH(0);

@@ -14,6 +14,21 @@ struct UiElement {
     std::string type;
     std::string id;
     std::string text;
+    int text_id = 0;
+    int btn_text_id = 0;
+    int tooltip_msg_id = 0;
+    int open_sound = -1;
+    int close_sound = -1;
+    int pushup = 0;
+    float scale_x = 1.0f;
+    float scale_y = 1.0f;
+    float gauge_width = 0;
+    float edit_w = 0;
+    float edit_h = 0;
+    float grid_pad_x = 1.0f;
+    float grid_pad_y = 1.0f;
+    bool shadow = false;
+    UiScriptUV gauge_piece_img{-1, 0,0,0,0};
     UiScriptRect rect{0,0,0,0};
     UiScriptRect caption_rect{0,0,0,0};
     UiScriptRect grid_cell{0,0,0,0};
@@ -27,6 +42,9 @@ struct UiElement {
     int alpha = 255;
     int grid_cols = 0;
     int grid_rows = 0;
+    int list_max_line = 0;
+    int middle_num = 0;
+    bool show_scroll = false;
     std::string func_name;
     bool moveable = false;
     bool active = true;
@@ -37,6 +55,7 @@ struct UiElement {
 class UiScriptParser {
 public:
     static UiElement ParseFile(const std::string& path);
+    static std::string WidgetTypeName(const std::string& raw_type);
 
 private:
     struct ParseContext {

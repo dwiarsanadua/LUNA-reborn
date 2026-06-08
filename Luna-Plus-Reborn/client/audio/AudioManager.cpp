@@ -47,7 +47,7 @@ void AudioManager::Shutdown() {
 
 std::string AudioManager::FindAudioPath(const std::string& name) const {
     const char* folders[] = {
-        "SFX", "Character", "Monster", "Effect", "Interface", "Weapon", "BGM"
+        "Interface", "Effect", "Character", "Monster", "Weapon", "Vehicle", "BGM", "SFX"
     };
     for (const char* folder : folders) {
         std::string path = Paths::Asset(std::string("audio/") + folder + "/" + name);
@@ -143,21 +143,34 @@ void AudioManager::PlaySFX(const std::string& name) {
 }
 
 void AudioManager::PlaySFXByCategory(Category cat, const std::string& name) {
-    std::string folder = "SFX";
-    switch(cat) {
-        case SFX_Skill: folder = "Weapon"; break;
-        case SFX_Hit: folder = "Character"; break;
-        case SFX_UI: folder = "Interface"; break;
-        case SFX_Ambient: folder = "SFX"; break;
-        case SFX_NPC: folder = "Character"; break;
-        case SFX_Monster: folder = "Monster"; break;
-        case SFX_Weapon: folder = "Weapon"; break;
-        case SFX_Character: folder = "Character"; break;
-        case SFX_Footstep: folder = "Character"; break;
-        default: break;
+    const char* folders[4] = {};
+    int folder_count = 0;
+    auto push = [&](const char* f) {
+        if (folder_count < 4) folders[folder_count++] = f;
+    };
+
+    switch (cat) {
+        case SFX_Skill: push("Effect"); push("Weapon"); break;
+        case SFX_Hit: push("Effect"); push("Character"); push("Monster"); break;
+        case SFX_UI: push("Interface"); break;
+        case SFX_Ambient: push("Effect"); push("Character"); break;
+        case SFX_NPC: push("Character"); push("Effect"); break;
+        case SFX_Monster: push("Monster"); push("Effect"); break;
+        case SFX_Weapon: push("Weapon"); push("Effect"); break;
+        case SFX_Character: push("Character"); push("Effect"); break;
+        case SFX_Footstep: push("Character"); break;
+        default: push("Effect"); break;
     }
-    std::string path = Paths::Asset("audio/" + folder + "/" + name);
-    if (!std::filesystem::exists(path)) {
+
+    std::string path;
+    for (int i = 0; i < folder_count; ++i) {
+        std::string candidate = Paths::Asset(std::string("audio/") + folders[i] + "/" + name);
+        if (std::filesystem::exists(candidate)) {
+            path = std::move(candidate);
+            break;
+        }
+    }
+    if (path.empty()) {
         path = FindAudioPath(name);
         if (path.empty()) return;
     }
@@ -310,7 +323,7 @@ int AudioManager::CalculateAttenuation(const SoundInstance& snd) const {
 void AudioManager::ScanAudioDirectory() {
     // Implementation for directory scanning
     sfx_count_ = 0;
-    std::string folders[] = {"Interface", "Weapon", "Character", "Monster", "SFX"};
+    std::string folders[] = {"Interface", "Effect", "Weapon", "Character", "Monster", "Vehicle"};
     for (auto& f : folders) {
         std::string p = Paths::Asset(std::string("audio/") + f + "/");
         if (std::filesystem::exists(p)) {

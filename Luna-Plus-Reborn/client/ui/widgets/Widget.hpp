@@ -35,6 +35,7 @@ public:
     bool IsVisible() const { return visible_; }
     void SetEnabled(bool e) { enabled_ = e; }
     bool IsEnabled() const { return enabled_; }
+    bool IsHovered() const { return hovered_; }
     void SetID(const std::string& id) { id_ = id; }
     const std::string& GetID() const { return id_; }
 
@@ -42,6 +43,8 @@ public:
     void OnEvent(EventCallback cb) { callback_ = cb; }
     void SetUserData(void* data) { userdata_ = data; }
     void* GetUserData() const { return userdata_; }
+    void SetTooltip(const std::string& t) { tooltip_ = t; }
+    const std::string& GetTooltip() const { return tooltip_; }
 
     virtual bool HitTest(float mx, float my) const {
         return visible_ && mx >= x_ && mx <= x_ + w_ && my >= y_ && my <= y_ + h_;
@@ -56,4 +59,5 @@ protected:
     std::string id_;
     EventCallback callback_;
     void* userdata_ = nullptr;
+    std::string tooltip_;
 };

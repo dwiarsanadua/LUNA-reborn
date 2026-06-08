@@ -1,4 +1,5 @@
 #include "SkillDialog.hpp"
+#include <ui/UiTabSheetController.hpp>
 #include <ui/UiScriptParser.hpp>
 #include <ui/ColorPalette.hpp>
 #include <gameobjects/ClassAdvancement.hpp>
@@ -9,15 +10,16 @@
 void SkillDialog::Open(GameState* state, WindowManager* wm) {
     if (window_) return;
 
-    if (wm) window_ = wm->LoadFromScript("assets/interface/Windows/Skill.bin.txt");
-
-    if (!window_) {
-        spdlog::warn("SkillDialog: failed to load UI script, using C++ fallback");
-        window_ = new Window("", 300, 40, 520, 420);
+    if (wm) {
+        window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/Skill.bin.txt",
+            "Skills", 300, 40, 520, 420);
         window_->SetClosable(true);
         window_->SetMovable(true);
         window_->SetTitleBarH(30);
     }
+    if (!window_) return;
+
+    UiTabSheetController::WireWindow(window_);
 
     window_->SetCustomBackground([this](UIRenderer& ui, float x, float y, float w, float h) {
         if (!bgfx::isValid(bg_tex_.handle)) {

@@ -3,7 +3,8 @@
 
 void DungeonDialog::Open(GameState* state, WindowManager* wm, DungeonSystem* dungeon) {
     dungeon_ = dungeon;
-    window_ = wm->Open("Dungeons", 150, 60, 500, 440);
+    window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/LimitDungeonDlg.bin.txt",
+        "Dungeons", 150, 60, 500, 440);
     window_->SetClosable(true);
     window_->SetMovable(true);
     window_->SetTitleBarH(24);

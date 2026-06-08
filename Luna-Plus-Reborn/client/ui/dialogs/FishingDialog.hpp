@@ -8,7 +8,7 @@
 class FishingDialog {
 public:
     Window* GetWindow() { return window_; }
-    void Open(GameState* state);
+    void Open(GameState* state, class WindowManager* wm = nullptr);
     void Close() { window_ = nullptr; active_ = false; }
     void Update(float dt);
     void Render(UIRenderer& ui);

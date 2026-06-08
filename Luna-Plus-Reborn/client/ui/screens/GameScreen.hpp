@@ -22,6 +22,8 @@ struct EntityInterp {
 };
 #include <ui/Screen.hpp>
 #include <ui/WindowManager.hpp>
+#include <ui/LegacyHudOverlay.hpp>
+#include <ui/ScriptDialogPanel.hpp>
 #include <ui/dialogs/InventoryDialog.hpp>
 #include <ui/dialogs/SkillDialog.hpp>
 #include <ui/dialogs/QuestDialog.hpp>
@@ -197,8 +199,10 @@ private:
     EngineSky sky_;
     WeatherSystem weather_;
     
-    // Scripted Window Manager
     WindowManager wm_;
+    LegacyHudOverlay legacy_hud_;
+    ScriptDialogPanel script_dialogs_;
+    void InitScriptDialogs();
 
     // Durability
     DurabilitySystem durability_;

@@ -24,6 +24,16 @@ add_executable(LunaPlusClient
     ui/widgets/ComboBox.cpp
     ui/widgets/CheckBox.cpp
     ui/widgets/Icon.cpp
+    ui/widgets/ToggleButton.cpp
+    ui/widgets/GaugeBar.cpp
+    ui/widgets/ScriptSprite.cpp
+    ui/UiScriptWidgetBuilder.cpp
+    ui/UiCaptureMode.cpp
+    ui/LegacyHudOverlay.cpp
+    ui/ScriptDialogPanel.cpp
+    ui/UiTabSheetController.cpp
+    ui/UiTooltip.cpp
+    util/ScreenshotCapture.cpp
     ui/screens/LoginScreen.cpp
     ui/screens/CharSelectScreen.cpp
     ui/screens/LoadingScreen.cpp
@@ -112,6 +122,9 @@ add_executable(LunaPlusClient
     config/KeyBindings.cpp
     ui/skin/UiSkinManager.cpp
     ui/UiScriptParser.cpp
+    ui/UiAtlasRegistry.cpp
+    ui/UiStringTable.cpp
+    ui/UiSoundIndex.cpp
 )
 
 target_include_directories(LunaPlusClient PRIVATE

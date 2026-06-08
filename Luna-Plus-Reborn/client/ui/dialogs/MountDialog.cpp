@@ -9,7 +9,8 @@ static const char* mount_names[] = {
 
 void MountDialog::Open(GameState* state, WindowManager* wm) {
     (void)state;
-    window_ = wm->Open("Mounts", 200, 80, 360, 380);
+    window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/RideOptionDlg.bin.txt",
+        "Mounts", 200, 80, 360, 380);
     window_->SetClosable(true);
     window_->SetMovable(true);
     window_->SetTitleBarH(24);

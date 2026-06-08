@@ -2,7 +2,8 @@
 #include <cstdio>
 
 void HousingDialog::Open(GameState* state, WindowManager* wm) {
-    window_ = wm->Open("Housing", 100, 60, 480, 400);
+    window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/HousingMainPointDlg.bin.txt",
+        "Housing", 100, 60, 480, 400);
     window_->SetClosable(true);
     window_->SetMovable(true);
     window_->SetTitleBarH(24);

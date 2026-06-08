@@ -72,6 +72,13 @@ void GameScreen::Enter() {
         consignment_.ListItem(4, 301, 1, 5000, 12000);
     }
     if (ui_) sky_.SetSampler(ui_->GetSampler(), ui_->GetWhiteTexture());
+    wm_.PreloadUI(VFS::Resolve("assets/interface/"));
+    InitScriptDialogs();
+    if (ui_) {
+        legacy_hud_.SetHotbarHandler([this](int slot) { CastHotbarSkill(slot); });
+        legacy_hud_.Init(ui_->logicalWidth, ui_->logicalHeight);
+        hero_.SetRenderHud(!legacy_hud_.IsActive());
+    }
     navmesh_.Init(256.0f, 2.0f);
     hero_.SetNavMesh(&navmesh_);
     hero_.SetPKManager(&pk_dlg_);
@@ -107,7 +114,7 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         else
             line = "[" + sender + "] " + text;
         state_->chat_messages.push_back(line);
-        chat_panel_.AddMessage(line);
+        if (!legacy_hud_.IsActive()) chat_panel_.AddMessage(line);
         if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
         return true;
     }
@@ -431,7 +438,7 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
     else if (key == 86) { // V key - Fishing
         state_->fishing_open = !state_->fishing_open;
         if (state_->fishing_open) {
-            fishing_dlg_.Open(state_);
+            fishing_dlg_.Open(state_, &wm_);
             fishing_dlg_.SetResultCallback([this](bool success, int fish_type) {
                 (void)fish_type;
                 if (success) {
@@ -543,7 +550,10 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
             npc_dlg_.Open(state_, 1, "Blacksmith");
         }
     }
-    else if (key == 84) chat_panel_.Toggle();
+    else if (key == 84) {
+        if (legacy_hud_.IsActive()) legacy_hud_.ToggleChat();
+        else chat_panel_.Toggle();
+    }
     else if (key == 257 && state_->chat_open) {
         state_->chat_open = false;
         if (!state_->chat_input.empty()) {
@@ -647,6 +657,19 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
                         SendTradeConfirm();
                     } else {
                         state_->chat_messages.push_back("Trade: /trade apply [name] | confirm | cancel");
+                    }
+                } else if (verb == "ui") {
+                    if (arg.empty()) {
+                        std::string help = "UI dialogs (" + std::to_string(script_dialogs_.RegisteredCount()) + "): ";
+                        auto keys = script_dialogs_.ListKeys();
+                        for (size_t i = 0; i < keys.size(); ++i) {
+                            if (i) help += "|";
+                            help += keys[i];
+                            if (help.size() > 220) { help += "|..."; break; }
+                        }
+                        state_->chat_messages.push_back(help);
+                    } else {
+                        script_dialogs_.Toggle(arg, &wm_);
                     }
                 } else if (verb == "ah" || verb == "auction") {
                     if (arg == "list" || arg.empty()) RequestConsignmentSearch("");
@@ -1740,6 +1763,7 @@ void GameScreen::Update(float dt) {
         state_->equipment_dirty = false;
     }
     hero_.Update(dt);
+    if (ui_) legacy_hud_.Update(state_, ui_->logicalWidth, ui_->logicalHeight);
     state_->player_y = hero_.GetY();
     SendMovementUpdate(dt);
     if (!state_->offline_mode)
@@ -1796,7 +1820,8 @@ void GameScreen::Update(float dt) {
 
     DoLevelUp();
 
-    chat_panel_.Update(state_, dt);
+    if (legacy_hud_.IsActive()) legacy_hud_.SyncChatInput(state_);
+    else chat_panel_.Update(state_, dt);
 
     if (state_->hp <= 0) {
         state_->hp = state_->max_hp / 2;
@@ -2043,7 +2068,7 @@ void GameScreen::RenderUI(UIRenderer& ui) {
     // Weather overlay
     weather_.Render(ui, state_->player_x, state_->player_z);
 
-    // === HUD (via Hero class) ===
+    legacy_hud_.Render(ui);
     hero_.Render(ui);
 
     // Stats line
@@ -2123,9 +2148,10 @@ void GameScreen::RenderUI(UIRenderer& ui) {
     // === Effects ===
     effect_mgr_.Render(ui, glm::mat4(1), glm::mat4(1));
 
-    // === Chat Panel ===
-    chat_panel_.Render(ui, state_);
+    if (!legacy_hud_.IsActive())
+        chat_panel_.Render(ui, state_);
 
+    if (!legacy_hud_.IsActive()) {
     // === Hotbar (bottom center) with cooldown overlay ===
     {
         float hb_y = lh - 50.0f, hb_s = 40, hb_p = 4;
@@ -2145,6 +2171,7 @@ void GameScreen::RenderUI(UIRenderer& ui) {
                 ui.DrawRect(sx, hb_y, hb_s, hb_s * pct, {0, 0, 0, 170});
             }
         }
+    }
     }
 
     // === Quest Tracker (right side) with progress ===
@@ -2365,6 +2392,53 @@ void GameScreen::RenderUI(UIRenderer& ui) {
         }
     }
     
-    // Script-loaded windows (WindowManager)
+    script_dialogs_.Render(ui, state_);
     wm_.Render(ui);
+}
+
+void GameScreen::InitScriptDialogs() {
+    auto reg = [this](const char* key, const char* path, const char* title,
+                      float x, float y, float w, float h, bool* flag = nullptr) {
+        script_dialogs_.Register(key, {path, title, x, y, w, h, flag});
+    };
+
+    reg("revival", "assets/interface/Windows/Revival.bin.txt", "Revive", 280, 180, 360, 300, &state_->revival_open);
+    reg("mix", "assets/interface/Windows/MixDialog.bin.txt", "Item Mix", 200, 100, 420, 380, &state_->mix_open);
+    reg("party_invite", "assets/interface/Windows/PartyInvite.bin.txt", "Party Invite", 320, 160, 340, 260, &state_->party_invite_open);
+    reg("guild_notice", "assets/interface/Windows/GuildNotice.bin.txt", "Guild Notice", 300, 120, 400, 320, &state_->guild_notice_open);
+    reg("stall_sell", "assets/interface/Windows/StallSell.bin.txt", "Street Stall", 200, 80, 480, 400, &state_->stall_sell_open);
+    reg("siege_flag", "assets/interface/Windows/SiegeWarFlagDlg.bin.txt", "Siege Flag", 350, 150, 380, 300, &state_->siege_flag_open);
+    reg("item_shop", "assets/interface/Windows/ItemmallBtnDlg.bin.txt", "Item Mall", 120, 60, 520, 480, &state_->cashshop_open);
+
+    reg("bank", "assets/interface/Windows/Bank.bin.txt", "Bank", 220, 120, 420, 340);
+    reg("bigmap", "assets/interface/Windows/BigMap.bin.txt", "Big Map", 80, 60, 640, 480);
+    reg("change_class", "assets/interface/Windows/ChangeClass.bin.txt", "Change Class", 260, 140, 400, 320);
+    reg("char_select", "assets/interface/Windows/CharSelect.bin.txt", "Character Select", 200, 100, 500, 400);
+    reg("enchant", "assets/interface/Windows/EnchantDialog.bin.txt", "Enchant", 240, 120, 420, 360);
+    reg("family_create", "assets/interface/Windows/FamilyCreate.bin.txt", "Create Family", 300, 150, 380, 280);
+    reg("family_invite", "assets/interface/Windows/FamilyInvite.bin.txt", "Family Invite", 320, 160, 360, 260);
+    reg("farm_manage", "assets/interface/Windows/FarmManage.bin.txt", "Farm", 200, 100, 480, 400);
+    reg("dissolve", "assets/interface/Windows/DissolveDialog.bin.txt", "Dissolve", 280, 160, 400, 300);
+    reg("divide", "assets/interface/Windows/DivideBox.bin.txt", "Divide Item", 300, 180, 360, 240);
+    reg("store_search", "assets/interface/Windows/StoreSearchDlg.bin.txt", "Store Search", 200, 80, 500, 420);
+    reg("weather", "assets/interface/Windows/WeatherDlg.bin.txt", "Weather", 400, 80, 320, 200);
+    reg("challenge_zone", "assets/interface/Windows/ChallengeZoneListDlg.bin.txt", "Challenge Zone", 180, 100, 520, 400);
+    reg("stall_buy", "assets/interface/Windows/StallBuy.bin.txt", "Stall Buy", 200, 100, 480, 380);
+    reg("party_matching", "assets/interface/Windows/PartyMatchingDlg.bin.txt", "Party Matching", 260, 120, 420, 340);
+    reg("channel", "assets/interface/Windows/Channel.bin.txt", "Channel", 300, 140, 380, 280);
+    reg("char_profile", "assets/interface/Windows/CharMakeProfile.bin.txt", "Profile", 240, 120, 440, 360);
+    reg("fishing_point", "assets/interface/Windows/FishingPointDlg.bin.txt", "Fishing Point", 280, 160, 400, 300);
+    reg("guild_warehouse", "assets/interface/Windows/GuildWarehouse.bin.txt", "Guild Warehouse", 200, 100, 480, 400);
+    reg("party_war", "assets/interface/Windows/PartyWarDlg.bin.txt", "Party War", 260, 120, 420, 340);
+    reg("ally_note", "assets/interface/Windows/AllyNote.bin.txt", "Ally Note", 300, 140, 380, 300);
+    reg("auto_note", "assets/interface/Windows/AutoNoteDlg.bin.txt", "Auto Note", 300, 140, 380, 300);
+    reg("additional_btn", "assets/interface/Windows/AdditionalButtonDlg.bin.txt", "Additional", 400, 200, 300, 200);
+    reg("change_name", "assets/interface/Windows/ChangeNameDlg.bin.txt", "Change Name", 300, 160, 380, 260);
+    reg("changejob", "assets/interface/Windows/Changejob.bin.txt", "Change Job", 260, 140, 400, 320);
+    reg("consignment_guide", "assets/interface/Windows/Consignment_Guide.bin.txt", "Auction Guide", 200, 100, 480, 400);
+    reg("farm_get", "assets/interface/Windows/Farm_Get.bin.txt", "Farm Harvest", 300, 160, 380, 280);
+    reg("farm_upgrade", "assets/interface/Windows/Farm_Upgrade.bin.txt", "Farm Upgrade", 300, 160, 380, 280);
+    reg("favor_icon", "assets/interface/Windows/FavorIconDlg.bin.txt", "Favor", 320, 180, 360, 260);
+    reg("date_matching", "assets/interface/Windows/DateMatchingDlg.bin.txt", "Date Matching", 240, 120, 440, 360);
+    reg("date_zone", "assets/interface/Windows/DateZoneListDlg.bin.txt", "Date Zone", 240, 120, 440, 360);
 }

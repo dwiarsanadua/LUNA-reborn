@@ -1,5 +1,6 @@
 #pragma once
 #include "Widget.hpp"
+#include <ui/UiScriptParser.hpp>
 
 class Button : public Widget {
 public:
@@ -14,7 +15,14 @@ public:
         tex_hover_ = hover;
         tex_pressed_ = pressed;
     }
-private:
+    void SetUVs(const UiScriptUV& normal, const UiScriptUV& hover, const UiScriptUV& pressed) {
+        uv_normal_ = normal;
+        uv_hover_ = hover;
+        uv_pressed_ = pressed;
+        use_uv_ = normal.atlas >= 0;
+    }
+
+protected:
     std::string text_;
     bool pressed_ = false;
     UIColor color_normal_ = {40, 50, 80, 220};
@@ -23,4 +31,8 @@ private:
     TextureInfo tex_normal_;
     TextureInfo tex_hover_;
     TextureInfo tex_pressed_;
+    UiScriptUV uv_normal_{-1,0,0,0,0};
+    UiScriptUV uv_hover_{-1,0,0,0,0};
+    UiScriptUV uv_pressed_{-1,0,0,0,0};
+    bool use_uv_ = false;
 };

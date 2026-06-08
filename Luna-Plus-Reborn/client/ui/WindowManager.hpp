@@ -12,6 +12,8 @@ public:
     
     Window* Open(const std::string& title, float x, float y, float w, float h);
     Window* LoadFromScript(const std::string& path);
+    Window* LoadFromScriptOrOpen(const std::string& path, const std::string& fallback_title,
+                                 float x, float y, float w, float h);
     void PreloadUI(const std::string& interface_path);
     void Close(const std::string& title);
     void CloseAll();

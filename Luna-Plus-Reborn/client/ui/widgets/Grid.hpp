@@ -1,5 +1,6 @@
 #pragma once
 #include "Widget.hpp"
+#include <algorithm>
 #include <input/InputSystem.hpp>
 #include <vector>
 
@@ -18,6 +19,10 @@ public:
     Grid(int rows, int cols, float slot_w, float slot_h, float x = 0, float y = 0);
     GridSlot* GetSlot(int row, int col);
     void SetPadding(float p) { padding_ = p; }
+    void SetScrollable(bool s) { scrollable_ = s; }
+    void SetScrollRow(int row) { scroll_row_ = std::max(0, std::min(row, std::max(0, rows_ - visible_rows_))); }
+    int GetScrollRow() const { return scroll_row_; }
+    void SetVisibleRows(int rows) { visible_rows_ = std::max(1, rows); }
     void SetSlot(int row, int col, const GridSlot& slot);
     void ClearSlot(int row, int col);
     void ClearAll();
@@ -43,6 +48,9 @@ public:
 
 private:
     int rows_, cols_;
+    int scroll_row_ = 0;
+    int visible_rows_ = 0;
+    bool scrollable_ = false;
     float slot_w_, slot_h_;
     float padding_ = 2;
     std::vector<GridSlot> slots_;

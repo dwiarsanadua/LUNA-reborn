@@ -6,7 +6,8 @@ HelperDlg::HelperDlg() {}
 
 void HelperDlg::Open(WindowManager* wm) {
     if (window_) return;
-    window_ = wm->Open("Helper", 880, 400, 240, 260);
+    window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/HelpDlg.bin.txt",
+        "Helper", 880, 400, 240, 260);
     window_->SetClosable(true);
     window_->SetMovable(true);
     window_->SetTitleBarH(20);

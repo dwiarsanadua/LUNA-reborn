@@ -167,6 +167,12 @@ struct GameState {
     bool macro_open = false;
     bool quest_open = false;
     bool npc_open = false;
+    bool revival_open = false;
+    bool mix_open = false;
+    bool party_invite_open = false;
+    bool guild_notice_open = false;
+    bool stall_sell_open = false;
+    bool siege_flag_open = false;
     std::string npc_text;
     int npc_id = 0;
     int npc_sub_mode = 0; // 0=main menu, 1=shop, 2=other

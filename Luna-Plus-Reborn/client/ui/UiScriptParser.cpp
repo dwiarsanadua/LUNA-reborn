@@ -1,7 +1,14 @@
 #include "UiScriptParser.hpp"
+#include "UiAtlasRegistry.hpp"
+#include "UiStringTable.hpp"
 #include <engine/gx_render/VFS.h>
 #include <spdlog/spdlog.h>
 #include <iostream>
+
+std::string UiScriptParser::WidgetTypeName(const std::string& raw_type) {
+    if (!raw_type.empty() && raw_type[0] == '$') return raw_type.substr(1);
+    return raw_type;
+}
 
 UiElement UiScriptParser::ParseFile(const std::string& path) {
     ParseContext ctx;
@@ -27,7 +34,7 @@ UiElement UiScriptParser::ParseStream(ParseContext& ctx) {
         if (line.empty() || line[0] == '@' || line[0] == ';') continue;
         if (line[0] == '$') {
             UiElement root = ParseBlock(ctx, line);
-            spdlog::info("UiScriptParser: parsed '{}' id='{}' at {:.0f},{:.0f} size {:.0f}x{:.0f} ({} children)",
+            spdlog::debug("UiScriptParser: parsed '{}' id='{}' at {:.0f},{:.0f} size {:.0f}x{:.0f} ({} children)",
                 root.type, root.id, root.rect.x, root.rect.y, root.rect.w, root.rect.h, root.children.size());
             return root;
         }
@@ -50,7 +57,8 @@ UiElement UiScriptParser::ParseBlock(ParseContext& ctx, const std::string& name)
 
     while (std::getline(ctx.file, line)) {
         line = Trim(line);
-        if (line.empty() || line[0] == '@' || line[0] == ';') continue;
+        if (line.empty() || line[0] == ';') continue;
+        if (!line.empty() && line[0] == '@') continue;
         if (line == "}") break;
 
         if (line[0] == '$') {
@@ -78,6 +86,36 @@ UiElement UiScriptParser::ParseBlock(ParseContext& ctx, const std::string& name)
             }
             else if (cmd == "#FUNC") elem.func_name = rest;
             else if (cmd == "#ID") elem.id = rest;
+            else if (cmd == "#TEXT") {
+                elem.text_id = std::atoi(rest.c_str());
+                const char* localized = UiStringTable::Get(elem.text_id);
+                if (localized) elem.text = localized;
+            }
+            else if (cmd == "#BTNTEXT") {
+                elem.btn_text_id = std::atoi(rest.c_str());
+                const char* localized = UiStringTable::Get(elem.btn_text_id);
+                if (localized) elem.text = localized;
+            }
+            else if (cmd == "#TOOLTIPMSG") elem.tooltip_msg_id = std::atoi(rest.c_str());
+            else if (cmd == "#PUSHUP") elem.pushup = std::atoi(rest.c_str());
+            else if (cmd == "#SHADOW") elem.shadow = (std::atoi(rest.c_str()) != 0);
+            else if (cmd == "#EDITSIZE") {
+                if (sscanf(rest.c_str(), "%f %f", &elem.edit_w, &elem.edit_h) < 2)
+                    sscanf(rest.c_str(), "%f %f", &elem.edit_w, &elem.edit_h);
+            }
+            else if (cmd == "#GUAGEPIECEIMAGE" || cmd == "#GAUGEPIECEIMAGE")
+                elem.gauge_piece_img = ParseImage(rest);
+            else if (cmd == "#GUAGEWIDTH" || cmd == "#GAUGEWIDTH")
+                elem.gauge_width = (float)std::atof(rest.c_str());
+            else if (cmd == "#OPEN_SOUND") elem.open_sound = std::atoi(rest.c_str());
+            else if (cmd == "#CLOSE_SOUND") elem.close_sound = std::atoi(rest.c_str());
+            else if (cmd == "#SCALE") {
+                float sx = 1.0f, sy = 1.0f;
+                if (sscanf(rest.c_str(), "%f %f", &sx, &sy) >= 1) {
+                    elem.scale_x = sx;
+                    elem.scale_y = (sy > 0.0f) ? sy : sx;
+                }
+            }
             else if (cmd == "#BASICIMAGE") elem.basic_img = ParseImage(rest);
             else if (cmd == "#OVERIMAGE") elem.over_img = ParseImage(rest);
             else if (cmd == "#PRESSIMAGE") elem.press_img = ParseImage(rest);
@@ -94,10 +132,19 @@ UiElement UiScriptParser::ParseBlock(ParseContext& ctx, const std::string& name)
             }
             else if (cmd == "#COLS") elem.grid_cols = std::atoi(rest.c_str());
             else if (cmd == "#ROWS") elem.grid_rows = std::atoi(rest.c_str());
+            else if (cmd == "#LISTMAXLINE") elem.list_max_line = std::atoi(rest.c_str());
+            else if (cmd == "#MIDDLENUM") {
+                int a = 0, b = 0;
+                if (sscanf(rest.c_str(), "%d %d", &a, &b) >= 1)
+                    elem.middle_num = a;
+            }
+            else if (cmd == "#SHOWSCROLL") elem.show_scroll = (std::atoi(rest.c_str()) != 0);
             else if (cmd == "#INITGRID") {
-                float gx, gy, gw, gh;
-                if (sscanf(rest.c_str(), "%f %f %f %f", &gx, &gy, &gw, &gh) >= 4) {
+                float gx, gy, gw, gh, padx = 1.0f, pady = 1.0f;
+                int n = sscanf(rest.c_str(), "%f %f %f %f %f %f", &gx, &gy, &gw, &gh, &padx, &pady);
+                if (n >= 4) {
                     elem.grid_cell = {gx, gy, gw, gh};
+                    if (n >= 6) { elem.grid_pad_x = padx; elem.grid_pad_y = pady; }
                 }
             }
             else if (cmd == "#ICONCELL") {
@@ -121,14 +168,15 @@ UiScriptRect UiScriptParser::ParseRect(const std::string& line) {
 
 UiScriptUV UiScriptParser::ParseImage(const std::string& line) {
     UiScriptUV uv{-1, 0,0,0,0};
-    // Format: ( atlas_id  x1 y1 x2 y2 )
     int a; float x1, y1, x2, y2;
     if (sscanf(line.c_str(), "( %d %f %f %f %f )", &a, &x1, &y1, &x2, &y2) == 5) {
+        float aw = UiAtlasRegistry::AtlasWidth(a);
+        float ah = UiAtlasRegistry::AtlasHeight(a);
         uv.atlas = a;
-        uv.u1 = x1 / 1024.0f;
-        uv.v1 = y1 / 1024.0f;
-        uv.u2 = x2 / 1024.0f;
-        uv.v2 = y2 / 1024.0f;
+        uv.u1 = x1 / aw;
+        uv.v1 = y1 / ah;
+        uv.u2 = x2 / aw;
+        uv.v2 = y2 / ah;
     }
     return uv;
 }

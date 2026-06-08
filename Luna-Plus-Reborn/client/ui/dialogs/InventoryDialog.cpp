@@ -11,12 +11,8 @@ void InventoryDialog::Open(GameState* state, WindowManager* wm) {
 
     // Load from legacy script
     if (wm) {
-        window_ = wm->LoadFromScript("assets/interface/Windows/Inven.bin.txt");
-    }
-
-    if (!window_) {
-        spdlog::warn("InventoryDialog: failed to load UI script, using C++ fallback");
-        window_ = wm->Open("Inventory", 40, 50, 355, 361);
+        window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/Inven.bin.txt",
+            "Inventory", 40, 50, 355, 361);
         window_->SetClosable(true);
         window_->SetMovable(true);
     }

@@ -37,7 +37,8 @@ static std::vector<std::pair<std::string, std::string>> GetBindingsByCategory(co
 
 void KeyBindDialog::Open(GameState* state, WindowManager* wm) {
     (void)state;
-    window_ = wm->Open("Key Bindings", 150, 60, 500, 420);
+    window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/KeySetting.bin.txt",
+        "Key Bindings", 150, 60, 500, 420);
     window_->SetClosable(true);
     window_->SetMovable(true);
     window_->SetTitleBarH(24);

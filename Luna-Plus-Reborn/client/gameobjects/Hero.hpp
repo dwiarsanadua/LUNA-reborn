@@ -20,6 +20,7 @@ public:
     void Init(GameState* state, AudioManager* audio, PhysicsWorld* physics = nullptr);
     void Update(float dt);
     void Render(UIRenderer& ui);
+    void SetRenderHud(bool v) { render_hud_ = v; }
     void UpdateEquipment();
     
     float GetX() const { return x_; }
@@ -102,6 +103,7 @@ private:
     float dash_cooldown_ = 0;
     float battle_delay_timer_ = 0.0f;
 
+    bool render_hud_ = true;
     bool has_waypoint_ = false;
     float waypoint_x_ = 0, waypoint_z_ = 0;
     class NavMeshSystem* navmesh_ = nullptr;

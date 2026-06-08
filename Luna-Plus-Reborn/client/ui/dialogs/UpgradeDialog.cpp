@@ -3,7 +3,8 @@
 #include <cstdlib>
 
 void UpgradeDialog::Open(GameState* state, WindowManager* wm) {
-    window_ = wm->Open("Item Upgrade & Synthesis", 180, 60, 440, 400);
+    window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/ReinforceDialog.bin.txt",
+        "Item Upgrade & Synthesis", 180, 60, 440, 400);
     window_->SetClosable(true);
     window_->SetMovable(true);
     window_->SetTitleBarH(24);

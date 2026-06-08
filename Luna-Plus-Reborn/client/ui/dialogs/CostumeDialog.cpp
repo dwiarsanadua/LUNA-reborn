@@ -3,7 +3,8 @@
 
 void CostumeDialog::Open(GameState* state, WindowManager* wm, CostumeSystem* cs) {
     costume_ = cs;
-    window_ = wm->Open("Costume & Equipment", 250, 100, 420, 400);
+    window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/BodyChangeDialog.bin.txt",
+        "Costume & Equipment", 250, 100, 420, 400);
     window_->SetClosable(true);
     window_->SetMovable(true);
     window_->SetTitleBarH(24);

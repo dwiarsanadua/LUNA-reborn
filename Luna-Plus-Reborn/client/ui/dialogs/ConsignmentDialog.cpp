@@ -4,7 +4,8 @@
 
 void ConsignmentDialog::Open(GameState* state, WindowManager* wm, ConsignmentSystem* cs) {
     consignment_ = cs;
-    window_ = wm->Open("Auction House", 80, 40, 600, 480);
+    window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/Consignment.bin.txt",
+        "Auction House", 80, 40, 600, 480);
     window_->SetClosable(true);
     window_->SetMovable(true);
     window_->SetTitleBarH(24);
