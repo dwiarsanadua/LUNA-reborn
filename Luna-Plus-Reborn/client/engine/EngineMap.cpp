@@ -52,6 +52,17 @@ bool EngineMap::Load(const std::string& map_id) {
         audio_->SmoothBGMTransition(bgm, 1.0f);
     }
 
+    // Load JSON-based spawn data and spawn monsters for this map
+    if (spawn_sys_) {
+        spawn_sys_->LoadSpawnData("assets/data/monsters.json");
+        try {
+            int mid = std::stoi(map_id);
+            spawn_sys_->SpawnMonstersForMap(*registry_, mid);
+        } catch (...) {
+            spdlog::warn("EngineMap: invalid map_id for SpawnSystem: {}", map_id);
+        }
+    }
+
     // Spawn monsters and NPCs from GameDataDB
     if (spawn_sys_ && registry_) {
         try {

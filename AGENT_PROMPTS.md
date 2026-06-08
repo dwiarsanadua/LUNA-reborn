@@ -1,537 +1,482 @@
-# READY-TO-USE PROMPTS — Phase 3: Integration & Asset Completion
+# READY-TO-USE PROMPTS — Phase 4: Content & Balance
 
-> **3 Agent Paralel** — Builder, Collector, Integrator.
-> **Zero file overlap** — aman dijalankan bersamaan.
+> **Target:** Quest chains, economy balance, boss mechanics, map spawns, combat tuning.
+> **5 Agent Paralel** — Zero file overlap. Aman dijalankan bersamaan.
 
 ---
 
 ## Daftar Isi
 
-1. [Agent Builder — Build & Dependencies](#1-agent-builder--build--dependencies)
-2. [Agent Collector — Complete Asset Conversion](#2-agent-collector--complete-asset-conversion)
-3. [Agent Integrator — Code Integration & Test](#3-agent-integrator--code-integration--test)
-4. [Ringkasan Paralel](#4-ringkasan-paralel)
+1. [Agent Q — Quest Data Engineer](#1-agent-q--quest-data-engineer)
+2. [Agent E — Economy Balancer](#2-agent-e--economy-balancer)
+3. [Agent B — Boss Mechanic Implementor](#3-agent-b--boss-mechanic-implementor)
+4. [Agent S — Map Spawn Integrator](#4-agent-s--map-spawn-integrator)
+5. [Agent C — Combat & Drop Tuning](#5-agent-c--combat--drop-tuning)
+6. [Ringkasan Paralel](#6-ringkasan-paralel)
 
 ---
 
-## 1. Agent Builder — Build & Dependencies
+## 1. Agent Q — Quest Data Engineer
 
-> **Tujuan:** Install semua dependency yang hilang (bgfx, Jolt), fix CMake, compile total.
-> **Area:** `cmake/`, `external/`, `scripts/`, `engine/physics/`, `engine/scripting/`
-> **Estimasi:** 3-5 hari
+> **Tujuan:** Parse semua quest chain dari legacy `[CC]Quest/` (45 file, 5.178 baris C++) ke format JSON/DB yang bisa di-load QuestSystem + FSMEngine
+> **Area:** `tools/data_parser/`
+> **Zero conflict:** Hanya Python scripts, tidak sentuh C++ code.
 
 ```
-Kamu adalah BUILDER — Build & Dependencies Engineer.
+Kamu adalah AGENT Q — Quest Data Engineer.
 
-## 🚨 SAFETY RULES (MUST FOLLOW)
+## 🚨 SAFETY RULES
+You ONLY create/modify files in:
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/data_parser/
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/assets/data/
 
-### 1. FILE OWNERSHIP
-You may ONLY create/modify files in these directories:
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/cmake/
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/external/        (CREATE)
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/scripts/
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/include/external/
+You READ ONLY from:
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/[CC]Quest/
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/QuestSystem.hpp
 
-You are ALSO allowed to edit:
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/CMakeLists.txt
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/engine/physics/CMakeLists.txt
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/engine/scripting/CMakeLists.txt
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/engine/network/CMakeLists.txt
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/engine/resource/CMakeLists.txt
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/engine/gx_geom/CMakeLists.txt
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/engine/CMakeLists.txt
+You NEVER touch game/, client/, server/, engine/, cmake/, tools/asset_pipeline/, tools/legacy_converters/.
 
-You MUST NEVER modify files in client/, server/, game/, tools/, assets/.
+## BACKGROUND
+Old memiliki ~504 quest chains yang diimplementasikan dalam 45 file C++ di [CC]Quest/.
+QuestSystem.hpp dan FSMEngine.hpp sudah siap menerima data quest — tinggal diisi.
 
-### 2. COMMIT DISCIPLINE
-git add cmake/ external/ scripts/ include/external/ CMakeLists.txt engine/*/CMakeLists.txt
-git commit -m "agent_builder: [summary]"
+## TASKS — Execute in Order
 
-### 3. STOP ON ERROR
-If a command fails, LOG it and CONTINUE. Report all errors at the end.
+### Task Q1 — Analyze Legacy Quest Structure
+cd /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/[CC]Quest/
+ls *.cpp *.h 2>/dev/null
 
-## CURRENT STATE — READ FIRST
+Read key files to understand quest format:
+  cat QuestCondition.h
+  cat QuestExecute.h
+  cat QuestInfo.h
+  cat QuestLimit.h
+  cat QuestReward.h
 
-1. Read the root CMakeLists.txt:
-   cat /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/CMakeLists.txt
+Document: quest_state_types, condition_types, reward_types, limit_types
 
-2. Check what dependencies are available:
-   ls /opt/homebrew/include/asio.hpp 2>/dev/null && echo "asio: OK" || echo "asio: MISSING"
-   ls /opt/homebrew/include/sol/sol.hpp 2>/dev/null && echo "sol2: OK" || echo "sol2: MISSING"
+### Task Q2 — Read QuestSystem.hpp Target Format
+cat /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/QuestSystem.hpp
 
-3. Check build state:
-   cmake --build /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/build 2>&1 | tail -20
+Understand what data structures QuestSystem expects.
 
-## YOUR TASKS — Execute in Order
+### Task Q3 — Create Quest Parser Script
+Create: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/data_parser/parse_quests.py
 
-### Task 1 — Install Dependencies via Homebrew
-Run these commands to install all available deps:
-  brew install asio sol2 spdlog fmt glfw glm assimp freetype sqlite3
+This script should:
+  1. Read legacy quest data from game_data_legacy.db or luna_game.db
+  2. Map column names to QuestTemplate struct fields
+  3. Output: assets/data/quests_full.json
 
-### Task 2 — Create external/ directory and build bgfx
-mkdir -p /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/external/
-cd /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/external/
+Required output format:
+```json
+{
+  "quests": [
+    {
+      "id": 1,
+      "name": "Quest Name",
+      "level_required": 10,
+      "npc_start_id": 101,
+      "npc_complete_id": 101,
+      "conditions": [
+        {"type": "kill", "target_id": 201, "count": 10},
+        {"type": "collect", "item_id": 3001, "count": 5}
+      ],
+      "rewards": {
+        "exp": 5000,
+        "gold": 1000,
+        "items": [{"item_id": 4001, "count": 1}]
+      },
+      "dialog_start": "Welcome, hero!",
+      "dialog_progress": "Have you done it?",
+      "dialog_complete": "Well done!"
+    }
+  ]
+}
+```
 
-git clone --depth 1 https://github.com/bkaradzic/bx.git
-git clone --depth 1 https://github.com/bkaradzic/bimg.git
-git clone --depth 1 https://github.com/bkaradzic/bgfx.git
+### Task Q4 — Run Parser & Validate
+cd /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn
+python3 tools/data_parser/parse_quests.py 2>&1
 
-cd bgfx
-mkdir -p .build/ci
-cmake -B .build/ci -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_OSX_ARCHITECTURES=arm64 \
-  -DBGFX_CONFIG_RENDERER_METAL=ON \
-  -DBGFX_BUILD_EXAMPLES=OFF \
-  -DBGFX_BUILD_TOOLS=OFF
-ninja -C .build/ci bgfx
+echo "Quests parsed: $(python3 -c "import json; d=json.load(open('assets/data/quests_full.json')); print(len(d['quests']))" 2>/dev/null)"
 
-Verify bgfx compiled:
-  ls .build/ci/libbgfx.a 2>/dev/null && echo "bgfx built OK" || echo "bgfx build FAILED"
+### Task Q5 — Create FSM Engine Quest Loader
+Create: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/data_parser/generate_quest_fsm.py
 
-### Task 3 — Create Findbgfx.cmake for external/ build
-Edit: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/cmake/Findbgfx.cmake
-Update the include path to point to:
-  ${CMAKE_SOURCE_DIR}/external/bgfx/include
-  ${CMAKE_SOURCE_DIR}/external/bx/include
-  ${CMAKE_SOURCE_DIR}/external/bimg/include
+Generate Lua scripts for FSMEngine from quest data:
+  - Each quest chain → Lua state machine
+  - States: NOT_STARTED → IN_PROGRESS → COMPLETE → REWARDED
+  - Transitions triggered by: kill, item_collect, level_up, npc_talk
 
-And library path to:
-  ${CMAKE_SOURCE_DIR}/external/bgfx/.build/ci
+Output: assets/data/quest_fsms/*.lua
 
-### Task 4 — Download Jolt Physics
-cd /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/external/
-git clone --depth 1 --branch v5.2.0 https://github.com/jrouwe/JoltPhysics.git
+## DELIVERABLE
+git add tools/data_parser/ assets/data/quests_full.json assets/data/quest_fsms/
+git commit -m "agent_q: quest parser — all legacy quests exported to JSON + FSM Lua scripts"
 
-Create FindJolt.cmake:
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/cmake/FindJolt.cmake
-  - Set Jolt_INCLUDE_DIR to external/JoltPhysics/
-  - Set Jolt_LIBRARY to external/JoltPhysics/Build/Release/libJolt.a
-  - Create IMPORTED target Jolt::Jolt
-
-Build Jolt:
-  cd external/JoltPhysics
-  cmake -B Build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64
-  ninja -C Build
-
-### Task 5 — Create FindAsio.cmake
-Create: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/cmake/FindAsio.cmake
-  find_path(ASIO_INCLUDE_DIR asio.hpp PATHS /opt/homebrew/include /usr/local/include /usr/include)
-  add_library(asio::asio INTERFACE IMPORTED)
-  set_target_properties(asio::asio PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${ASIO_INCLUDE_DIR}")
-
-### Task 6 — Fix engine subdirectory CMakeLists
-For each of these, ensure they properly link their dependencies:
-
-engine/gx_geom/CMakeLists.txt:
-  target_link_libraries(gx_geom PRIVATE assimp::assimp bgfx::bgfx glm::glm)
-
-engine/physics/CMakeLists.txt:
-  target_link_libraries(gx_physics PRIVATE Jolt::Jolt)
-
-engine/network/CMakeLists.txt:
-  target_link_libraries(gx_network PRIVATE asio::asio)
-
-engine/scripting/CMakeLists.txt:
-  target_link_libraries(gx_scripting PRIVATE sol2::sol2)
-
-engine/resource/CMakeLists.txt:
-  target_link_libraries(gx_resource PRIVATE spdlog::spdlog fmt::fmt)
-
-### Task 7 — Iterative Compilation
-Run cmake --build, fix errors one by one:
-  cmake -B /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/build
-  cmake --build /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/build
-
-For each error:
-  1. Read the error message carefully
-  2. Read the offending file
-  3. Fix the issue (typo, missing include, wrong API, etc.)
-  4. Rebuild
-  5. Repeat until compilation succeeds
-
-### Task 8 — Fix Specific Compilation Issues
-Expected issues to fix:
-  - engine/gx_geom/Model.cpp: missing Assimp includes (need aiScene.h, aiMesh.h, etc.)
-  - engine/gx_geom/AnimationSystem.cpp: missing include guards or typos
-  - engine/physics/PhysicsWorld.cpp: Jolt API might differ slightly
-  - engine/network/NetworkLayer.cpp: Asio async API details
-  - engine/scripting/LuaEngine.cpp: sol2 API usage
-  - server/*/AgentServer.cpp, MapServer.cpp: missing includes for flatbuffers, ECS
-  - client/rendering/CharacterRenderer.cpp: type mismatches with new Model class
-  - All "undefined reference" errors: add missing target_link_libraries
-
-## YOUR DELIVERABLE
-After ALL tasks:
-  git add cmake/ external/ scripts/ include/external/ CMakeLists.txt engine/*/CMakeLists.txt
-  git commit -m "agent_builder: build system complete — bgfx, Jolt, asio, sol2, all compile errors fixed"
-
-Then run:
-  cmake -B /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/build 2>&1
-  cmake --build /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/build 2>&1
-
-Print:
-  "BUILDER COMPLETE
-   Dependencies: bgfx ✅ Jolt ✅ asio ✅ sol2 ✅
-   Compilation: [SUCCEEDED / FAILED with XX errors]
-   Binaries: ls build/bin/"
-
-## CRITICAL: DO NOT
-- Touch client/ code (rendering, game objects, UI)
-- Touch server/ code (agent, map, distribute)
-- Touch assets/ or tools/asset_pipeline/
-- Delete any existing cmake files
+## DO NOT
+Touch game/, client/, server/, engine/, cmake/
 ```
 
 ---
 
-## 2. Agent Collector — Complete Asset Conversion
+## 2. Agent E — Economy Balancer
 
-> **Tujuan:** Jalankan pipeline untuk melengkapi model GLB, animation JSON, dan HGT maps.
-> **Area:** `tools/asset_pipeline/`, `assets/`
-> **Estimasi:** 2-3 hari
+> **Tujuan:** Tuning semua economy values — drop rates, exp curves, shop prices, damage formulas — berdasarkan data legacy
+> **Area:** `game/ecs/systems/GameDataDB.cpp`, `assets/data/`, `game/ecs/systems/CombatSystem.cpp`
+> **Zero conflict:** Hanya sentuh data file + GameDataDB loading functions.
 
 ```
-Kamu adalah COLLECTOR — Asset Conversion Engineer.
+Kamu adalah AGENT E — Economy Balancer.
 
-## 🚨 SAFETY RULES (MUST FOLLOW)
+## 🚨 SAFETY RULES
+You ONLY create/modify files in:
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/GameDataDB.cpp
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/GameDataDB.hpp
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/assets/data/
 
-### 1. FILE OWNERSHIP
-You may ONLY create/modify files in these directories:
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/assets/
+You READ ONLY from:
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/CombatSystem.hpp
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/components/CharacterStats.hpp
 
-You may READ from:
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LunaPlus/
+You NEVER touch client/, server/, engine/, cmake/, tools/asset_pipeline/.
 
-You MUST NEVER modify files in engine/, client/, game/, server/, shaders/, cmake/.
+## TASKS — Execute in Order
 
-### 2. COMMIT DISCIPLINE
-git add tools/asset_pipeline/ assets/
-git commit -m "agent_collector: [summary]"
+### Task E1 — Audit Current Economy Values
+cd /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn
+grep -n "exp\|EXP\|drop\|Drop\|gold\|price\|damage\|Damage\|level.*mult\|exp_curve" game/ecs/systems/CombatSystem.cpp game/ecs/systems/GameDataDB.cpp | head -30
 
-## CURRENT STATE — READ FIRST
+### Task E2 — Extract Economy Data from Legacy DB
+sqlite3 assets/data/luna_game.db "
+  SELECT 'EXP Curve' as tbl, COUNT(*) FROM exp_table
+  UNION ALL SELECT 'Drop Rates', COUNT(*) FROM drop_table
+  UNION ALL SELECT 'Shop Prices', COUNT(*) FROM shop_table
+  UNION ALL SELECT 'Item Values', COUNT(*) FROM item_template;
+" 2>/dev/null
 
-1. Check what exists:
-  find /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/assets/ -type f | wc -l
+### Task E3 — Create Economy Data File
+Create: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/assets/data/economy.json
 
-2. Check pipeline scripts:
-  ls /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/
+Populate with data from legacy DB:
+  - exp_curve: level 1-150, XP required per level
+  - drop_rates_by_monster: monster_id → [item_id, rate, min_count, max_count]
+  - shop_prices: item_id → buy_price, sell_price
+  - damage_formula: base ATK, DEF multipliers, crit chance/damage, elemental modifiers
 
-3. Check available source assets:
-  find /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/unpacked/ -name "*.mod" 2>/dev/null | wc -l
-  find /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/unpacked/ -name "*.obj" 2>/dev/null | wc -l
-  find /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/ -name "*.anm" 2>/dev/null | wc -l
-  find /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/unpacked/map/ -name "*.hfl" 2>/dev/null | wc -l
-  find /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/unpacked/map/ -name "*.map" 2>/dev/null | wc -l
+### Task E4 — Update GameDataDB Economy Loader
+Edit: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/GameDataDB.cpp
 
-4. Check existing pipeline log:
-  cat /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/pipeline_status.json 2>/dev/null
+Add function: LoadEconomyData(const string& path)
+  - Parse economy.json
+  - Store in memory: exp_table[level], drop_table[monster_id], price_table[item_id]
+  - Make accessible via getters: GetExpForLevel(level), GetDropTable(monster_id), GetItemPrice(item_id)
 
-## YOUR TASKS — Execute in Order
+### Task E5 — Implement Level-Based Scaling
+Edit: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/CombatSystem.cpp
 
-### Task 1 — Verify Pipeline Scripts Work
-cd /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline
-python3 run.py --dry-run
-This should list all steps without executing.
+Update CalculateDamage() to use:
+  - Level difference penalty: ±5% per level difference (cap 50%)
+  - Monster stats scaling: HP/ATK/DEF scale with monster level
+  - Crit chance: base 5% + AGI/100
+  - Crit damage: 150% base + STR/200
 
-If run.py doesn't exist or has errors, check the individual scripts:
-  ls convert_*.py
-  If missing, copy from ../ (root tools/) or recreate.
+### Task E6 — Verify Compilation
+cd /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn
+cmake --build build --target game_core 2>&1 | tail -10
+Fix any errors.
 
-### Task 2 — Complete Model Conversion (.mod/.obj → .glb)
-Run the batch model converter:
-  cd /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline
-  python3 run.py --models
+## DELIVERABLE
+git add assets/data/economy.json game/ecs/systems/GameDataDB.cpp game/ecs/systems/GameDataDB.hpp
+git commit -m "agent_e: economy balance — exp curves, drop rates, shop prices, damage formulas from legacy data"
 
-Source dir: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/unpacked/
-Target dir: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/assets/models/
-
-Organize into subdirectories:
-  character/  — character body parts, costumes
-  monster/    — monster models
-  npc/        — NPC models
-  pet/        — pet models
-  vehicle/    — mount/vehicle models
-  prop/       — environment props
-  weapon/     — weapons, shields
-
-### Task 3 — Complete Animation Conversion (.anm → .anm.json)
-Run the animation converter:
-  cd /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline
-  python3 run.py --animations
-
-If the --animations flag doesn't exist, run:
-  cp /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/scripts_legacy/convert_anm.py .
-  python3 convert_anm.py --input /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/ --output /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/assets/animations/
-
-Note: Legacy .anm files are at:
-  find /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/ -name "*.anm" 2>/dev/null
-
-### Task 4 — Complete Heightmap Conversion (.hfl → .hgt)
-Run the heightmap converter:
-  cd /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline
-  python3 run.py --heightmaps
-
-Or use the dedicated script:
-  cp /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/scripts_legacy/hfl_to_raw.py .
-  python3 hfl_to_raw.py --input /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/unpacked/map/ --output /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/assets/maps/
-
-### Task 5 — Convert Map Scripts (.map → scene.json)
-Convert map definition files:
-  cd /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline
-  python3 run.py --maps
-
-Or using the converter tool:
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/map_converter/main
-
-Map sources: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/unpacked/map/
-Look for .map files and convert to JSON scene format.
-
-### Task 6 — Organize and Validate
-After all conversions:
-  cd /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline
-  python3 validate_assets.py --report
-  python3 generate_inventory.py
-
-### Task 7 — Create README_ASSETS.md
-Create: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/assets/README_ASSETS.md
-With final counts:
-
-# Assets Inventory
-Generated: [date]
-
-| Category | Count | Format |
-|----------|-------|--------|
-| Textures | XX | .png |
-| Models | XX | .glb |
-| Animations | XX | .anm.json |
-| Audio | XX | .wav/.mp3 |
-| Heightmaps | XX | .hgt |
-| Scene Maps | XX | .json |
-| Character Defs | XX | .json |
-| Shaders (compiled) | XX | .bin |
-| Fonts | XX | .ttf |
-
-## YOUR DELIVERABLE
-After ALL tasks:
-  git add tools/asset_pipeline/ assets/
-  git commit -m "agent_collector: complete asset conversion — models, animations, heightmaps done"
-
-Print:
-  "COLLECTOR COMPLETE
-   Textures: XX files
-   Models: XX → XX files (was 0)
-   Animations: XX → XX files (was 0)
-   Heightmaps: XX → XX files (was 0)
-   Total assets: XX GB"
-
-## CRITICAL: DO NOT
-- Touch engine/, client/, game/, server/ directories
-- Touch cmake/ or CMakeLists.txt files
-- Delete existing assets — only add new ones
+## DO NOT
+Touch client/, server/ (except GameDataDB includes), engine/, cmake/
 ```
 
 ---
 
-## 3. Agent Integrator — Code Integration & Test
+## 3. Agent B — Boss Mechanic Implementor
 
-> **Tujuan:** Hubungkan CharacterRenderer dengan Model class, integrasikan AnimationSystem, test server startup.
-> **Area:** `client/rendering/`, `client/gameobjects/`, `client/engine/`, `engine/gx_geom/`, `server/`
-> **Estimasi:** 4-6 hari
+> **Tujuan:** Implementasi phase transitions, enrage timer, special attacks untuk 34 field bosses + 5 dungeon bosses
+> **Area:** `game/ecs/systems/AISystem.cpp`, `game/ecs/components/AIComponent.hpp`
+> **Zero conflict:** Hanya sentuh AI system, tidak overlap dengan agent lain.
 
 ```
-Kamu adalah INTEGRATOR — Code Integration & Test Engineer.
+Kamu adalah AGENT B — Boss Mechanic Implementor.
 
-## 🚨 SAFETY RULES (MUST FOLLOW)
+## 🚨 SAFETY RULES
+You ONLY create/modify files in:
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/AISystem.cpp
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/AISystem.hpp
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/components/AIComponent.hpp
 
-### 1. FILE OWNERSHIP
-You may ONLY create/modify files in these directories:
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/client/rendering/
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/client/gameobjects/
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/client/engine/
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/engine/gx_geom/
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/server/
+You READ ONLY from:
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/CombatSystem.hpp
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/components/CharacterStats.hpp
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/assets/data/monsters.json
 
-You may READ files from ANYWHERE but may only MODIFY files in the above directories.
-You MUST NEVER modify files in cmake/, tools/, assets/, shaders/.
+You NEVER touch client/, server/, engine/, cmake/, tools/.
 
-### 2. COMMIT DISCIPLINE
-After each integration step:
-  git add [specific files]
-  git commit -m "agent_integrator: [summary]"
+## BACKGROUND
+AIComponent.hpp sudah punya basic state machine (Idle/Patrol/Chase/Attack/Return/Flee/Stun/Sleep).
+AISystem.cpp sudah implementasi states tersebut. Tapi boss-specific mechanics (phase, enrage) belum.
 
-### 3. API CONTRACT
-Before modifying a file, read it fully. If it has:
-  // AGENT Titan — DO NOT MODIFY
-  // AGENT Nexus — DO NOT MODIFY
-Then coordinate the change — do NOT silently override.
+## TASKS — Execute in Order
 
-## CURRENT STATE — READ FIRST
+### Task B1 — Read Current AI System
+cat /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/components/AIComponent.hpp
+cat /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/AISystem.hpp
 
-Read these files to understand the interfaces:
+### Task B2 — Add Boss Phase Fields to AIComponent
+Edit: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/components/AIComponent.hpp
 
-Titan's engine core:
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/engine/gx_geom/Model.h
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/engine/gx_geom/AnimationSystem.h
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/engine/gx_geom/MeshObject.h
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/engine/gx_geom/Skeleton.h
+Add to struct:
+  - int boss_phase = 0;          // current phase (0 = normal, 1-5 = boss phases)
+  - float enrage_timer = 0;      // enrage countdown
+  - float enrage_threshold = 0;  // seconds until enrage (180 = 3 min)
+  - bool is_boss = false;        // is this entity a boss?
+  - std::vector<float> phase_hp_thresholds;  // HP% for each phase trigger (75%, 50%, 25%)
+  - float special_attack_timer = 0;
+  - float special_attack_cooldown = 8.0f;
 
-Existing renderer:
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/client/rendering/CharacterRenderer.cpp
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/client/rendering/CharacterRenderer.hpp
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/client/rendering/AnmParser.h
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/client/rendering/SceneRenderer.cpp
+### Task B3 — Add Boss State + Phase Handling
+Edit: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/AISystem.cpp
 
-Game objects:
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/client/gameobjects/Hero.cpp
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/client/gameobjects/Monster.cpp
+Add to State enum:
+  - BossPhase1, BossPhase2, BossPhase3, BossPhase4, BossPhase5
 
-Server:
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/server/agent/AgentServer.h
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/server/map/MapServer.h
-  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/server/shared/Database.h
+Add function: HandleBossAI(entt::registry&, entt::entity)
+Called every tick for boss entities:
+  1. Check HP % → trigger phase transitions
+  2. Check enrage_timer → enter enrage mode (+50% ATK, -50% DEF, new attacks)
+  3. Special attack rotation: every special_attack_cooldown seconds, use area/summon/buff
+  4. Phase-specific behavior:
+     - Phase 1: Basic attacks + occasional special
+     - Phase 2: + adds summon
+     - Phase 3: + AOE attack
+     - Phase 4: + enrage mode
+     - Phase 5: + desperation (all abilities on low CD)
 
-## YOUR TASKS — Execute in Order
+### Task B4 — Implement 5 Boss Types
+Create: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/BossData.hpp
 
-### Task 1 — Integrate Model class into CharacterRenderer
-Edit: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/client/rendering/CharacterRenderer.cpp
+```cpp
+struct BossDefinition {
+    uint32_t monster_id;
+    std::string name;
+    int map_id;
+    float spawn_x, spawn_y, spawn_z;
+    float respawn_time;        // seconds
+    std::vector<float> phase_hp;  // HP thresholds
+    std::vector<std::string> special_abilities;
+    bool has_enrage;
+    float enrage_time;
+    float min_party_size;
+    std::string loot_table_id;
+};
+```
 
-Currently CharacterRenderer uses Assimp directly (aiScene, aiMesh). Change it to use Titan's Model class:
+Define 5 dungeon bosses + 34 field bosses using data from monsters.json.
 
-  1. Include "engine/gx_geom/Model.h" and "engine/gx_geom/MeshObject.h"
-  2. Change CharRenderer_LoadModel() to create a Model instance and call LoadFromGLB()
-  3. Use Model::GetMeshes() to get mesh data
-  4. Use MeshObject::UploadToGPU() to create bgfx vertex/index buffers
-  5. Use Model::GetBones() for skeleton data
-  6. Update the SkinnedVertex struct if needed to match MeshPart format
+### Task B5 — Load Boss Data from DB
+Edit: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/AISystem.cpp
 
-### Task 2 — Integrate AnimationSystem into CharacterRenderer
-Edit: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/client/rendering/CharacterRenderer.cpp
+Add function: LoadBossDefinitions(const string& json_path)
+  - Read boss data from JSON/DB
+  - Populate unordered_map<uint32_t, BossDefinition>
 
-  1. Include "engine/gx_geom/AnimationSystem.h"
-  2. Load .anm.json files using AnimationSystem::LoadFromJson()
-  3. In the render loop, call AnimationSystem::Update(dt) and GetBlendedPose()
-  4. Upload bone matrices to GPU uniform "u_bones"
-  5. Support animation state transitions (idle → walk → run → attack via CharAnim enum)
-  6. Implement blend between animations (BlendTo() with 0.2s transition)
+### Task B6 — Verify Compilation
+cd /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn
+cmake --build build --target game_core 2>&1 | tail -10
+Fix any errors.
 
-### Task 3 — Integrate Skeleton
-Edit: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/client/rendering/CharacterRenderer.cpp
+## DELIVERABLE
+git add game/ecs/systems/AISystem.cpp game/ecs/systems/AISystem.hpp game/ecs/components/AIComponent.hpp game/ecs/systems/BossData.hpp
+git commit -m "agent_b: boss mechanics — phase transitions, enrage, special attacks, 39 boss definitions"
 
-  1. Include "engine/gx_geom/Skeleton.h"
-  2. Build skeleton from Model::GetBones()
-  3. Use Skeleton::ComputeFinalPose() to get world-space bone transforms
-  4. Pass to AnimationSystem::GetBlendedPose() for correct skinning
-
-### Task 4 — Update vs_skinned.shader to Match
-Edit: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/shaders/vs_skinned.sc
-
-  1. Ensure it declares uniform mat4 u_bones[64]
-  2. Ensure it transforms positions by bone weights
-  3. Ensure it transforms normals for correct lighting
-
-### Task 5 — Integrate PhysicsWorld into Hero/Monster
-Edit: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/client/gameobjects/Hero.cpp
-Edit: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/client/gameobjects/Monster.cpp
-
-  1. Include "engine/physics/PhysicsWorld.h"
-  2. On Hero::Init(), create a physics character via PhysicsWorld::CreateCharacter()
-  3. On Hero::Move(), use PhysicsWorld::SetCharacterPosition()
-  4. On Monster::Update(), check PhysicsWorld::RayCast() for line-of-sight
-  5. Add gravity: on each frame, apply PhysicsWorld::GetTerrainHeight() to stick to ground
-
-### Task 6 — Integrate PhysicsWorld into CollisionSystem
-Edit: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/client/engine/CollisionSystem.hpp
-
-  Verify it already has SetPhysicsWorld() method.
-  If not, add it. Ensure IsWalkable(x,z) uses PhysicsWorld raycast.
-
-### Task 7 — Test Server Startup
-Create a simple test script or modify server main to:
-  1. Initialize Database
-  2. Initialize NetworkLayer
-  3. Start AgentServer on port 8100
-  4. Print "Server started successfully"
-  5. Run for 5 seconds, then shutdown
-
-File: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/server/test_startup.cpp
-  #include "agent/AgentServer.h"
-  #include "shared/Database.h"
-  
-  int main() {
-    Database db;
-    db.Initialize("assets/data/luna_member.db");
-    
-    AgentServer server;
-    server.Initialize(8100);
-    
-    printf("Server test: OK\n");
-    sleep(5);
-    
-    server.Shutdown();
-    db.Shutdown();
-    return 0;
-  }
-
-### Task 8 — Update CMakeLists for Integration
-Edit: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/client/CMakeLists.txt
-  Ensure client links: gx_geom gx_physics gx_render
-
-Edit: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/CMakeLists.txt
-  Ensure game_core links: gx_geom gx_physics
-
-## YOUR DELIVERABLE
-After ALL tasks:
-  git add client/rendering/ client/gameobjects/ client/engine/ engine/gx_geom/ game/ecs/ server/ shaders/
-  git commit -m "agent_integrator: full integration — Model, AnimationSystem, Physics, Server test"
-
-Print:
-  "INTEGRATOR COMPLETE
-   CharacterRenderer → Model: [OK/SKIPPED]
-   CharacterRenderer → AnimationSystem: [OK/SKIPPED]
-   Hero/Monster → Physics: [OK/SKIPPED]
-   Server startup test: [OK/FAILED]
-   Compilation: [SUCCEEDED/FAILED]"
-
-## CRITICAL: DO NOT
-- Touch cmake/ or root CMakeLists.txt — Builder handles that
-- Touch tools/ or assets/ — Collector handles that
-- Touch shaders/ except vs_skinned.sc
-- Delete any existing files — only extend/modify
+## DO NOT
+Touch client/, server/, engine/, cmake/, tools/
 ```
 
 ---
 
-## 4. Ringkasan Paralel
+## 4. Agent S — Map Spawn Integrator
+
+> **Tujuan:** Menghubungkan data spawn points dari DB ke runtime — monster spawn, NPC placement, respawn cycle
+> **Area:** `client/engine/EngineMap.cpp`, `server/map/MapServer.cpp`, `game/ecs/systems/SpawnSystem.cpp`
+> **Zero conflict:** Tidak overlap dengan agent lain.
+
+```
+Kamu adalah AGENT S — Map Spawn Integrator.
+
+## 🚨 SAFETY RULES
+You ONLY create/modify files in:
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/client/engine/EngineMap.cpp
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/client/engine/EngineMap.hpp
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/server/map/MapServer.cpp
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/SpawnSystem.cpp
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/SpawnSystem.hpp
+
+You NEVER touch tools/, cmake/, shaders/.
+
+## TASKS — Execute in Order
+
+### Task S1 — Read Current Systems
+cat /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/SpawnSystem.hpp
+cat /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/client/engine/EngineMap.hpp
+
+### Task S2 — Enhance SpawnSystem
+Edit: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/SpawnSystem.cpp
+
+Add functions:
+  - LoadSpawnData(const string& json_path) — read spawn points from JSON
+  - SpawnMonstersForMap(int map_id) — spawn all monsters for a given map
+  - RespawnMonster(int spawn_id, float delay) — schedule respawn
+  - DespawnAll() — clear all spawned entities
+
+SpawnPoint struct:
+```cpp
+struct SpawnPoint {
+    uint32_t id;
+    int map_id;
+    uint32_t monster_id;
+    float x, y, z;
+    float respawn_time;  // seconds
+    int max_count;       // max simultaneous
+    int current_count;   // currently alive
+    float aggro_range;
+    uint32_t patrol_radius;
+};
+```
+
+### Task S3 — Integrate with EngineMap
+Edit: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/client/engine/EngineMap.cpp
+
+On map load:
+  1. Call SpawnSystem::LoadSpawnData("assets/data/monsters.json")
+  2. Call SpawnSystem::SpawnMonstersForMap(current_map_id)
+  3. Call GameDataDB::GetNPCPositions(current_map_id)
+  4. Place NPCs on map (static entities with dialog triggers)
+
+### Task S4 — Integrate with MapServer
+Edit: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/server/map/MapServer.cpp
+
+On player enter map:
+  1. Query spawn points for this map from DB
+  2. Spawn initial monsters
+  3. Send NPC list to client
+  4. Start respawn timer loop (every 30s, check & respawn)
+
+### Task S5 — Verify Compilation
+cd /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn
+cmake --build build 2>&1 | grep -E "error:|Built target" | head -10
+Fix any errors.
+
+## DELIVERABLE
+git add client/engine/EngineMap.cpp client/engine/EngineMap.hpp server/map/MapServer.cpp game/ecs/systems/SpawnSystem.cpp game/ecs/systems/SpawnSystem.hpp
+git commit -m "agent_s: map spawn integration — monster spawns, NPC placement, respawn cycle from DB data"
+
+## DO NOT
+Touch tools/, cmake/, shaders/
+```
+
+---
+
+## 5. Agent C — Combat & Drop Tuning
+
+> **Tujuan:** Implementasi drop table system, combat formula tuning, dan item upgrade/enchant mechanics
+> **Area:** `game/ecs/systems/CombatSystem.cpp`, `game/ecs/systems/ItemSystem.cpp`, `game/ecs/systems/LootSystem.cpp`
+> **Zero conflict:** Tidak overlap dengan agent lain.
+
+```
+Kamu adalah AGENT C — Combat & Drop Tuning.
+
+## 🚨 SAFETY RULES
+You ONLY create/modify files in:
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/CombatSystem.cpp
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/ItemSystem.cpp
+  /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/LootSystem.cpp
+
+You NEVER touch client/, server/, engine/, cmake/, tools/.
+
+## TASKS — Execute in Order
+
+### Task C1 — Read Current Combat System
+cat /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/CombatSystem.hpp
+grep -n "damage|Calculate|ApplyDamage|HandleAttack|crit|element|defense" /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/CombatSystem.cpp | head -30
+
+### Task C2 — Implement Drop Table System
+Edit: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/LootSystem.cpp
+
+Add functions:
+  - LoadDropTables(const string& json_path) — read from loot data
+  - RollLoot(int monster_id) → vector<LootEntry> — calculate drops based on rates
+  - SpawnLootItems(vec3 position, vector<LootEntry> items) — create item entities on ground
+  - CanLoot(entity player, entity item) → bool — check distance, ownership
+
+DropTable struct:
+```cpp
+struct LootEntry { uint32_t item_id; int count; float rate; };
+struct DropTable { uint32_t monster_id; vector<LootEntry> entries; int gold_min; int gold_max; float exp_mult; };
+```
+
+Read drop data from assets/data/monsters.json.
+
+### Task C3 — Tune Combat Formulas
+Edit: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/CombatSystem.cpp
+
+Update CalculateDamage():
+  - Base damage = (ATK * 2) - DEF
+  - Element system: 7 elements (none, earth, water, divine, wind, fire, dark)
+    - Advantage: 30% bonus (fire → wind, wind → earth, earth → water, water → fire)
+    - Dark/Divine: 30% bonus vs each other
+  - Crit: base 5% + (AGI/200), crit damage = 150% + (STR/500)
+  - Level difference penalty: ±5% per level, cap at 50%
+  - Damage variance: ±10% random
+  - Add miss chance: 5% base, reduced by DEX
+
+### Task C4 — Implement Item Upgrade System
+Edit: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/game/ecs/systems/ItemSystem.cpp
+
+Add functions:
+  - UpgradeItem(entity player, int inventory_slot) → bool
+  - Success rate: +1=95%, +2=85%, +3=70%, +4=55%, +5=40%, +6=30%, +7=20%, +8=12%, +9=7%, +10=3%
+  - On fail: item destroyed if ≥ +7, else downgrade by 1
+  - Stat increase per level: +10% ATK/DEF per upgrade level
+  - Special effect at +7: glow effect
+  - Special effect at +10: max stats + unique name color
+
+### Task C5 — Verify Compilation
+cd /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn
+cmake --build build --target game_core 2>&1 | tail -10
+Fix any errors.
+
+## DELIVERABLE
+git add game/ecs/systems/CombatSystem.cpp game/ecs/systems/ItemSystem.cpp game/ecs/systems/LootSystem.cpp
+git commit -m "agent_c: combat & drop tuning — drop tables, combat formulas, item upgrade system"
+
+## DO NOT
+Touch client/, server/, engine/, cmake/, tools/
+```
+
+---
+
+## 6. Ringkasan Paralel
 
 ### Area Kerja — Zero Conflict
 
-| Agent | Direktori | File Baru | File Existing |
-|-------|-----------|-----------|---------------|
-| **Builder** | `cmake/`, `external/`, `scripts/` | `external/bgfx/`, `external/JoltPhysics/` | `CMakeLists.txt`, `engine/*/CMakeLists.txt` |
-| **Collector** | `tools/`, `assets/` | `.glb`, `.anm.json`, `.hgt` | `tools/asset_pipeline/` |
-| **Integrator** | `client/rendering/`, `client/gameobjects/`, `server/` | `server/test_startup.cpp` | `CharacterRenderer.cpp`, `Hero.cpp`, `Monster.cpp` |
+| Agent | Direktori | Jenis File | Konflik dengan |
+|-------|-----------|-----------|----------------|
+| **Q** | `tools/data_parser/`, `assets/data/` | .py, .json, .lua | ✅ **Tidak ada** |
+| **E** | `game/ecs/systems/GameDataDB.*`, `assets/data/` | .cpp, .json | ✅ **Tidak ada** |
+| **B** | `game/ecs/systems/AISystem.*`, `game/ecs/components/AIComponent.*` | .cpp, .hpp | ✅ **Tidak ada** |
+| **S** | `client/engine/EngineMap.*`, `server/map/MapServer.cpp`, `game/ecs/systems/SpawnSystem.*` | .cpp, .hpp | ✅ **Tidak ada** |
+| **C** | `game/ecs/systems/CombatSystem.cpp`, `ItemSystem.cpp`, `LootSystem.cpp` | .cpp | ✅ **Tidak ada** |
 
-**Zero konflik — setiap agent memiliki area tertutup sendiri.**
+### Catatan
 
-### Timeline
+1. **Agent E dan Agent C sama-sama menyentuh `CombatSystem.cpp`** — tapi Agent E hanya update `CalculateDamage()` (formula), sementara Agent C hanya tambah element system + level scaling. **Jika terjadi conflict, prioritas Agent C** karena lebih komprehensif. Atau merge manual setelah keduanya selesai.
 
-```
-AGENT      DAY 1  2  3  4  5  6  7  8  9 10
-────────  ────────────────────────────────────
-Builder   ██████████████████░░░░░░░░░░░░░░░░
-Collector ██████████████████████████░░░░░░░░
-Integrator░░░░░░░░████████████████████████░░
-
-           Week 1          Week 2
-```
-
-### Aturan
-
-1. **Builder + Collector bisa mulai bersamaan** (Hari 1) — beda area total
-2. **Integrator mulai Hari 4** — butuh Model class dari Builder dan asset dari Collector
-3. **Semua commit WAJIB** setelah setiap task selesai
-4. **Setelah semua selesai** → compile total dari root
+2. **Semua aman dijalankan paralel.**

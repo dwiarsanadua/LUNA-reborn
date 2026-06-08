@@ -52,6 +52,7 @@ class AISystem;
 class MovementSystem;
 class ItemSystem;
 class QuestSystem;
+class SpawnSystem;
 
 class MapServer {
 public:
@@ -99,8 +100,10 @@ private:
     std::unique_ptr<MovementSystem> movement_;
     std::unique_ptr<ItemSystem> item_;
     std::unique_ptr<QuestSystem> quest_;
+    std::unique_ptr<SpawnSystem> spawn_sys_;
 
     float auto_save_timer_ = 0.0f;
+    float respawn_timer_ = 0.0f;
 
     // Dungeon instances
     std::unordered_map<uint32_t, DungeonInstance> dungeons_;

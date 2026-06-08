@@ -31,6 +31,7 @@ MapServer::MapServer()
     , movement_(std::make_unique<MovementSystem>())
     , item_(std::make_unique<ItemSystem>())
     , quest_(std::make_unique<QuestSystem>())
+    , spawn_sys_(std::make_unique<SpawnSystem>())
 {}
 
 MapServer::~MapServer() { Shutdown(); }
@@ -80,38 +81,27 @@ bool MapServer::Initialize(int map_id, uint16_t port) {
         spdlog::debug("MapServer: packet received size={}", size);
     });
 
-    // Load monster spawns from game_data.db using direct SQL
+    // Load monster spawns and NPCs via SpawnSystem + direct DB
     {
+        spawn_sys_->LoadSpawnData("assets/data/monsters.json");
+        spawn_sys_->SpawnMonstersForMap(*registry_, map_id);
+
         sqlite3* gamedb = nullptr;
         if (sqlite3_open("data/game_data.db", &gamedb) == SQLITE_OK) {
-            SpawnSystem spawn_sys;
-            // Query monster spawns for this map
-            const char* spawn_sql = "SELECT col_0000, col_0001, col_0002, col_0003, col_0004, col_0005 FROM game_monsterlist WHERE col_0002=?";
-            sqlite3_stmt* stmt = nullptr;
-            if (sqlite3_prepare_v2(gamedb, spawn_sql, -1, &stmt, nullptr) == SQLITE_OK) {
-                sqlite3_bind_int(stmt, 1, map_id);
-                int spawn_count = 0;
-                while (sqlite3_step(stmt) == SQLITE_ROW) {
-                    int monster_id = sqlite3_column_int(stmt, 1);
-                    int count = sqlite3_column_int(stmt, 3);
-                    float radius = static_cast<float>(sqlite3_column_double(stmt, 5));
-                    for (int i = 0; i < count; ++i) {
-                        float ox = (static_cast<float>(rand() % 200) - 100.0f) * radius / 100.0f;
-                        float oz = (static_cast<float>(rand() % 200) - 100.0f) * radius / 100.0f;
-                        spawn_sys.SpawnMonster(*registry_, static_cast<uint32_t>(monster_id),
-                                               glm::vec3(ox, 0.0f, oz), 1);
-                        spawn_count++;
-                    }
-                }
-                sqlite3_finalize(stmt);
-                spdlog::info("MapServer: spawned {} monsters for map {}", spawn_count, map_id);
-            }
-            // Query NPC positions
+            // Query NPC positions for this map
             const char* npc_sql = "SELECT col_0000, col_0001, col_0002, col_0003, col_0004, col_0005 FROM game_npc WHERE col_0002=?";
+            sqlite3_stmt* stmt = nullptr;
             if (sqlite3_prepare_v2(gamedb, npc_sql, -1, &stmt, nullptr) == SQLITE_OK) {
                 sqlite3_bind_int(stmt, 1, map_id);
                 int npc_count = 0;
                 while (sqlite3_step(stmt) == SQLITE_ROW) {
+                    int npc_id = sqlite3_column_int(stmt, 0);
+                    const char* name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+                    float x = static_cast<float>(sqlite3_column_double(stmt, 3));
+                    float y = static_cast<float>(sqlite3_column_double(stmt, 4));
+                    float z = static_cast<float>(sqlite3_column_double(stmt, 5));
+                    spdlog::info("MapServer: NPC '{}' (id={}) at ({},{},{}) for map {}",
+                                 name ? name : "?", npc_id, x, y, z, map_id);
                     npc_count++;
                 }
                 sqlite3_finalize(stmt);
@@ -141,6 +131,7 @@ void MapServer::Shutdown() {
 void MapServer::Update(float dt) {
     network_->Update();
 
+    spawn_sys_->Update(*registry_, dt);
     movement_->Update(*registry_, dt);
     ai_->Update(*registry_, dt);
     combat_->Update(*registry_, dt);
@@ -184,6 +175,14 @@ void MapServer::Update(float dt) {
 
     for (auto id : to_cleanup) {
         CleanupDungeon(id);
+    }
+
+    // Respawn timer loop every 30 seconds
+    respawn_timer_ += dt;
+    if (respawn_timer_ >= 30.0f) {
+        respawn_timer_ = 0.0f;
+        spawn_sys_->SpawnMonstersForMap(*registry_, map_id_);
+        spdlog::debug("MapServer: respawn check for map {}", map_id_);
     }
 
     // Auto-save player state every 60 seconds

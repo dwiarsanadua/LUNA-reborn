@@ -84,9 +84,9 @@ DamageResult CombatSystem::CalculateDamage(const CharacterStats& attacker,
         damage = (damage * (0.6f - (defender.constitution / 4000.0f))) - defender.shield_defense;
     }
 
-    // 7. Critical: base 5% + (DEX/200), crit damage = 150% + (STR/500)
-    float crit_rate = 5.0f + attacker.dexterity / 200.0f;
-    float crit_dmg = 1.50f + attacker.strength / 500.0f;
+    // 7. Critical: base 5% + (DEX/100), crit damage = 150% + (STR/200)
+    float crit_rate = 5.0f + attacker.dexterity / 100.0f;
+    float crit_dmg = 1.50f + attacker.strength / 200.0f;
     if (!result.is_block && (attacker.critical_rate >= 100.0f ||
                              crit_rate >= std::uniform_real_distribution<float>(0, 100)(rng))) {
         result.is_critical = true;
