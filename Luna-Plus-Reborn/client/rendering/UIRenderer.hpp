@@ -5,15 +5,32 @@
 #include <vector>
 #include <unordered_map>
 #include <cstdarg>
+#include <cstdint>
 #include <engine/gx_render/RenderDevice.h>
 
 struct UIColor { uint8_t r, g, b, a; };
+
+struct UIVertex {
+    float x, y, z;
+    uint32_t color;
+    float u, v;
+};
 
 struct FontGlyph {
     float u0, v0, u1, v1;
     float xoff, yoff;
     float xadvance;
     float w, h;
+};
+
+struct FontAtlas {
+    bgfx::TextureHandle tex = BGFX_INVALID_HANDLE;
+    std::vector<FontGlyph> glyphs;
+    int atlas_w = 512;
+    int atlas_h = 128;
+    int range_first = 32;
+    int range_count = 224;
+    bool ready = false;
 };
 
 struct TextureInfo {
@@ -25,6 +42,10 @@ struct TextureInfo {
 struct AtlasRegion {
     float u0, v0, u1, v1;
     int x, y, w, h;
+};
+
+struct ScissorRect {
+    float x, y, w, h;
 };
 
 class UIRenderer {
@@ -51,8 +72,16 @@ public:
     void DrawTextCentered(float y, uint32_t color, const char* fmt, ...);
     float MeasureText(const char* text);
 
+    void FlushBatch();
     void Render();
     void Shutdown();
+
+    void SetFontSize(float size);
+    void LoadGlyphsForText(const std::string& text);
+
+    void PushScissor(float x, float y, float w, float h);
+    void PopScissor();
+    bool IsClipped(float x, float y, float w, float h) const;
 
     bgfx::UniformHandle GetSampler() const { return s_tex_; }
     bgfx::TextureHandle GetWhiteTexture() const { return white_tex_; }
@@ -70,6 +99,16 @@ private:
     AtlasRegion PackInAtlas(int w, int h);
     void UploadAtlas();
 
+    static int DecodeUTF8(const char*& s);
+
+    FontAtlas& GetOrCreateFontAtlas(float size);
+
+    // Batch accumulator
+    std::vector<UIVertex> batch_verts_;
+    std::vector<uint16_t> batch_indices_;
+    bgfx::TextureHandle current_batch_tex_ = BGFX_INVALID_HANDLE;
+    static constexpr int BATCH_SIZE = 4096;
+
     bgfx::ProgramHandle prog_ = BGFX_INVALID_HANDLE;
     bgfx::ProgramHandle ui_prog_ = BGFX_INVALID_HANDLE;
     bgfx::UniformHandle s_tex_ = BGFX_INVALID_HANDLE;
@@ -78,12 +117,11 @@ private:
     bgfx::TextureHandle white_tex_ = BGFX_INVALID_HANDLE;
     TextureInfo login_bg_;
 
-    bgfx::TextureHandle font_tex_ = BGFX_INVALID_HANDLE;
-    FontGlyph font_glyphs_[96];
+    // Font system — per-size atlases
+    std::unordered_map<float, FontAtlas> font_atlases_;
+    float current_font_size_ = 18.0f;
     int font_atlas_w_ = 512;
     int font_atlas_h_ = 128;
-    float font_size_ = 18.0f;
-    bool font_ready_ = false;
 
     // Texture atlas for UI textures
     static constexpr int ATLAS_SIZE = 2048;
@@ -96,6 +134,9 @@ private:
     std::unordered_map<std::string, AtlasRegion> atlas_regions_;
     std::vector<std::pair<std::string, std::string>> atlas_pending_;
     int atlas_bind_count_ = 0;
+
+    // Scissor stack
+    std::vector<ScissorRect> scissor_stack_;
 };
 
 extern UIRenderer* g_ui;

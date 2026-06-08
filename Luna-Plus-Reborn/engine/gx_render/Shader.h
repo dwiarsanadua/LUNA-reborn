@@ -22,6 +22,11 @@ private:
     std::string name_;
 };
 
+namespace ShaderUtils {
+    const bgfx::Memory* LoadShaderBin(const std::string& name);
+    bgfx::ProgramHandle LoadProgram(const std::string& vs_name, const std::string& fs_name);
+}
+
 class ShaderManager {
 public:
     bool Init(const std::string& shader_dir);
@@ -30,7 +35,7 @@ public:
 
     Shader* GetDefaultShader();
     Shader* GetUnlitShader();
-    Shader* GetLightShader();
+    Shader* GetLitShader();
 
 private:
     std::unordered_map<std::string, std::unique_ptr<Shader>> programs_;

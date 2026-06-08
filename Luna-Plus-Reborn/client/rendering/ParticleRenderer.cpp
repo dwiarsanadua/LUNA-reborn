@@ -1,17 +1,11 @@
 #include "ParticleRenderer.hpp"
+#include <engine/gx_render/Shader.h>
 #include <fstream>
 #include <cstring>
+#include <stb_image.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-
-static const bgfx::Memory* loadShader(const char* path) {
-    std::ifstream file(path, std::ios::binary | std::ios::ate);
-    if (!file) return nullptr;
-    size_t size = file.tellg(); file.seekg(0);
-    auto* mem = bgfx::alloc(static_cast<uint32_t>(size));
-    file.read(reinterpret_cast<char*>(mem->data), size);
-    return mem;
-}
+#include <spdlog/spdlog.h>
 
 static bgfx::VertexLayout getLayout() {
     bgfx::VertexLayout layout;
@@ -24,9 +18,7 @@ static bgfx::VertexLayout getLayout() {
 }
 
 void ParticleRenderer::Init() {
-    auto vs = loadShader("shaders/vs_default.bin");
-    auto fs = loadShader("shaders/fs_default.bin");
-    if (vs && fs) prog_ = bgfx::createProgram(bgfx::createShader(vs), bgfx::createShader(fs), true);
+    prog_ = ShaderUtils::LoadProgram("shaders/vs_default.bin", "shaders/fs_default.bin");
     s_tex_ = bgfx::createUniform("s_texColor", bgfx::UniformType::Sampler);
     uint32_t white = 0xffffffff;
     white_tex_ = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::makeRef(&white, sizeof(white)));
@@ -36,12 +28,26 @@ void ParticleRenderer::Render(const glm::mat4& view, const glm::mat4& proj,
                                const std::vector<glm::vec3>& positions,
                                const std::vector<uint32_t>& colors,
                                const std::vector<float>& sizes) {
-    if (!bgfx::isValid(prog_) || positions.empty()) return;
-    size_t count = positions.size();
-    if (count > 512) count = 512;
+    Render(view, proj, positions, colors, sizes, BGFX_INVALID_HANDLE);
+}
 
-    // Billboard particles: each is a camera-facing quad with size
-    // For simplicity, just render as screen-aligned colored dots
+void ParticleRenderer::Render(const glm::mat4& view, const glm::mat4& proj,
+                               const std::vector<glm::vec3>& positions,
+                               const std::vector<uint32_t>& colors,
+                               const std::vector<float>& sizes,
+                               bgfx::TextureHandle texture) {
+    if (!bgfx::isValid(prog_) || positions.empty()) return;
+    size_t count = std::min(positions.size(), MAX_PARTICLES);
+    if (count < positions.size()) {
+        spdlog::warn("ParticleRenderer: overflow, {} particles truncated to {}",
+                     positions.size(), MAX_PARTICLES);
+    }
+
+    // Extract camera right and up vectors from inverse view matrix
+    glm::mat4 inv_view = glm::inverse(view);
+    glm::vec3 cam_right(inv_view[0][0], inv_view[1][0], inv_view[2][0]);
+    glm::vec3 cam_up(inv_view[0][1], inv_view[1][1], inv_view[2][1]);
+
     std::vector<PartVertex> verts;
     verts.reserve(count * 4);
     std::vector<uint16_t> idx;
@@ -51,24 +57,36 @@ void ParticleRenderer::Render(const glm::mat4& view, const glm::mat4& proj,
         uint16_t base = static_cast<uint16_t>(verts.size());
         float s = sizes[i] * 0.5f;
         uint32_t c = colors[i];
-        verts.push_back({positions[i].x - s, positions[i].y - s, positions[i].z, c, 0, 0});
-        verts.push_back({positions[i].x + s, positions[i].y - s, positions[i].z, c, 1, 0});
-        verts.push_back({positions[i].x - s, positions[i].y + s, positions[i].z, c, 0, 1});
-        verts.push_back({positions[i].x + s, positions[i].y + s, positions[i].z, c, 1, 1});
+        glm::vec3 p = positions[i];
+
+        verts.push_back({p.x + (-cam_right.x + cam_up.x) * s,
+                         p.y + (-cam_right.y + cam_up.y) * s,
+                         p.z + (-cam_right.z + cam_up.z) * s, c, 0, 0});
+        verts.push_back({p.x + ( cam_right.x + cam_up.x) * s,
+                         p.y + ( cam_right.y + cam_up.y) * s,
+                         p.z + ( cam_right.z + cam_up.z) * s, c, 1, 0});
+        verts.push_back({p.x + (-cam_right.x - cam_up.x) * s,
+                         p.y + (-cam_right.y - cam_up.y) * s,
+                         p.z + (-cam_right.z - cam_up.z) * s, c, 0, 1});
+        verts.push_back({p.x + ( cam_right.x - cam_up.x) * s,
+                         p.y + ( cam_right.y - cam_up.y) * s,
+                         p.z + ( cam_right.z - cam_up.z) * s, c, 1, 1});
         idx.push_back(base); idx.push_back(base+1); idx.push_back(base+2);
         idx.push_back(base+1); idx.push_back(base+3); idx.push_back(base+2);
     }
 
     bgfx::setViewTransform(view_id_, &view, &proj);
     bgfx::setViewClear(view_id_, BGFX_CLEAR_NONE, 0, 1.0f, 0);
-    bgfx::setViewRect(view_id_, 0, 0, 1280, 720);
+    bgfx::setViewRect(view_id_, 0, 0, bgfx::BackbufferRatio::Equal);
 
     bgfx::TransientVertexBuffer tvb;
     bgfx::TransientIndexBuffer tib;
     if (bgfx::allocTransientBuffers(&tvb, getLayout(), (uint16_t)verts.size(), &tib, (uint32_t)idx.size())) {
         std::memcpy(tvb.data, verts.data(), verts.size() * sizeof(PartVertex));
         std::memcpy(tib.data, idx.data(), idx.size() * sizeof(uint16_t));
-        bgfx::setTexture(0, s_tex_, white_tex_);
+        bgfx::TextureHandle tex = bgfx::isValid(texture) ? texture :
+                                  (bgfx::isValid(particle_tex_) ? particle_tex_ : white_tex_);
+        bgfx::setTexture(0, s_tex_, tex);
         bgfx::setVertexBuffer(0, &tvb);
         bgfx::setIndexBuffer(&tib);
         bgfx::setState(BGFX_STATE_DEFAULT | BGFX_STATE_BLEND_ALPHA);
@@ -76,8 +94,31 @@ void ParticleRenderer::Render(const glm::mat4& view, const glm::mat4& proj,
     }
 }
 
+void ParticleRenderer::SetParticleTexture(const std::string& path) {
+    if (bgfx::isValid(particle_tex_)) {
+        bgfx::destroy(particle_tex_);
+        particle_tex_ = BGFX_INVALID_HANDLE;
+    }
+    int w, h, channels;
+    unsigned char* data = stbi_load(path.c_str(), &w, &h, &channels, 4);
+    if (!data) {
+        spdlog::warn("ParticleRenderer: failed to load texture {}: {}", path, stbi_failure_reason());
+        return;
+    }
+    const bgfx::Memory* mem = bgfx::copy(data, w * h * 4);
+    stbi_image_free(data);
+    particle_tex_ = bgfx::createTexture2D((uint16_t)w, (uint16_t)h, false, 1,
+                                           bgfx::TextureFormat::RGBA8, 0, mem);
+    if (bgfx::isValid(particle_tex_)) {
+        spdlog::info("ParticleRenderer: loaded texture {} ({}x{})", path, w, h);
+    } else {
+        spdlog::warn("ParticleRenderer: failed to create GPU texture from {}", path);
+    }
+}
+
 void ParticleRenderer::Shutdown() {
     if (bgfx::isValid(prog_)) bgfx::destroy(prog_);
     if (bgfx::isValid(s_tex_)) bgfx::destroy(s_tex_);
     if (bgfx::isValid(white_tex_)) bgfx::destroy(white_tex_);
+    if (bgfx::isValid(particle_tex_)) bgfx::destroy(particle_tex_);
 }

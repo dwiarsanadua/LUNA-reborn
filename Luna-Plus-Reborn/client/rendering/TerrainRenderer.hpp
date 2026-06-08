@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <engine/gx_render/RenderDevice.h>
+#include "RenderQueue.hpp"
 
 struct TerrainPatch {
     float min_x, min_z, max_x, max_z;
@@ -33,7 +34,8 @@ public:
     void Render(const glm::mat4& view, const glm::mat4& proj);
     void Render(const glm::mat4& view, const glm::mat4& proj, const EnvData& env);
     void Render(const glm::mat4& view, const glm::mat4& proj, bgfx::TextureHandle shadow_map, const glm::mat4& shadow_mvp);
-    void RenderShadow(const glm::mat4& light_mvp);
+    void RenderShadow(bgfx::ViewId view_id, const glm::mat4& light_mvp);
+    void SetRenderQueue(RenderQueue* q) { render_queue_ = q; }
     void Shutdown();
 
     float GetHeight(float x, float z) const;
@@ -80,6 +82,7 @@ private:
 
     std::vector<TerrainPatch> patches_;
     int visible_patches_ = 0;
+    RenderQueue* render_queue_ = nullptr;
 
     struct Vertex { float x, y, z; float nx, ny, nz; uint32_t color; float u, v; };
     static bgfx::VertexLayout& GetLayout();

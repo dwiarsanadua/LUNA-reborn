@@ -17,9 +17,11 @@ public:
 
     void BeginShadowPass(const glm::vec3& light_dir);
     void EndShadowPass();
+    void SetSceneViewsFBO(bgfx::FrameBufferHandle fbo);
     bgfx::TextureHandle GetShadowMap() const { return shadow_map_; }
     const glm::mat4& GetShadowMVP() const { return shadow_mvp_; }
     bool HasShadow() const { return bgfx::isValid(shadow_map_); }
+    bgfx::ViewId GetShadowViewId() const { return static_cast<bgfx::ViewId>(shadow_view_id_); }
 
     // Profiling statistics
     void UpdateStats(float dt);
@@ -40,6 +42,7 @@ private:
     bgfx::TextureHandle shadow_map_ = BGFX_INVALID_HANDLE;
     bgfx::TextureHandle shadow_depth_ = BGFX_INVALID_HANDLE;
     bgfx::UniformHandle u_shadow_map_ = BGFX_INVALID_HANDLE;
+    bgfx::ProgramHandle shadow_program_ = BGFX_INVALID_HANDLE;
     glm::mat4 shadow_mvp_;
     int shadow_map_size_ = 1024;
     bool shadow_initialized_ = false;

@@ -1,7 +1,18 @@
+#!/usr/bin/env python3
+"""
+LUNA Plus Reborn — Animation Converter
+Converts .anm binary animation files to .anm.json format
+"""
 import struct
 import sys
 import os
 import json
+import argparse
+from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
+SRC_DEFAULT = os.environ.get('LUNA_LEGACY_SRC', str(Path(__file__).parent.parent.parent.parent / 'Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/unpacked'))
+DST_DEFAULT = os.environ.get('LUNA_REBORN_ROOT', str(Path(__file__).parent.parent.parent)) + '/assets/animations'
 
 def read_str(f, length):
     try:
@@ -19,13 +30,12 @@ class AnmConverter:
     def parse(self):
         if not os.path.exists(self.file_path):
             return False
-            
+
         try:
             with open(self.file_path, 'rb') as f:
-                # FILE_MOTION_HEADER
                 header_data = f.read(160)
                 if len(header_data) < 160: return False
-                
+
                 h = struct.unpack('<IIIIIII 4x 128s', header_data)
                 self.header = {
                     'version': h[0],
@@ -37,7 +47,7 @@ class AnmConverter:
                     'step': h[6],
                     'name': h[7].decode('euc-kr', errors='replace').split('\x00')[0].strip()
                 }
-                
+
                 for i in range(self.header['obj_num']):
                     obj_type_data = f.read(4)
                     if not obj_type_data: break
@@ -48,7 +58,7 @@ class AnmConverter:
                     mo_hdr_data = f.read(152)
                     if len(mo_hdr_data) < 152: break
                     mo_h = struct.unpack('<IIIII 128s I', mo_hdr_data)
-                    
+
                     mo = {
                         'index': mo_h[0],
                         'rot_keys_num': mo_h[1],
@@ -101,15 +111,90 @@ class AnmConverter:
             return False
 
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python3 anm_to_json.py <input.anm> [output.json]")
-        sys.exit(1)
-    
-    in_file = sys.argv[1]
-    out_file = sys.argv[2] if len(sys.argv) > 2 else in_file + ".json"
-    
-    conv = AnmConverter(in_file)
+def convert_anm_file(input_path, output_dir):
+    name = os.path.splitext(os.path.basename(input_path))[0]
+    out = os.path.join(output_dir, f"{name}.anm.json")
+    if os.path.exists(out):
+        return (input_path, 'skip', 'exists')
+    conv = AnmConverter(input_path)
     if conv.parse():
-        conv.save_json(out_file)
-        print(f"Successfully converted to {out_file}")
+        conv.save_json(out)
+        return (input_path, 'ok', None)
+    return (input_path, 'fail', 'parse failed')
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Convert ANM animations to JSON')
+    parser.add_argument('--all', action='store_true', help='Batch convert all .anm files')
+    parser.add_argument('--src', default=SRC_DEFAULT, help='Source directory (searched recursively)')
+    parser.add_argument('--dst', default=DST_DEFAULT, help='Output directory')
+    parser.add_argument('--file', type=str, help='Single file to convert')
+    parser.add_argument('--workers', type=int, default=4, help='Parallel workers')
+    args = parser.parse_args()
+
+    dst_dir = args.dst
+    os.makedirs(dst_dir, exist_ok=True)
+
+    if args.file:
+        path, status, err = convert_anm_file(args.file, dst_dir)
+        print(f"{status}: {os.path.basename(path)}" + (f" ({err})" if err else ""))
+        return 0 if status == 'ok' else 1
+
+    if not args.all and not args.file:
+        parser.print_help()
+        return 1
+
+    # Find all .anm files recursively
+    src_path = Path(args.src)
+    if not src_path.exists():
+        print(f"Source directory not found: {src_path}")
+        return 1
+
+    anm_files = sorted([str(f) for f in src_path.rglob('*.anm')])
+    if not anm_files:
+        print("No .anm files found.")
+        return 0
+
+    total = len(anm_files)
+    success = failed = skipped = 0
+    print(f"Found {total} animation files")
+    print(f"Output: {dst_dir}")
+    print()
+
+    if args.workers > 1:
+        with ProcessPoolExecutor(max_workers=args.workers) as executor:
+            futures = {executor.submit(convert_anm_file, f, dst_dir): f for f in anm_files}
+            for future in as_completed(futures):
+                path, status, err = future.result()
+                name = os.path.basename(path)
+                if status == 'ok':
+                    success += 1
+                    print(f"  OK  {name}")
+                elif status == 'skip':
+                    skipped += 1
+                else:
+                    failed += 1
+                    print(f"  FAIL {name} ({err})")
+    else:
+        for f in anm_files:
+            path, status, err = convert_anm_file(f, dst_dir)
+            name = os.path.basename(path)
+            if status == 'ok':
+                success += 1
+                print(f"  OK  {name}")
+            elif status == 'skip':
+                skipped += 1
+            else:
+                failed += 1
+                print(f"  FAIL {name} ({err})")
+
+    print()
+    print(f"=== Animation Conversion Complete ===")
+    print(f"  Converted: {success}")
+    print(f"  Failed:    {failed}")
+    print(f"  Skipped:   {skipped}")
+    print(f"  Total:     {total}")
+    return 0 if failed == 0 else 1
+
+if __name__ == "__main__":
+    sys.exit(main())

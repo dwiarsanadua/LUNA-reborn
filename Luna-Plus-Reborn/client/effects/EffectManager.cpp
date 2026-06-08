@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <glm/gtc/matrix_transform.hpp>
 
 extern AudioManager* g_audio;
 
@@ -304,10 +305,14 @@ void EffectManager::Update(float dt) {
 }
 
 void EffectManager::Render(UIRenderer& ui, const glm::mat4& view, const glm::mat4& proj) {
-    (void)view; (void)proj;
+    // Extract camera position from inverse view matrix
+    glm::mat4 inv_view = glm::inverse(view);
+    glm::vec3 cam_pos(inv_view[3]);
 
     auto render_effect = [&](Effect& e) {
         if (!e.active) return;
+
+        glm::ivec4 viewport(0, 0, (int)ui.width, (int)ui.height);
 
         switch (e.type) {
         case EffectType::DamageNumber: {
@@ -322,15 +327,24 @@ void EffectManager::Render(UIRenderer& ui, const glm::mat4& view, const glm::mat
             case DamageType::Heal:   color = (int(alpha) << 24) | 0x44ff44; break;
             }
 
-            float sy = 240.0f - e.age * 50.0f;
+            // Float upward in world-space Y
+            glm::vec3 float_pos = e.world_pos;
+            float_pos.y += e.age * 2.0f;
+            glm::vec3 screen_pos = glm::project(float_pos, view, proj, viewport);
+            float sx = screen_pos.x;
+            float sy = ui.height - screen_pos.y;
+
+            // Scale font size based on distance
+            float dist = glm::distance(e.world_pos, cam_pos);
+            float scale = std::min(1.5f, 30.0f / std::max(dist, 1.0f));
 
             if (e.dmg_type == DamageType::Crit) {
-                ui.DrawText(580, sy - 12, color, "CRITICAL!");
-                ui.DrawText(598, sy + 6, color, "%d", e.damage);
+                ui.DrawText(sx - 50 * scale, sy - 12 * scale, color, "CRITICAL!");
+                ui.DrawText(sx - 10 * scale, sy + 6 * scale, color, "%d", e.damage);
             } else if (e.dmg_type == DamageType::Miss) {
-                ui.DrawText(600, sy, color, "MISS");
+                ui.DrawText(sx - 10 * scale, sy, color, "MISS");
             } else {
-                ui.DrawText(600, sy, color, "%d", e.damage);
+                ui.DrawText(sx - 10 * scale, sy, color, "%d", e.damage);
             }
             break;
         }
@@ -344,10 +358,20 @@ void EffectManager::Render(UIRenderer& ui, const glm::mat4& view, const glm::mat
                 (uint8_t)(e.billboard_color & 0xFF),
                 a
             };
-            float sx = (e.world_pos.x * 12.0f + 640.0f) - e.billboard_size * 0.5f;
-            float sy = (e.world_pos.z * 12.0f + 360.0f) - e.billboard_size * 0.5f - e.age * 20.0f;
-            if (sx > -e.billboard_size && sx < 1280 + e.billboard_size && sy > -e.billboard_size && sy < 720 + e.billboard_size) {
-                ui.DrawRect(sx, sy, e.billboard_size, e.billboard_size, c);
+
+            // Float upward in world-space Y
+            glm::vec3 float_pos = e.world_pos;
+            float_pos.y += e.age * 2.0f;
+            glm::vec3 screen_pos = glm::project(float_pos, view, proj, viewport);
+            float sx = screen_pos.x;
+            float sy = ui.height - screen_pos.y;
+
+            // Scale size based on distance
+            float dist = glm::distance(e.world_pos, cam_pos);
+            float size = e.billboard_size * (30.0f / std::max(dist, 1.0f));
+
+            if (sx > -size && sx < ui.width + size && sy > -size && sy < ui.height + size) {
+                ui.DrawRect(sx - size * 0.5f, sy - size * 0.5f, size, size, c);
             }
             break;
         }
@@ -364,10 +388,18 @@ void EffectManager::Render(UIRenderer& ui, const glm::mat4& view, const glm::mat
                     (uint8_t)(p.color & 0xFF),
                     a
                 };
-                float sx = (p.pos.x * 12.0f + 640.0f) - p.size * 0.5f;
-                float sy = (p.pos.z * 12.0f + 360.0f) - p.size * 0.5f;
-                if (sx > -64 && sx < 1280 + 64 && sy > -64 && sy < 720 + 64) {
-                    ui.DrawRect(sx, sy, p.size * 4.0f, p.size * 4.0f, c);
+
+                // Project particle world position to screen
+                glm::vec3 screen_pos = glm::project(p.pos, view, proj, viewport);
+                float sx = screen_pos.x;
+                float sy = ui.height - screen_pos.y;
+
+                // Scale particle size based on distance
+                float dist = glm::distance(p.pos, cam_pos);
+                float draw_size = p.size * 4.0f * (30.0f / std::max(dist, 1.0f));
+
+                if (sx > -64 && sx < ui.width + 64 && sy > -64 && sy < ui.height + 64) {
+                    ui.DrawRect(sx - draw_size * 0.5f, sy - draw_size * 0.5f, draw_size, draw_size, c);
                 }
             }
             break;

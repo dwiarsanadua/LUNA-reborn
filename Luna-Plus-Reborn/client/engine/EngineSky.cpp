@@ -7,30 +7,25 @@
 #include <fstream>
 #include <spdlog/spdlog.h>
 #include <stb_image.h>
+#include <engine/gx_render/RenderDevice.h>
 #include <engine/gx_render/VFS.h>
-
-static const bgfx::Memory* loadShader(const char* path) {
-    std::ifstream file(path, std::ios::binary | std::ios::ate);
-    if (!file) return nullptr;
-    size_t size = file.tellg(); file.seekg(0);
-    auto* mem = bgfx::alloc(static_cast<uint32_t>(size));
-    file.read(reinterpret_cast<char*>(mem->data), size);
-    return mem;
-}
+#include <engine/gx_render/Shader.h>
 
 void EngineSky::SetSampler(bgfx::UniformHandle sampler, bgfx::TextureHandle white_tex) {
-    sampler_ = sampler;
+    (void)sampler;
     white_tex_ = white_tex;
 }
 
 void EngineSky::Init() {
     spdlog::info("EngineSky: initialized (time={:.2f}, speed={:.3f})", time_of_day_, time_speed_);
 
-    auto vs = loadShader("shaders/vs_default.bin");
-    auto fs = loadShader("shaders/fs_default.bin");
-    if (vs && fs) {
-        program_ = bgfx::createProgram(bgfx::createShader(vs), bgfx::createShader(fs), true);
+    program_ = ShaderUtils::LoadProgram("shaders/vs_default.bin", "shaders/fs_sky.bin");
+    if (!bgfx::isValid(program_)) {
+        spdlog::warn("EngineSky: fs_sky.bin not found, fallback to fs_default.bin");
+        program_ = ShaderUtils::LoadProgram("shaders/vs_default.bin", "shaders/fs_default.bin");
     }
+
+    s_texSky_ = bgfx::createUniform("s_texSky", bgfx::UniformType::Sampler);
 
     // Load sky texture — try multiple possible paths
     sky_tex_ = LoadSkyTexture(VFS::Find("assets/textures/unpacked/map/01_human_sky.png"));
@@ -169,9 +164,29 @@ glm::vec3 EngineSky::GetLightDirection() const {
 void EngineSky::Render(UIRenderer& ui, const glm::mat4& view, const glm::mat4& proj) {
     (void)ui;
     if (!bgfx::isValid(program_) || !bgfx::isValid(vb_)) return;
-    if (!bgfx::isValid(sampler_)) return;
+    if (!bgfx::isValid(s_texSky_)) return;
 
-    bgfx::ViewId view_id = 0;
+    bgfx::ViewId sky_view = static_cast<bgfx::ViewId>(ViewId::Sky);
+
+    // Ensure sky renders first (behind everything)
+    {
+        const bgfx::ViewId order[] = {
+            sky_view,
+            static_cast<bgfx::ViewId>(ViewId::Shadow),
+            static_cast<bgfx::ViewId>(ViewId::Terrain),
+            static_cast<bgfx::ViewId>(ViewId::Props),
+            static_cast<bgfx::ViewId>(ViewId::Character),
+            static_cast<bgfx::ViewId>(ViewId::Particle),
+            static_cast<bgfx::ViewId>(ViewId::UI),
+            static_cast<bgfx::ViewId>(ViewId::Debug),
+            static_cast<bgfx::ViewId>(ViewId::Scene),
+            static_cast<bgfx::ViewId>(ViewId::PostFX),
+            static_cast<bgfx::ViewId>(ViewId::PostFX2),
+            static_cast<bgfx::ViewId>(ViewId::PostFX3),
+            static_cast<bgfx::ViewId>(ViewId::PostFX4),
+        };
+        bgfx::setViewOrder(0, sizeof(order) / sizeof(order[0]), order);
+    }
 
     glm::mat4 invView = glm::inverse(view);
     glm::vec3 cam_pos(invView[3]);
@@ -181,9 +196,9 @@ void EngineSky::Render(UIRenderer& ui, const glm::mat4& view, const glm::mat4& p
     uint32_t clear_col = ((uint32_t)(fog.r * 255) << 24) |
                          ((uint32_t)(fog.g * 255) << 16) |
                          ((uint32_t)(fog.b * 255) << 8) | 0xff;
-    bgfx::setViewClear(view_id, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, clear_col, 1.0f, 0);
-    bgfx::setViewRect(view_id, 0, 0, 1280, 720);
-    bgfx::setViewTransform(view_id, glm::value_ptr(view), glm::value_ptr(proj));
+    bgfx::setViewClear(sky_view, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, clear_col, 1.0f, 0);
+    bgfx::setViewRect(sky_view, 0, 0, bgfx::BackbufferRatio::Equal);
+    bgfx::setViewTransform(sky_view, glm::value_ptr(view), glm::value_ptr(proj));
 
     // Translate dome to camera position
     float mtx[16] = {
@@ -194,11 +209,11 @@ void EngineSky::Render(UIRenderer& ui, const glm::mat4& view, const glm::mat4& p
 
     // Use sky texture if available, otherwise use white so vertex colors show
     bgfx::TextureHandle tex = bgfx::isValid(sky_tex_) ? sky_tex_ : white_tex_;
-    bgfx::setTexture(0, sampler_, bgfx::isValid(tex) ? tex : bgfx::TextureHandle{bgfx::kInvalidHandle});
+    bgfx::setTexture(0, s_texSky_, bgfx::isValid(tex) ? tex : bgfx::TextureHandle{bgfx::kInvalidHandle});
     bgfx::setVertexBuffer(0, vb_);
     bgfx::setIndexBuffer(ib_);
     bgfx::setState(BGFX_STATE_DEFAULT | BGFX_STATE_CULL_CW | BGFX_STATE_DEPTH_TEST_LEQUAL);
-    bgfx::submit(view_id, program_);
+    bgfx::submit(sky_view, program_);
 }
 
 void EngineSky::Shutdown() {
@@ -207,4 +222,5 @@ void EngineSky::Shutdown() {
     if (bgfx::isValid(sky_tex_)) bgfx::destroy(sky_tex_);
     if (bgfx::isValid(cloud_tex_)) bgfx::destroy(cloud_tex_);
     if (bgfx::isValid(program_)) bgfx::destroy(program_);
+    if (bgfx::isValid(s_texSky_)) bgfx::destroy(s_texSky_);
 }

@@ -10,15 +10,10 @@
 
 #include <stb_image.h>
 #include <engine/gx_render/VFS.h>
+#include <engine/gx_render/Shader.h>
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #include <stb_truetype.h>
-
-struct UIVertex {
-    float x, y, z;
-    uint32_t color;
-    float u, v;
-};
 
 static bgfx::VertexLayout getLayout() {
     static bgfx::VertexLayout layout;
@@ -34,53 +29,88 @@ static bgfx::VertexLayout getLayout() {
     return layout;
 }
 
-static const bgfx::Memory* loadShader(const char* path) {
-    std::string searchPaths[] = { "build/bin/" + std::string(path), std::string(path), VFS::Resolve("assets/" + std::string(path)) };
-    for (const auto& p : searchPaths) {
-        std::ifstream file(p, std::ios::binary | std::ios::ate);
-        if (file) {
-            size_t size = file.tellg();
-            file.seekg(0);
-            auto* mem = bgfx::alloc(static_cast<uint32_t>(size));
-            file.read(reinterpret_cast<char*>(mem->data), size);
-            spdlog::info("Shader: loaded {} ({} bytes)", p, size);
-            return mem;
-        }
-    }
-    return nullptr;
-}
-
 void UIRenderer::BeginFrame() {
+    FlushBatch();
+    batch_verts_.clear();
+    batch_indices_.clear();
+    current_batch_tex_ = BGFX_INVALID_HANDLE;
     atlas_bind_count_ = 0;
+    scissor_stack_.clear();
+
     bgfx::setViewRect(view_id_, 0, 0, (uint16_t)width, (uint16_t)height);
     bgfx::setViewMode(view_id_, bgfx::ViewMode::Sequential);
     float identity[16]; std::memset(identity, 0, sizeof(identity));
     identity[0] = identity[5] = identity[10] = identity[15] = 1.0f;
     bgfx::setViewTransform(view_id_, identity, identity);
     bgfx::touch(view_id_);
+
+    FlushBatch();
+}
+
+void UIRenderer::FlushBatch() {
+    if (batch_verts_.empty() || batch_indices_.empty()) return;
+
+    auto prog = bgfx::isValid(ui_prog_) ? ui_prog_ : prog_;
+    if (!bgfx::isValid(prog)) {
+        batch_verts_.clear();
+        batch_indices_.clear();
+        return;
+    }
+
+    bgfx::TransientVertexBuffer tvb;
+    bgfx::TransientIndexBuffer tib;
+    if (bgfx::allocTransientBuffers(&tvb, getLayout(),
+        (uint16_t)batch_verts_.size(), &tib, (uint32_t)batch_indices_.size())) {
+        memcpy(tvb.data, batch_verts_.data(), batch_verts_.size() * sizeof(UIVertex));
+        memcpy(tib.data, batch_indices_.data(), batch_indices_.size() * sizeof(uint16_t));
+
+        bgfx::setTexture(0, s_tex_, current_batch_tex_);
+        bgfx::setVertexBuffer(0, &tvb);
+        bgfx::setIndexBuffer(&tib);
+
+        uint64_t state = BGFX_STATE_DEFAULT | BGFX_STATE_BLEND_ALPHA;
+        if (!scissor_stack_.empty()) {
+            const auto& s = scissor_stack_.back();
+            uint16_t px = (uint16_t)(s.x / logicalWidth * width);
+            uint16_t py = (uint16_t)(s.y / logicalHeight * height);
+            uint16_t pw = (uint16_t)(s.w / logicalWidth * width);
+            uint16_t ph = (uint16_t)(s.h / logicalHeight * height);
+            bgfx::setScissor(px, py, pw, ph);
+        }
+        bgfx::setState(state);
+        bgfx::submit(view_id_, prog);
+        atlas_bind_count_++;
+    }
+
+    batch_verts_.clear();
+    batch_indices_.clear();
+    current_batch_tex_ = BGFX_INVALID_HANDLE;
 }
 
 void UIRenderer::DrawGlyph(float x, float y, uint32_t color, int char_index) {
-    if (char_index < 0 || char_index >= 96) return;
-    auto& g = font_glyphs_[char_index];
+    FontAtlas& atlas = font_atlases_[current_font_size_];
+    if (!atlas.ready) return;
+    if (char_index < 0 || char_index >= (int)atlas.glyphs.size()) return;
+    auto& g = atlas.glyphs[char_index];
     if (g.w < 0.5f || g.h < 0.5f) return;
-    bgfx::ProgramHandle prog = bgfx::isValid(ui_prog_) ? ui_prog_ : prog_;
-    if (!bgfx::isValid(prog)) return;
 
-    float sx0 = ( (x + g.xoff) / logicalWidth) * 2.0f - 1.0f;
-    float sy0 = 1.0f - ( (y + g.yoff) / logicalHeight) * 2.0f;
-    float sx1 = ( (x + g.xoff + g.w) / logicalWidth) * 2.0f - 1.0f;
-    float sy1 = 1.0f - ( (y + g.yoff + g.h) / logicalHeight) * 2.0f;
+    float sx0 = ((x + g.xoff) / logicalWidth) * 2.0f - 1.0f;
+    float sy0 = 1.0f - ((y + g.yoff) / logicalHeight) * 2.0f;
+    float sx1 = ((x + g.xoff + g.w) / logicalWidth) * 2.0f - 1.0f;
+    float sy1 = 1.0f - ((y + g.yoff + g.h) / logicalHeight) * 2.0f;
 
-    UIVertex verts[4] = { {sx0, sy1, 0, color, g.u0, g.v1}, {sx1, sy1, 0, color, g.u1, g.v1}, {sx0, sy0, 0, color, g.u0, g.v0}, {sx1, sy0, 0, color, g.u1, g.v0} };
-    uint16_t idx[6] = {0,1,2, 1,3,2};
-    bgfx::TransientVertexBuffer tvb; bgfx::TransientIndexBuffer tib;
-    if (bgfx::allocTransientBuffers(&tvb, getLayout(), 4, &tib, 6)) {
-        std::memcpy(tvb.data, verts, sizeof(verts)); std::memcpy(tib.data, idx, sizeof(idx));
-        bgfx::setTexture(0, s_tex_, font_tex_); bgfx::setVertexBuffer(0, &tvb); bgfx::setIndexBuffer(&tib);
-        bgfx::setState(BGFX_STATE_DEFAULT | BGFX_STATE_WRITE_Z | BGFX_STATE_BLEND_ALPHA); bgfx::submit(view_id_, prog);
-        atlas_bind_count_++;
-    }
+    if (current_batch_tex_.idx != atlas.tex.idx) FlushBatch();
+    current_batch_tex_ = atlas.tex;
+
+    uint16_t base = (uint16_t)batch_verts_.size();
+    batch_verts_.push_back({sx0, sy1, 0, color, g.u0, g.v1});
+    batch_verts_.push_back({sx1, sy1, 0, color, g.u1, g.v1});
+    batch_verts_.push_back({sx0, sy0, 0, color, g.u0, g.v0});
+    batch_verts_.push_back({sx1, sy0, 0, color, g.u1, g.v0});
+    batch_indices_.push_back(base);   batch_indices_.push_back(base+1); batch_indices_.push_back(base+2);
+    batch_indices_.push_back(base+1); batch_indices_.push_back(base+3); batch_indices_.push_back(base+2);
+
+    if (batch_verts_.size() >= BATCH_SIZE) FlushBatch();
 }
 
 void UIRenderer::DrawImageUV(float x, float y, float w, float h, bgfx::TextureHandle tex, float u1, float v1, float u2, float v2, UIColor tint) {
@@ -88,20 +118,24 @@ void UIRenderer::DrawImageUV(float x, float y, float w, float h, bgfx::TextureHa
     if (!bgfx::isValid(final_tex)) final_tex = white_tex_;
     if (!bgfx::isValid(final_tex)) return;
 
-    bgfx::ProgramHandle prog = bgfx::isValid(ui_prog_) ? ui_prog_ : prog_;
-    if (!bgfx::isValid(prog)) return;
+    if (current_batch_tex_.idx != final_tex.idx) FlushBatch();
+    current_batch_tex_ = final_tex;
+
     uint32_t col = (tint.a << 24) | (tint.b << 16) | (tint.g << 8) | tint.r;
-    float x2 = (x / logicalWidth) * 2.0f - 1.0f; float y2 = 1.0f - (y / logicalHeight) * 2.0f;
-    float x3 = ((x + w) / logicalWidth) * 2.0f - 1.0f; float y3 = 1.0f - ((y + h) / logicalHeight) * 2.0f;
-    UIVertex verts[4] = { {x2, y3, 0, col, u1, v2}, {x3, y3, 0, col, u2, v2}, {x2, y2, 0, col, u1, v1}, {x3, y2, 0, col, u2, v1} };
-    uint16_t idx[6] = {0,1,2, 1,3,2};
-    bgfx::TransientVertexBuffer tvb; bgfx::TransientIndexBuffer tib;
-    if (bgfx::allocTransientBuffers(&tvb, getLayout(), 4, &tib, 6)) {
-        std::memcpy(tvb.data, verts, sizeof(verts)); std::memcpy(tib.data, idx, sizeof(idx));
-        bgfx::setTexture(0, s_tex_, final_tex); bgfx::setVertexBuffer(0, &tvb); bgfx::setIndexBuffer(&tib);
-        bgfx::setState(BGFX_STATE_DEFAULT | BGFX_STATE_WRITE_Z | BGFX_STATE_BLEND_ALPHA); bgfx::submit(view_id_, prog);
-        atlas_bind_count_++;
-    }
+    float x2 = (x / logicalWidth) * 2.0f - 1.0f;
+    float y2 = 1.0f - (y / logicalHeight) * 2.0f;
+    float x3 = ((x + w) / logicalWidth) * 2.0f - 1.0f;
+    float y3 = 1.0f - ((y + h) / logicalHeight) * 2.0f;
+
+    uint16_t base = (uint16_t)batch_verts_.size();
+    batch_verts_.push_back({x2, y3, 0, col, u1, v2});
+    batch_verts_.push_back({x3, y3, 0, col, u2, v2});
+    batch_verts_.push_back({x2, y2, 0, col, u1, v1});
+    batch_verts_.push_back({x3, y2, 0, col, u2, v1});
+    batch_indices_.push_back(base);   batch_indices_.push_back(base+1); batch_indices_.push_back(base+2);
+    batch_indices_.push_back(base+1); batch_indices_.push_back(base+3); batch_indices_.push_back(base+2);
+
+    if (batch_verts_.size() >= BATCH_SIZE) FlushBatch();
 }
 
 void UIRenderer::DrawImage(float x, float y, float w, float h, bgfx::TextureHandle tex, UIColor tint) {
@@ -134,15 +168,41 @@ void UIRenderer::DrawWindow(float x, float y, float w, float h, const char* titl
 void UIRenderer::DrawButton(float x, float y, float w, float h, const char* text, bool hover) {
     UIColor c = hover ? UIColor{100, 100, 180, 255} : UIColor{60, 60, 100, 255};
     DrawRect(x, y, w, h, c); DrawBorder(x, y, w, h, {150, 150, 255, 255});
-    float tw = MeasureText(text); DrawText(x + (w - tw) * 0.5f, y + (h - 18) * 0.5f, 0xffffffff, text);
+    float tw = MeasureText(text); DrawText(x + (w - tw) * 0.5f, y + (h - current_font_size_) * 0.5f, 0xffffffff, text);
+}
+
+int UIRenderer::DecodeUTF8(const char*& s) {
+    if (!s || !*s) return -1;
+    unsigned char c = (unsigned char)*s;
+    int codepoint;
+    int bytes;
+    if (c < 0x80) { codepoint = c; bytes = 1; }
+    else if ((c & 0xE0) == 0xC0) { codepoint = c & 0x1F; bytes = 2; }
+    else if ((c & 0xF0) == 0xE0) { codepoint = c & 0x0F; bytes = 3; }
+    else if ((c & 0xF8) == 0xF0) { codepoint = c & 0x07; bytes = 4; }
+    else { codepoint = c; bytes = 1; }
+    for (int i = 1; i < bytes; i++) {
+        if (!s[i]) { codepoint = c; bytes = 1; break; }
+        codepoint = (codepoint << 6) | (s[i] & 0x3F);
+    }
+    s += bytes;
+    return codepoint;
 }
 
 void UIRenderer::DrawText(float x, float y, uint32_t color, const char* fmt, ...) {
-    if (!font_ready_) return;
+    FontAtlas& atlas = font_atlases_[current_font_size_];
+    if (!atlas.ready) return;
     char buf[1024]; va_list args; va_start(args, fmt); vsnprintf(buf, 1024, fmt, args); va_end(args);
-    float cur_x = x; for (int i = 0; buf[i]; i++) {
-        char c = buf[i]; if (c < 32 || c > 126) continue;
-        DrawGlyph(cur_x, y, color, c - 32); cur_x += font_glyphs_[c - 32].xadvance;
+    float cur_x = x; const char* p = buf;
+    int first = atlas.range_first;
+    int count = atlas.range_count;
+    while (*p) {
+        int cp = DecodeUTF8(p);
+        if (cp < 0) continue;
+        int idx = cp - first;
+        if (idx < 0 || idx >= count) continue;
+        DrawGlyph(cur_x, y, color, idx);
+        cur_x += atlas.glyphs[idx].xadvance;
     }
 }
 
@@ -156,15 +216,123 @@ void UIRenderer::DrawTextCentered(float y, uint32_t color, const char* fmt, ...)
 }
 
 float UIRenderer::MeasureText(const char* text) {
-    if (!font_ready_) return strlen(text) * 8.0f;
-    float w = 0; for (int i = 0; text[i]; i++) { char c = text[i]; if (c >= 32 && c <= 126) w += font_glyphs_[c - 32].xadvance; }
+    FontAtlas& atlas = font_atlases_[current_font_size_];
+    if (!atlas.ready) return strlen(text) * 8.0f;
+    float w = 0; const char* p = text;
+    int first = atlas.range_first;
+    int count = atlas.range_count;
+    while (*p) {
+        int cp = DecodeUTF8(p);
+        if (cp < 0) continue;
+        int idx = cp - first;
+        if (idx >= 0 && idx < count)
+            w += atlas.glyphs[idx].xadvance;
+    }
     return w;
+}
+
+void UIRenderer::SetFontSize(float size) {
+    if (size <= 0) return;
+    current_font_size_ = size;
+    GetOrCreateFontAtlas(size);
+}
+
+void UIRenderer::LoadGlyphsForText(const std::string& text) {
+    FontAtlas& atlas = GetOrCreateFontAtlas(current_font_size_);
+    if (!atlas.ready) return;
+
+    int min_cp = 255, max_cp = 32;
+    const char* p = text.c_str();
+    while (*p) {
+        int cp = DecodeUTF8(p);
+        if (cp < 0) continue;
+        if (cp < atlas.range_first || cp >= atlas.range_first + atlas.range_count) {
+            min_cp = std::min(min_cp, cp);
+            max_cp = std::max(max_cp, cp);
+        }
+    }
+
+    if (max_cp < min_cp) return;
+
+    int new_first = std::min(atlas.range_first, min_cp);
+    int new_last = std::max(atlas.range_first + atlas.range_count - 1, max_cp);
+    int new_count = new_last - new_first + 1;
+
+    if (new_count <= atlas.range_count && new_first >= atlas.range_first) return;
+
+    std::string fontPath = VFS::Resolve("assets/interface/Windows/2002_EYA.ttf");
+    std::ifstream f(fontPath, std::ios::binary);
+    if (!f) return;
+    std::vector<unsigned char> data((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    stbtt_fontinfo info;
+    if (!stbtt_InitFont(&info, data.data(), 0)) return;
+
+    int aw = atlas.atlas_w, ah = atlas.atlas_h;
+    std::vector<unsigned char> atlas_data(aw * ah, 0);
+    std::vector<stbtt_bakedchar> chardata(new_count);
+    int baked = stbtt_BakeFontBitmap(data.data(), 0, current_font_size_,
+        atlas_data.data(), aw, ah, new_first, new_count, chardata.data());
+    if (!baked) {
+        aw *= 2; ah *= 2;
+        atlas_data.resize(aw * ah, 0);
+        baked = stbtt_BakeFontBitmap(data.data(), 0, current_font_size_,
+            atlas_data.data(), aw, ah, new_first, new_count, chardata.data());
+        if (!baked) {
+            spdlog::warn("UIRenderer: font atlas too small for range {}..{}", new_first, new_last);
+            return;
+        }
+    }
+
+    std::vector<unsigned char> rgba(aw * ah * 4);
+    for (int i = 0; i < aw * ah; i++) {
+        rgba[i*4+0] = rgba[i*4+1] = rgba[i*4+2] = 255;
+        rgba[i*4+3] = atlas_data[i];
+    }
+
+    if (bgfx::isValid(atlas.tex)) bgfx::destroy(atlas.tex);
+    atlas.tex = bgfx::createTexture2D((uint16_t)aw, (uint16_t)ah, false, 1,
+        bgfx::TextureFormat::RGBA8, 0, bgfx::copy(rgba.data(), (uint32_t)rgba.size()));
+
+    atlas.glyphs.resize(new_count);
+    for (int i = 0; i < new_count; i++) {
+        auto& g = atlas.glyphs[i];
+        g.u0 = (float)chardata[i].x0 / aw;
+        g.v0 = (float)chardata[i].y0 / ah;
+        g.u1 = (float)chardata[i].x1 / aw;
+        g.v1 = (float)chardata[i].y1 / ah;
+        g.xoff = chardata[i].xoff;
+        g.yoff = chardata[i].yoff + current_font_size_;
+        g.xadvance = chardata[i].xadvance;
+        g.w = (float)(chardata[i].x1 - chardata[i].x0);
+        g.h = (float)(chardata[i].y1 - chardata[i].y0);
+    }
+    atlas.range_first = new_first;
+    atlas.range_count = new_count;
+    atlas.atlas_w = aw;
+    atlas.atlas_h = ah;
+    atlas.ready = true;
+}
+
+void UIRenderer::PushScissor(float x, float y, float w, float h) {
+    FlushBatch();
+    scissor_stack_.push_back({x, y, w, h});
+}
+
+void UIRenderer::PopScissor() {
+    if (scissor_stack_.empty()) return;
+    FlushBatch();
+    scissor_stack_.pop_back();
+}
+
+bool UIRenderer::IsClipped(float x, float y, float w, float h) const {
+    if (scissor_stack_.empty()) return false;
+    const auto& s = scissor_stack_.back();
+    return (x + w <= s.x || x >= s.x + s.w || y + h <= s.y || y >= s.y + s.h);
 }
 
 AtlasRegion UIRenderer::PackInAtlas(int w, int h) {
     AtlasRegion reg = {0,0,0,0, 0,0,0,0};
 
-    // Simple row-packing: if doesn't fit current row, advance to next
     if (atlas_cursor_x_ + w > ATLAS_SIZE) {
         atlas_cursor_x_ = 0;
         atlas_cursor_y_ += atlas_row_h_ + 1;
@@ -213,14 +381,12 @@ void UIRenderer::BuildTextureAtlas() {
     atlas_row_h_ = 0;
     atlas_regions_.clear();
 
-    // Process pending textures
     for (auto& [name, path] : atlas_pending_) {
         int w, h, n;
         unsigned char* d = stbi_load(path.c_str(), &w, &h, &n, 4);
         if (!d) continue;
 
         if (w > ATLAS_SIZE || h > ATLAS_SIZE) {
-            // Too large for atlas, create individual texture
             auto tex = bgfx::createTexture2D((uint16_t)w, (uint16_t)h, false, 1,
                 bgfx::TextureFormat::RGBA8, 0, bgfx::copy(d, w * h * 4));
             TextureInfo info; info.handle = tex; info.width = w; info.height = h;
@@ -239,7 +405,6 @@ void UIRenderer::BuildTextureAtlas() {
             continue;
         }
 
-        // Copy pixels into atlas
         uint32_t* src = (uint32_t*)d;
         for (int py = 0; py < h; py++) {
             std::memcpy(&atlas_data_[(reg.y + py) * ATLAS_SIZE + reg.x],
@@ -249,7 +414,7 @@ void UIRenderer::BuildTextureAtlas() {
         atlas_regions_[name] = reg;
 
         TextureInfo info;
-        info.handle = atlas_tex_; // Will be valid after upload
+        info.handle = atlas_tex_;
         info.width = w;
         info.height = h;
         textures_[name] = info;
@@ -260,63 +425,102 @@ void UIRenderer::BuildTextureAtlas() {
     atlas_pending_.clear();
     UploadAtlas();
 
-    // Update texture handles to point to atlas
     for (auto& [name, reg] : atlas_regions_) {
         textures_[name].handle = atlas_tex_;
     }
 }
 
 void UIRenderer::Init() {
-    auto vs = loadShader("shaders/vs_ui.bin"); auto fs = loadShader("shaders/fs_ui.bin");
-    if (vs && fs) {
-        bgfx::ShaderHandle vs_h = bgfx::createShader(vs);
-        bgfx::ShaderHandle fs_h = bgfx::createShader(fs);
-        if (!bgfx::isValid(vs_h)) spdlog::error("UIRenderer: vs_ui.bin GAGAL di Metal macOS!");
-        if (!bgfx::isValid(fs_h)) spdlog::error("UIRenderer: fs_ui.bin GAGAL di Metal macOS!");
-        ui_prog_ = bgfx::createProgram(vs_h, fs_h, true);
-        if (!bgfx::isValid(ui_prog_))
-            spdlog::error("UIRenderer: Program UI GAGAL di Metal macOS! Shader tidak kompatibel.");
-        else
-            spdlog::info("UIRenderer: Program UI valid (handle={})", ui_prog_.idx);
-    }
+    ui_prog_ = ShaderUtils::LoadProgram("shaders/vs_ui.bin", "shaders/fs_ui.bin");
+    if (!bgfx::isValid(ui_prog_))
+        spdlog::error("UIRenderer: Program UI GAGAL di Metal macOS! Shader tidak kompatibel.");
+    else
+        spdlog::info("UIRenderer: Program UI valid (handle={})", ui_prog_.idx);
     s_tex_ = bgfx::createUniform("s_texColor", bgfx::UniformType::Sampler);
     uint32_t white = 0xffffffff; white_tex_ = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::makeRef(&white, 4));
     CreateFont();
 
-    // Initialize atlas data
     atlas_data_.resize(ATLAS_SIZE * ATLAS_SIZE, 0);
 
     spdlog::info("UIRenderer: initialized with texture atlas ({}x{})", ATLAS_SIZE, ATLAS_SIZE);
 }
 
-void UIRenderer::CreateFont() {
-    std::string fontPath = VFS::Resolve("assets/interface/Windows/2002_EYA.ttf"); std::ifstream f(fontPath, std::ios::binary);
-    if (!f) return; std::vector<unsigned char> data((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-    stbtt_fontinfo info; if (!stbtt_InitFont(&info, data.data(), 0)) return;
-    std::vector<unsigned char> atlas(512 * 128, 0); stbtt_bakedchar chardata[96];
-    stbtt_BakeFontBitmap(data.data(), 0, font_size_, atlas.data(), 512, 128, 32, 96, chardata);
-    std::vector<unsigned char> rgba(512 * 128 * 4); for (int i = 0; i < 512 * 128; i++) { rgba[i*4+0]=rgba[i*4+1]=rgba[i*4+2]=255; rgba[i*4+3]=atlas[i]; }
-    font_tex_ = bgfx::createTexture2D(512, 128, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::copy(rgba.data(), (uint32_t)rgba.size()));
-    for (int i = 0; i < 96; i++) {
-        font_glyphs_[i].u0 = (float)chardata[i].x0 / 512; font_glyphs_[i].v0 = (float)chardata[i].y0 / 128;
-        font_glyphs_[i].u1 = (float)chardata[i].x1 / 512; font_glyphs_[i].v1 = (float)chardata[i].y1 / 128;
-        font_glyphs_[i].xoff = chardata[i].xoff; font_glyphs_[i].yoff = chardata[i].yoff + font_size_;
-        font_glyphs_[i].xadvance = chardata[i].xadvance; font_glyphs_[i].w = (float)(chardata[i].x1 - chardata[i].x0); font_glyphs_[i].h = (float)(chardata[i].y1 - chardata[i].y0);
-    }
-    font_ready_ = true;
+FontAtlas& UIRenderer::GetOrCreateFontAtlas(float size) {
+    auto it = font_atlases_.find(size);
+    if (it != font_atlases_.end()) return it->second;
 
-    // Build the texture atlas on font load
+    FontAtlas& atlas = font_atlases_[size];
+    atlas.atlas_w = font_atlas_w_;
+    atlas.atlas_h = font_atlas_h_;
+    atlas.range_first = 32;
+    atlas.range_count = 224;
+
+    std::string fontPath = VFS::Resolve("assets/interface/Windows/2002_EYA.ttf");
+    std::ifstream f(fontPath, std::ios::binary);
+    if (!f) return atlas;
+    std::vector<unsigned char> data((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    stbtt_fontinfo info;
+    if (!stbtt_InitFont(&info, data.data(), 0)) return atlas;
+
+    std::vector<unsigned char> atlas_data(atlas.atlas_w * atlas.atlas_h, 0);
+    std::vector<stbtt_bakedchar> chardata(atlas.range_count);
+    int baked = stbtt_BakeFontBitmap(data.data(), 0, size,
+        atlas_data.data(), atlas.atlas_w, atlas.atlas_h,
+        atlas.range_first, atlas.range_count, chardata.data());
+    if (!baked) {
+        spdlog::warn("UIRenderer: font atlas too small for size {}px, need larger atlas", size);
+        atlas.atlas_w *= 2;
+        atlas.atlas_h *= 2;
+        atlas_data.resize(atlas.atlas_w * atlas.atlas_h, 0);
+        baked = stbtt_BakeFontBitmap(data.data(), 0, size,
+            atlas_data.data(), atlas.atlas_w, atlas.atlas_h,
+            atlas.range_first, atlas.range_count, chardata.data());
+        if (!baked) return atlas;
+    }
+
+    std::vector<unsigned char> rgba(atlas.atlas_w * atlas.atlas_h * 4);
+    for (int i = 0; i < atlas.atlas_w * atlas.atlas_h; i++) {
+        rgba[i*4+0] = rgba[i*4+1] = rgba[i*4+2] = 255;
+        rgba[i*4+3] = atlas_data[i];
+    }
+
+    atlas.tex = bgfx::createTexture2D((uint16_t)atlas.atlas_w, (uint16_t)atlas.atlas_h, false, 1,
+        bgfx::TextureFormat::RGBA8, 0, bgfx::copy(rgba.data(), (uint32_t)rgba.size()));
+
+    atlas.glyphs.resize(atlas.range_count);
+    for (int i = 0; i < atlas.range_count; i++) {
+        auto& g = atlas.glyphs[i];
+        g.u0 = (float)chardata[i].x0 / atlas.atlas_w;
+        g.v0 = (float)chardata[i].y0 / atlas.atlas_h;
+        g.u1 = (float)chardata[i].x1 / atlas.atlas_w;
+        g.v1 = (float)chardata[i].y1 / atlas.atlas_h;
+        g.xoff = chardata[i].xoff;
+        g.yoff = chardata[i].yoff + size;
+        g.xadvance = chardata[i].xadvance;
+        g.w = (float)(chardata[i].x1 - chardata[i].x0);
+        g.h = (float)(chardata[i].y1 - chardata[i].y0);
+    }
+    atlas.ready = true;
+    return atlas;
+}
+
+void UIRenderer::CreateFont() {
+    font_atlas_w_ = 512;
+    font_atlas_h_ = 128;
+    font_atlases_.clear();
+
+    GetOrCreateFontAtlas(18.0f);
+    current_font_size_ = 18.0f;
+
     BuildTextureAtlas();
 
     spdlog::info("UIRenderer: font created, texture atlas cached");
 }
 
 TextureInfo UIRenderer::LoadTexture(const std::string& name, const std::string& path) {
-    // Check cache first
     auto it = textures_.find(name);
     if (it != textures_.end()) return it->second;
 
-    // Check if already in atlas
     auto at = atlas_regions_.find(name);
     if (at != atlas_regions_.end()) {
         TextureInfo info;
@@ -327,7 +531,6 @@ TextureInfo UIRenderer::LoadTexture(const std::string& name, const std::string& 
         return info;
     }
 
-    // Queue for atlas packing
     std::string search[] = {
         path,
         VFS::Resolve("assets/textures/ui/" + path),
@@ -343,12 +546,10 @@ TextureInfo UIRenderer::LoadTexture(const std::string& name, const std::string& 
             stbi_image_free(d);
 
             if (w <= 256 && h <= 256 && w > 0 && h > 0) {
-                // Small texture, queue for atlas
                 atlas_pending_.push_back({name, p});
-                return TextureInfo{}; // Will be available after BuildTextureAtlas
+                return TextureInfo{};
             }
 
-            // Large texture, load individually
             d = stbi_load(p.c_str(), &w, &h, &n, 4);
             if (d) {
                 TextureInfo info;
@@ -369,14 +570,21 @@ void UIRenderer::Render() {
 }
 
 void UIRenderer::Shutdown() {
+    FlushBatch();
     static bool done = false; if (done) return; done = true;
     for (auto& [n, t] : textures_) if (bgfx::isValid(t.handle) && t.handle.idx != atlas_tex_.idx) bgfx::destroy(t.handle);
     textures_.clear();
     if (bgfx::isValid(atlas_tex_)) bgfx::destroy(atlas_tex_);
-    if (bgfx::isValid(font_tex_)) bgfx::destroy(font_tex_);
+    for (auto& [size, atlas] : font_atlases_) {
+        if (bgfx::isValid(atlas.tex)) bgfx::destroy(atlas.tex);
+    }
+    font_atlases_.clear();
     if (bgfx::isValid(white_tex_)) bgfx::destroy(white_tex_); if (bgfx::isValid(s_tex_)) bgfx::destroy(s_tex_);
     if (bgfx::isValid(ui_prog_)) bgfx::destroy(ui_prog_);
     atlas_data_.clear();
     atlas_regions_.clear();
     atlas_pending_.clear();
+    batch_verts_.clear();
+    batch_indices_.clear();
+    scissor_stack_.clear();
 }

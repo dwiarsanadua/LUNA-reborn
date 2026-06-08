@@ -2,6 +2,7 @@
 #include "CharacterRenderer.hpp"
 #include <engine/gx_render/RenderDevice.h>
 #include <engine/gx_geom/Model.h>
+#include <engine/gx_geom/ModelManager.hpp>
 #include <engine/gx_geom/MeshObject.h>
 #include <engine/gx_geom/Skeleton.h>
 #include <engine/gx_geom/AnimationSystem.h>
@@ -16,21 +17,19 @@
 #include <fstream>
 #include <algorithm>
 #include <engine/gx_render/VFS.h>
+#include <engine/gx_render/Shader.h>
 
-static constexpr int MAX_BONES = 64;
-static uint16_t g_fb_width = 1280;
-static uint16_t g_fb_height = 720;
-static float g_frame_dt = 1.0f / 60.0f;
+namespace {
+constexpr int MAX_BONES = 64;
 
-// Map CharAnim to animation clip name
-static const char* AnimNameForCharAnim(CharAnim anim) {
+const char* AnimNameForCharAnim(CharAnim anim) {
     switch (anim) {
-    case CHAR_IDLE:   return "idle";
-    case CHAR_WALK:   return "walk";
-    case CHAR_RUN:    return "run";
-    case CHAR_ATTACK: return "attack";
-    case CHAR_DIE:    return "die";
-    default:          return "idle";
+    case CharAnim::Idle:   return "idle";
+    case CharAnim::Walk:   return "walk";
+    case CharAnim::Run:    return "run";
+    case CharAnim::Attack: return "attack";
+    case CharAnim::Die:    return "die";
+    default:               return "idle";
     }
 }
 
@@ -38,14 +37,13 @@ struct LoadedModel {
     Model model;
     std::vector<MeshObject> meshes;
     Skeleton skeleton;
-    std::vector<glm::mat4> bind_pose; // local-space bind pose
+    std::vector<glm::mat4> bind_pose;
 };
 
 struct AnimationState {
     AnimationSystem anim_sys;
     std::unordered_map<std::string, AnimClip> clips;
-    CharAnim current_anim = CHAR_IDLE;
-    CharAnim target_anim = CHAR_IDLE;
+    CharAnim current_anim = CharAnim::Idle;
     bool needs_transition = false;
 };
 
@@ -54,7 +52,7 @@ struct RenderInstance {
     glm::vec3 pos{0};
     float rot = 0;
     uint32_t color = 0xffffffff;
-    CharAnim anim = CHAR_IDLE;
+    CharAnim anim = CharAnim::Idle;
     bool moving = false;
     float anim_time = 0;
 
@@ -65,92 +63,100 @@ struct RenderInstance {
     };
     std::vector<Attachment> attachments;
 };
+} // anonymous namespace
 
-static std::unordered_map<std::string, LoadedModel> g_models;
-static std::unordered_map<std::string, AnimationState> g_anim_states;
-static std::unordered_map<uint32_t, RenderInstance> g_instances;
-static bgfx::ProgramHandle g_prog = BGFX_INVALID_HANDLE;
-static bgfx::UniformHandle g_tex = BGFX_INVALID_HANDLE;
-static bgfx::UniformHandle g_bones_uniform = BGFX_INVALID_HANDLE;
-static bgfx::UniformHandle g_light_dir = BGFX_INVALID_HANDLE;
-static bgfx::UniformHandle g_u_color = BGFX_INVALID_HANDLE;
-static bgfx::TextureHandle g_white = BGFX_INVALID_HANDLE;
+struct CharacterRenderer::Impl {
+    uint16_t fb_width = 1280;
+    uint16_t fb_height = 720;
+    float frame_dt = 1.0f / 60.0f;
 
-static const bgfx::Memory* loadShader(const char* path) {
-    std::string search[] = { "build/bin/" + std::string(path), std::string(path), VFS::Resolve("assets/" + std::string(path)) };
-    for (auto& p : search) {
-        std::ifstream file(p, std::ios::binary | std::ios::ate);
-        if (file) {
-            size_t size = file.tellg();
-            file.seekg(0);
-            auto* mem = bgfx::alloc(static_cast<uint32_t>(size));
-            file.read(reinterpret_cast<char*>(mem->data), size);
-            spdlog::info("Shader: loaded {} ({} bytes)", p, size);
-            return mem;
-        }
-    }
-    return nullptr;
+    std::unordered_map<std::string, LoadedModel> models;
+    std::unordered_map<std::string, AnimationState> anim_states;
+    std::unordered_map<uint32_t, RenderInstance> instances;
+
+    bgfx::ProgramHandle prog = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle tex = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle bones_uniform = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle light_dir = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle u_color = BGFX_INVALID_HANDLE;
+    bgfx::TextureHandle white = BGFX_INVALID_HANDLE;
+
+    ModelManager model_mgr;
+    bool initialized = false;
+};
+
+CharacterRenderer::CharacterRenderer()
+    : impl_(std::make_unique<Impl>()) {}
+
+CharacterRenderer::~CharacterRenderer() {
+    Shutdown();
 }
 
-void CharRenderer_Init() {
-    auto vs = loadShader("shaders/vs_skinned.bin");
-    auto fs = loadShader("shaders/fs_lit.bin");
-    if (vs && fs) g_prog = bgfx::createProgram(bgfx::createShader(vs), bgfx::createShader(fs), true);
-    g_tex = bgfx::createUniform("s_texColor", bgfx::UniformType::Sampler);
-    g_bones_uniform = bgfx::createUniform("u_bones", bgfx::UniformType::Mat4, MAX_BONES);
-    g_light_dir = bgfx::createUniform("u_lightDir", bgfx::UniformType::Vec4);
-    g_u_color = bgfx::createUniform("u_color", bgfx::UniformType::Vec4);
+bool CharacterRenderer::Init(const std::string& shader_dir) {
+    auto& i = *impl_;
+    std::string vs = shader_dir + "vs_skinned.bin";
+    std::string fs = shader_dir + "fs_lit.bin";
+
+    i.prog = ShaderUtils::LoadProgram(vs, fs);
+    i.tex = bgfx::createUniform("s_texColor", bgfx::UniformType::Sampler);
+    i.bones_uniform = bgfx::createUniform("u_bones", bgfx::UniformType::Mat4, MAX_BONES);
+    i.light_dir = bgfx::createUniform("u_lightDir", bgfx::UniformType::Vec4);
+    i.u_color = bgfx::createUniform("u_color", bgfx::UniformType::Vec4);
     uint32_t white = 0xffffffff;
-    g_white = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::makeRef(&white, 4));
+    i.white = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::makeRef(&white, 4));
+
+    i.initialized = true;
+    return true;
 }
 
-void CharRenderer_SetFBSize(uint16_t w, uint16_t h) {
-    g_fb_width = w; g_fb_height = h;
+void CharacterRenderer::SetFramebufferSize(uint16_t w, uint16_t h) {
+    impl_->fb_width = w;
+    impl_->fb_height = h;
 }
 
-void CharRenderer_SetFrameDelta(float dt) {
-    if (dt > 0.0f && dt < 0.5f) g_frame_dt = dt;
+void CharacterRenderer::SetFrameDelta(float dt) {
+    if (dt > 0.0f && dt < 0.5f) impl_->frame_dt = dt;
 }
 
-uint32_t CharRenderer_LoadModel(const std::string& path) {
+uint32_t CharacterRenderer::LoadModel(const std::string& path) {
+    auto& i = *impl_;
     std::string resolved = path;
-    if (!g_models.count(resolved)) {
+
+    if (!i.models.count(resolved)) {
         std::string found = VFS::Find(path);
         if (!found.empty()) resolved = found;
     }
-    if (g_models.count(resolved)) return 1;
+    if (i.models.count(resolved)) return 1;
 
-    LoadedModel lm;
-    if (!lm.model.LoadFromGLB(resolved)) {
+    Model* raw = i.model_mgr.Load(resolved, resolved);
+    if (!raw) {
         spdlog::error("CharRenderer: failed to load model {}", path);
         return 0;
     }
 
-    // Create MeshObject for each mesh part
+    LoadedModel lm;
+    lm.model = *raw;
+
     const auto& parts = lm.model.GetMeshes();
     lm.meshes.resize(parts.size());
-    for (size_t i = 0; i < parts.size(); i++) {
-        if (!lm.meshes[i].UploadToGPU(parts[i])) {
-            spdlog::error("CharRenderer: failed to upload mesh '{}' to GPU", parts[i].name);
+    for (size_t mi = 0; mi < parts.size(); mi++) {
+        if (!lm.meshes[mi].UploadToGPU(parts[mi])) {
+            spdlog::error("CharRenderer: failed to upload mesh '{}' to GPU", parts[mi].name);
             return 0;
         }
     }
 
-    // Build skeleton from model bones
     if (lm.model.HasBones()) {
         lm.skeleton.BuildFromModel(lm.model);
-
-        // Build local-space bind pose from inverse bind matrices
         const auto& inv_bind = lm.skeleton.GetInverseBindMatrices();
         lm.bind_pose.resize(inv_bind.size());
-        for (size_t i = 0; i < inv_bind.size(); i++) {
-            lm.bind_pose[i] = glm::inverse(inv_bind[i]);
+        for (size_t bi = 0; bi < inv_bind.size(); bi++) {
+            lm.bind_pose[bi] = glm::inverse(inv_bind[bi]);
         }
     }
 
-    g_models[resolved] = std::move(lm);
+    i.models[resolved] = std::move(lm);
 
-    // Auto-load animation clips
     AnimationState as;
     std::string base_path = resolved.substr(0, resolved.find_last_of('.'));
     const char* clip_names[] = {"idle", "walk", "run", "attack", "die"};
@@ -164,7 +170,6 @@ uint32_t CharRenderer_LoadModel(const std::string& path) {
             as.clips[name] = std::move(clip);
             spdlog::debug("CharRenderer: loaded anim clip '{}' from {}", name, json_path);
         } else {
-            // Fallback to .anm binary
             std::string anm_path = VFS::Find(base_path + "_" + name + ".anm");
             if (anm_path.empty()) anm_path = base_path + "_" + name + ".anm";
             if (as.anim_sys.LoadFromAnm(anm_path, clip)) {
@@ -176,43 +181,46 @@ uint32_t CharRenderer_LoadModel(const std::string& path) {
         }
     }
 
-    // Start with idle
     auto it = as.clips.find("idle");
     if (it != as.clips.end()) {
         as.anim_sys.Play(&it->second, true, 0.0f);
     }
-    as.current_anim = CHAR_IDLE;
-    g_anim_states[resolved] = std::move(as);
+    as.current_anim = CharAnim::Idle;
+    i.anim_states[resolved] = std::move(as);
 
     return 1;
 }
 
-void CharRenderer_Spawn(uint32_t id, const std::string& model, float x, float y, float z, uint32_t color) {
-    CharRenderer_LoadModel(model);
+uint32_t CharacterRenderer::Spawn(uint32_t id, const std::string& model,
+                                   float x, float y, float z, uint32_t color) {
+    LoadModel(model);
     RenderInstance inst;
     std::string found = VFS::Find(model);
     inst.model_key = found.empty() ? model : found;
     inst.pos = {x, y, z};
     inst.color = color;
-    g_instances[id] = inst;
+    impl_->instances[id] = inst;
+    return id;
 }
 
-void CharRenderer_Remove(uint32_t id) { g_instances.erase(id); }
+void CharacterRenderer::Remove(uint32_t id) {
+    impl_->instances.erase(id);
+}
 
-void CharRenderer_Move(uint32_t id, float x, float y, float z, bool moving, CharAnim anim) {
-    auto it = g_instances.find(id);
-    if (it == g_instances.end()) return;
+void CharacterRenderer::Move(uint32_t id, float x, float y, float z, bool moving, CharAnim anim) {
+    auto& i = *impl_;
+    auto it = i.instances.find(id);
+    if (it == i.instances.end()) return;
     auto& inst = it->second;
     inst.pos = {x, y, z};
     inst.moving = moving;
 
-    // Handle animation state transitions
-    auto anim_it = g_anim_states.find(inst.model_key);
-    if (anim_it == g_anim_states.end()) return;
+    auto anim_it = i.anim_states.find(inst.model_key);
+    if (anim_it == i.anim_states.end()) return;
     auto& as = anim_it->second;
 
     CharAnim desired = anim;
-    if (desired == CHAR_IDLE && moving) desired = CHAR_WALK;
+    if (desired == CharAnim::Idle && moving) desired = CharAnim::Walk;
 
     if (desired != as.current_anim) {
         auto clip_it = as.clips.find(AnimNameForCharAnim(desired));
@@ -223,95 +231,91 @@ void CharRenderer_Move(uint32_t id, float x, float y, float z, bool moving, Char
     }
 }
 
-void CharRenderer_Attach(uint32_t id, const std::string& model, const std::string& bone) {
-    auto it = g_instances.find(id);
-    if (it == g_instances.end()) return;
-    CharRenderer_LoadModel(model);
+void CharacterRenderer::Attach(uint32_t id, const std::string& model, const std::string& bone) {
+    auto& i = *impl_;
+    auto it = i.instances.find(id);
+    if (it == i.instances.end()) return;
+    LoadModel(model);
     RenderInstance::Attachment att;
     att.model_key = model;
     att.bone_name = bone;
 
-    // Resolve bone index
-    auto mit = g_models.find(it->second.model_key);
-    if (mit != g_models.end()) {
+    auto mit = i.models.find(it->second.model_key);
+    if (mit != i.models.end()) {
         att.bone_index = mit->second.skeleton.GetBoneIndex(bone);
     }
     it->second.attachments.push_back(att);
 }
 
-void CharRenderer_Detach(uint32_t id, const std::string& bone) {
-    auto it = g_instances.find(id);
-    if (it == g_instances.end()) return;
+void CharacterRenderer::Detach(uint32_t id, const std::string& bone) {
+    auto& i = *impl_;
+    auto it = i.instances.find(id);
+    if (it == i.instances.end()) return;
     auto& atts = it->second.attachments;
     atts.erase(std::remove_if(atts.begin(), atts.end(),
         [&bone](const RenderInstance::Attachment& a) { return a.bone_name == bone; }), atts.end());
 }
 
-void CharRenderer_Render(const glm::mat4& view, const glm::mat4& proj, float time, const EnvData& env) {
-    if (!bgfx::isValid(g_prog)) return;
+void CharacterRenderer::Render(const glm::mat4& view, const glm::mat4& proj, float time, const EnvData& env) {
+    (void)time;
+    auto& i = *impl_;
+    if (!bgfx::isValid(i.prog)) return;
     bgfx::ViewId vid = (bgfx::ViewId)ViewId::Character;
     bgfx::setViewTransform(vid, &view, &proj);
     bgfx::setViewClear(vid, BGFX_CLEAR_NONE, 0, 1.0f, 0);
-    bgfx::setViewRect(vid, 0, 0, g_fb_width, g_fb_height);
+    bgfx::setViewRect(vid, 0, 0, i.fb_width, i.fb_height);
 
     float white[4] = {1, 1, 1, 1};
-    bgfx::setUniform(g_light_dir, glm::value_ptr(env.light_dir));
-    bgfx::setUniform(g_u_color, white);
+    bgfx::setUniform(i.light_dir, glm::value_ptr(env.light_dir));
+    bgfx::setUniform(i.u_color, white);
 
-    for (auto& [id, inst] : g_instances) {
-        auto mit = g_models.find(inst.model_key);
-        if (mit == g_models.end()) continue;
+    for (auto& [id_, inst] : i.instances) {
+        (void)id_;
+        auto mit = i.models.find(inst.model_key);
+        if (mit == i.models.end()) continue;
         auto& lm = mit->second;
 
-        auto ait = g_anim_states.find(inst.model_key);
-        AnimationState* as = (ait != g_anim_states.end()) ? &ait->second : nullptr;
+        auto ait = i.anim_states.find(inst.model_key);
+        AnimationState* as = (ait != i.anim_states.end()) ? &ait->second : nullptr;
 
-        // Update animation
         if (as) {
-            as->anim_sys.Update(g_frame_dt);
+            as->anim_sys.Update(i.frame_dt);
         }
 
-        // Compute skinning matrices
         glm::mat4 bone_matrices[MAX_BONES];
         std::fill_n(bone_matrices, MAX_BONES, glm::mat4(1.0f));
 
         if (as && lm.model.HasBones()) {
-            // Get blended pose from animation system
             std::vector<glm::mat4> blended_pose(lm.bind_pose.size(), glm::mat4(1.0f));
             as->anim_sys.GetBlendedPose(lm.bind_pose, blended_pose.data(), blended_pose.size());
 
-            // Compute world-space final pose
             std::vector<glm::mat4> world_pose;
             lm.skeleton.ComputeFinalPose(blended_pose, world_pose);
 
-            // Convert to skinning matrices: pose * inverse_bind
             const auto& inv_bind = lm.skeleton.GetInverseBindMatrices();
             size_t count = std::min(world_pose.size(), (size_t)MAX_BONES);
-            for (size_t i = 0; i < count; i++) {
-                bone_matrices[i] = world_pose[i] * inv_bind[i];
+            for (size_t bi = 0; bi < count; bi++) {
+                bone_matrices[bi] = world_pose[bi] * inv_bind[bi];
             }
         }
 
-        bgfx::setUniform(g_bones_uniform, bone_matrices, MAX_BONES);
+        bgfx::setUniform(i.bones_uniform, bone_matrices, MAX_BONES);
 
-        // Render all meshes
         float mtx[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, inst.pos.x, inst.pos.y, inst.pos.z, 1};
         bgfx::setTransform(mtx);
 
         for (auto& mesh_obj : lm.meshes) {
             mesh_obj.Render(0);
             bgfx::setState(BGFX_STATE_DEFAULT | BGFX_STATE_WRITE_Z);
-            bgfx::setTexture(0, g_tex, g_white);
-            bgfx::submit(vid, g_prog);
+            bgfx::setTexture(0, i.tex, i.white);
+            bgfx::submit(vid, i.prog);
         }
 
-        // Render attachments
         for (auto& att : inst.attachments) {
-            auto amit = g_models.find(att.model_key);
-            if (amit == g_models.end()) continue;
+            auto amit = i.models.find(att.model_key);
+            if (amit == i.models.end()) continue;
             auto& alm = amit->second;
 
-            // Apply attachment bone transform if index is valid
             if (att.bone_index >= 0 && att.bone_index < MAX_BONES) {
                 glm::mat4 att_mtx = glm::make_mat4(mtx) * bone_matrices[att.bone_index];
                 bgfx::setTransform(glm::value_ptr(att_mtx));
@@ -320,27 +324,30 @@ void CharRenderer_Render(const glm::mat4& view, const glm::mat4& proj, float tim
             for (auto& att_mesh : alm.meshes) {
                 att_mesh.Render(0);
                 bgfx::setState(BGFX_STATE_DEFAULT | BGFX_STATE_WRITE_Z);
-                bgfx::setTexture(0, g_tex, g_white);
-                bgfx::submit(vid, g_prog);
+                bgfx::setTexture(0, i.tex, i.white);
+                bgfx::submit(vid, i.prog);
             }
         }
     }
 }
 
-void CharRenderer_Render(const glm::mat4& view, const glm::mat4& proj, float time) {
-    EnvData env; CharRenderer_Render(view, proj, time, env);
-}
+void CharacterRenderer::Shutdown() {
+    if (!impl_->initialized) return;
+    impl_->initialized = false;
 
-void CharRenderer_Shutdown() {
-    static bool is_shutdown = false;
-    if (is_shutdown) return;
-    is_shutdown = true;
-    g_models.clear();
-    g_anim_states.clear();
-    if (bgfx::isValid(g_prog)) bgfx::destroy(g_prog);
-    if (bgfx::isValid(g_tex)) bgfx::destroy(g_tex);
-    if (bgfx::isValid(g_bones_uniform)) bgfx::destroy(g_bones_uniform);
-    if (bgfx::isValid(g_light_dir)) bgfx::destroy(g_light_dir);
-    if (bgfx::isValid(g_u_color)) bgfx::destroy(g_u_color);
-    if (bgfx::isValid(g_white)) bgfx::destroy(g_white);
+    impl_->models.clear();
+    impl_->anim_states.clear();
+    if (bgfx::isValid(impl_->prog)) bgfx::destroy(impl_->prog);
+    if (bgfx::isValid(impl_->tex)) bgfx::destroy(impl_->tex);
+    if (bgfx::isValid(impl_->bones_uniform)) bgfx::destroy(impl_->bones_uniform);
+    if (bgfx::isValid(impl_->light_dir)) bgfx::destroy(impl_->light_dir);
+    if (bgfx::isValid(impl_->u_color)) bgfx::destroy(impl_->u_color);
+    if (bgfx::isValid(impl_->white)) bgfx::destroy(impl_->white);
+
+    impl_->prog = BGFX_INVALID_HANDLE;
+    impl_->tex = BGFX_INVALID_HANDLE;
+    impl_->bones_uniform = BGFX_INVALID_HANDLE;
+    impl_->light_dir = BGFX_INVALID_HANDLE;
+    impl_->u_color = BGFX_INVALID_HANDLE;
+    impl_->white = BGFX_INVALID_HANDLE;
 }

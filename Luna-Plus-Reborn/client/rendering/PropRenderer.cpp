@@ -10,29 +10,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <stb_image.h>
 #include <engine/gx_render/VFS.h>
-
-static const bgfx::Memory* loadShader(const char* path) {
-    std::string searchPaths[] = {
-        std::string("build/bin/") + path,
-        std::string("bin/") + path,
-        path,
-        std::string("../") + path,
-        VFS::Resolve(std::string("assets/") + path)
-    };
-
-    for (const auto& p : searchPaths) {
-        std::ifstream file(p, std::ios::binary | std::ios::ate);
-        if (file) {
-            size_t size = file.tellg();
-            file.seekg(0);
-            auto* mem = bgfx::alloc(static_cast<uint32_t>(size));
-            file.read(reinterpret_cast<char*>(mem->data), size);
-            spdlog::info("Shader: loaded {} ({} bytes)", p, size);
-            return mem;
-        }
-    }
-    return nullptr;
-}
+#include <engine/gx_render/Shader.h>
 
 struct ObjVertex { float x, y, z; float nx, ny, nz; float u, v; };
 struct ObjFace { int v[3]; int vn[3]; int vt[3]; };
@@ -78,12 +56,12 @@ bgfx::TextureHandle PropRenderer::LoadNormalMap(const std::string& base_name) {
 }
 
 bool PropRenderer::Init() {
-    auto vs = loadShader("shaders/vs_default.bin");
-    auto fs = loadShader("shaders/fs_lit.bin");
-    if (!vs || !fs) { spdlog::error("PropRenderer: shader load failed"); return false; }
-    program_ = bgfx::createProgram(bgfx::createShader(vs), bgfx::createShader(fs), true);
+    program_ = ShaderUtils::LoadProgram("shaders/vs_default.bin", "shaders/fs_lit.bin");
+    if (!bgfx::isValid(program_)) { spdlog::error("PropRenderer: shader load failed"); return false; }
+    shadow_program_ = ShaderUtils::LoadProgram("shaders/vs_default.bin", "shaders/fs_unlit.bin");
     u_color_ = bgfx::createUniform("u_color", bgfx::UniformType::Vec4);
     u_light_dir_ = bgfx::createUniform("u_lightDir", bgfx::UniformType::Vec4);
+    u_shadow_mvp_ = bgfx::createUniform("u_shadowMVP", bgfx::UniformType::Mat4);
     s_tex_color_ = bgfx::createUniform("s_texColor", bgfx::UniformType::Sampler);
     s_tex_normal_ = bgfx::createUniform("s_texNormal", bgfx::UniformType::Sampler);
     uint32_t white = 0xffffffff;
@@ -271,6 +249,32 @@ void PropRenderer::Render(const glm::mat4& view, const glm::mat4& proj, const En
     }
 }
 
+void PropRenderer::RenderShadow(bgfx::ViewId view_id, const glm::mat4& shadow_mvp) {
+    if (!bgfx::isValid(shadow_program_)) return;
+    if (instances_.empty()) return;
+
+    for (auto& inst : instances_) {
+        int mid = (int)inst.mesh_idx;
+        if (mid < 0 || mid >= (int)meshes_.size()) continue;
+        auto& mesh = meshes_[mid];
+        if (!bgfx::isValid(mesh.vb)) continue;
+
+        glm::mat4 m = glm::translate(glm::mat4(1.0f), inst.position);
+        m = glm::rotate(m, inst.rotation.x, glm::vec3(1,0,0));
+        m = glm::rotate(m, inst.rotation.y, glm::vec3(0,1,0));
+        m = glm::rotate(m, inst.rotation.z, glm::vec3(0,0,1));
+        m = glm::scale(m, glm::vec3(inst.scale));
+
+        glm::mat4 mvp = shadow_mvp * m;
+        bgfx::setUniform(u_shadow_mvp_, glm::value_ptr(mvp));
+        bgfx::setTransform(glm::value_ptr(m));
+        bgfx::setVertexBuffer(0, mesh.vb);
+        bgfx::setIndexBuffer(mesh.ib);
+        bgfx::setState(BGFX_STATE_DEFAULT | BGFX_STATE_WRITE_Z);
+        bgfx::submit(view_id, shadow_program_);
+    }
+}
+
 void PropRenderer::Shutdown() {
     static bool is_shutdown = false;
     if (is_shutdown) return;
@@ -289,9 +293,11 @@ void PropRenderer::Shutdown() {
     if (bgfx::isValid(white_tex_)) bgfx::destroy(white_tex_);
     if (bgfx::isValid(s_tex_color_)) bgfx::destroy(s_tex_color_);
     if (bgfx::isValid(s_tex_normal_)) bgfx::destroy(s_tex_normal_);
+    if (bgfx::isValid(shadow_program_)) bgfx::destroy(shadow_program_);
     if (bgfx::isValid(program_)) bgfx::destroy(program_);
     if (bgfx::isValid(u_color_)) bgfx::destroy(u_color_);
     if (bgfx::isValid(u_light_dir_)) bgfx::destroy(u_light_dir_);
+    if (bgfx::isValid(u_shadow_mvp_)) bgfx::destroy(u_shadow_mvp_);
 }
 
 void PropRenderer::ClearProps() {

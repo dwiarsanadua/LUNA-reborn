@@ -52,6 +52,7 @@ private:
     bgfx::TextureHandle cloud_tex_ = BGFX_INVALID_HANDLE;
     bgfx::ProgramHandle program_ = BGFX_INVALID_HANDLE;
     bgfx::UniformHandle sampler_ = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle s_texSky_ = BGFX_INVALID_HANDLE;
     bgfx::TextureHandle white_tex_ = BGFX_INVALID_HANDLE;
     
     glm::vec3 LerpColor(const glm::vec3& a, const glm::vec3& b, float t) const;

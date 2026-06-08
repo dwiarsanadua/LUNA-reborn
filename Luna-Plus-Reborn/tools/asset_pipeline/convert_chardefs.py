@@ -12,8 +12,8 @@ import struct
 import argparse
 from pathlib import Path
 
-SRC_BASE = Path("/Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/unpacked")
-DST_BASE = Path("/Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/assets/characters")
+SRC_BASE_DEFAULT = os.environ.get('LUNA_LEGACY_SRC', str(Path(__file__).parent.parent.parent.parent / 'Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/unpacked'))
+DST_BASE_DEFAULT = os.environ.get('LUNA_REBORN_ROOT', str(Path(__file__).parent.parent.parent)) + '/assets/characters'
 
 SOURCE_CATEGORIES = ['character', 'monster', 'npc', 'effect', 'farm', 'housing', 'image', 'map', 'npcImage']
 
@@ -100,10 +100,15 @@ def main():
     parser.add_argument('--all', action='store_true', help='Process all character defs')
     parser.add_argument('--category', type=str, help='Specific category')
     parser.add_argument('--file', type=str, help='Single file to convert')
+    parser.add_argument('--src', default=SRC_BASE_DEFAULT, help='Source base directory')
+    parser.add_argument('--dst', default=DST_BASE_DEFAULT, help='Output base directory')
     args = parser.parse_args()
 
+    src_base = Path(args.src)
+    dst_base = Path(args.dst)
+
     if args.file:
-        path, status, msg = convert_chx(args.file, str(DST_BASE))
+        path, status, msg = convert_chx(args.file, str(dst_base))
         print(f"{status}: {os.path.basename(path)} ({msg})")
         return 0 if status == 'ok' else 1
 
@@ -111,7 +116,7 @@ def main():
 
     all_chx = []
     for cat in categories:
-        src_dir = SRC_BASE / cat
+        src_dir = src_base / cat
         if not src_dir.exists():
             print(f"Source directory not found: {src_dir}")
             continue
@@ -129,7 +134,7 @@ def main():
     skipped = 0
 
     print(f"\nTotal: {total} character defs to convert")
-    print(f"Output: {DST_BASE}")
+    print(f"Output: {dst_base}")
     print()
 
     for f in all_chx:

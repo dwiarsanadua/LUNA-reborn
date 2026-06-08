@@ -1,4 +1,5 @@
 #include "Shader.h"
+#include "VFS.h"
 #include <spdlog/spdlog.h>
 #include <fstream>
 #include <vector>
@@ -69,6 +70,56 @@ void Shader::Destroy() {
     }
 }
 
+// ─── ShaderUtils ───────────────────────────────────────────
+
+const bgfx::Memory* ShaderUtils::LoadShaderBin(const std::string& name) {
+    std::string searchPaths[] = {
+        "build/bin/" + name,
+        "bin/" + name,
+        name,
+        "../" + name,
+        "shaders/" + name,
+        "assets/shaders/" + name,
+        VFS::Resolve("assets/" + name),
+    };
+
+    for (const auto& p : searchPaths) {
+        std::ifstream file(p, std::ios::binary | std::ios::ate);
+        if (file) {
+            size_t size = file.tellg();
+            file.seekg(0);
+            auto* mem = bgfx::alloc(static_cast<uint32_t>(size));
+            file.read(reinterpret_cast<char*>(mem->data), size);
+            spdlog::info("ShaderUtils: loaded {} ({} bytes)", p, size);
+            return mem;
+        }
+    }
+    spdlog::error("ShaderUtils: failed to load '{}'", name);
+    return nullptr;
+}
+
+bgfx::ProgramHandle ShaderUtils::LoadProgram(const std::string& vs_name, const std::string& fs_name) {
+    auto vs = LoadShaderBin(vs_name);
+    auto fs = LoadShaderBin(fs_name);
+    if (!vs || !fs) return BGFX_INVALID_HANDLE;
+
+    bgfx::ShaderHandle vs_h = bgfx::createShader(vs);
+    bgfx::ShaderHandle fs_h = bgfx::createShader(fs);
+
+    if (!bgfx::isValid(vs_h) || !bgfx::isValid(fs_h)) {
+        spdlog::error("ShaderUtils: failed to create shader handles");
+        if (bgfx::isValid(vs_h)) bgfx::destroy(vs_h);
+        if (bgfx::isValid(fs_h)) bgfx::destroy(fs_h);
+        return BGFX_INVALID_HANDLE;
+    }
+
+    bgfx::ProgramHandle prog = bgfx::createProgram(vs_h, fs_h, true);
+    if (!bgfx::isValid(prog)) {
+        spdlog::error("ShaderUtils: failed to create program from '{}' / '{}'", vs_name, fs_name);
+    }
+    return prog;
+}
+
 // ─── ShaderManager ─────────────────────────────────────────
 
 bool ShaderManager::Init(const std::string& shader_dir) {
@@ -85,7 +136,7 @@ bool ShaderManager::Init(const std::string& shader_dir) {
     auto dir = shader_dir_ + "/";
     load("default", dir + "vs_default.bin", dir + "fs_default.bin");
     load("unlit", dir + "vs_unlit.bin", dir + "fs_unlit.bin");
-    load("light", dir + "vs_light.bin", dir + "fs_light.bin");
+    load("lit", dir + "vs_default.bin", dir + "fs_lit.bin");
 
     spdlog::info("ShaderManager: initialized ({} programs)", programs_.size());
     return !programs_.empty();
@@ -108,6 +159,6 @@ Shader* ShaderManager::GetUnlitShader() {
     return GetProgram("unlit");
 }
 
-Shader* ShaderManager::GetLightShader() {
-    return GetProgram("light");
+Shader* ShaderManager::GetLitShader() {
+    return GetProgram("lit");
 }

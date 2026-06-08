@@ -1,4 +1,5 @@
 #include "SceneRenderer.hpp"
+#include <engine/gx_render/Shader.h>
 #include <ecs/components/Transform.hpp>
 #include <spdlog/spdlog.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -11,18 +12,25 @@ void SceneRenderer::Initialize() {
     bgfx::setViewClear(view_id_, BGFX_CLEAR_NONE, clear_color_, 1.0f, 0);
     bgfx::setViewRect(view_id_, 0, 0, (uint16_t)width, (uint16_t)height);
 
-    shadow_map_ = bgfx::createTexture2D(
-        (uint16_t)shadow_map_size_, (uint16_t)shadow_map_size_,
-        false, 1, bgfx::TextureFormat::D24S8,
-        BGFX_TEXTURE_RT | BGFX_SAMPLER_COMPARE_LEQUAL);
+    // Shadow program
+    shadow_program_ = ShaderUtils::LoadProgram("shaders/vs_default.bin", "shaders/fs_unlit.bin");
 
-    if (!bgfx::isValid(shadow_map_)) {
+    // Create depth texture for shadow map
+    bgfx::TextureFormat::Enum shadow_formats[] = {
+        bgfx::TextureFormat::D24S8,
+        bgfx::TextureFormat::D16,
+        bgfx::TextureFormat::D32F
+    };
+
+    shadow_map_ = BGFX_INVALID_HANDLE;
+    for (auto fmt : shadow_formats) {
         shadow_map_ = bgfx::createTexture2D(
             (uint16_t)shadow_map_size_, (uint16_t)shadow_map_size_,
-            false, 1, bgfx::TextureFormat::D16,
+            false, 1, fmt,
             BGFX_TEXTURE_RT | BGFX_SAMPLER_COMPARE_LEQUAL);
+        if (bgfx::isValid(shadow_map_)) break;
     }
-
+    // D32F may not support compare mode, retry without
     if (!bgfx::isValid(shadow_map_)) {
         shadow_map_ = bgfx::createTexture2D(
             (uint16_t)shadow_map_size_, (uint16_t)shadow_map_size_,
@@ -31,22 +39,17 @@ void SceneRenderer::Initialize() {
     }
 
     if (bgfx::isValid(shadow_map_)) {
-        shadow_fbo_ = bgfx::createFrameBuffer(shadow_map_size_, shadow_map_size_,
-            bgfx::TextureFormat::D24S8);
-        if (!bgfx::isValid(shadow_fbo_)) {
-            shadow_fbo_ = bgfx::createFrameBuffer(shadow_map_size_, shadow_map_size_,
-                bgfx::TextureFormat::D16);
-        }
-        if (!bgfx::isValid(shadow_fbo_)) {
-            shadow_fbo_ = bgfx::createFrameBuffer(shadow_map_size_, shadow_map_size_,
-                bgfx::TextureFormat::D32F);
-        }
+        bgfx::TextureHandle fb_textures[] = { shadow_map_ };
+        shadow_fbo_ = bgfx::createFrameBuffer(1, fb_textures, true);
         shadow_initialized_ = bgfx::isValid(shadow_fbo_);
-        spdlog::info("ShadowMap: created {}x{}", shadow_map_size_, shadow_map_size_);
+        spdlog::info("ShadowMap: created {}x{} (fbo={})", shadow_map_size_, shadow_map_size_,
+                     shadow_initialized_ ? "valid" : "invalid");
     } else {
         spdlog::warn("ShadowMap: failed to create, falling back to no shadows");
         shadow_initialized_ = false;
     }
+
+    u_shadow_map_ = bgfx::createUniform("u_shadowMap", bgfx::UniformType::Sampler);
 }
 
 void SceneRenderer::Render(const glm::mat4& view, const glm::mat4& proj) {
@@ -74,23 +77,33 @@ void SceneRenderer::BeginShadowPass(const glm::vec3& light_dir) {
     if (!shadow_initialized_) return;
 
     glm::vec3 light_pos = -light_dir * 500.0f;
-    glm::mat4 light_view = glm::lookAt(light_pos, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+    glm::vec3 up = glm::abs(light_dir.y) < 0.99f ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
+    glm::mat4 light_view = glm::lookAt(light_pos, glm::vec3(0, 0, 0), up);
     glm::mat4 light_proj = glm::ortho(-300.0f, 300.0f, -300.0f, 300.0f, 0.1f, 1000.0f);
     shadow_mvp_ = light_proj * light_view;
 
-    bgfx::setViewClear(shadow_view_id_, BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR, 0xffffffff, 1.0f, 0);
-    bgfx::setViewRect(shadow_view_id_, 0, 0, shadow_map_size_, shadow_map_size_);
-    glm::mat4 identity = glm::mat4(1.0f);
-    bgfx::setViewTransform(shadow_view_id_, &identity, &identity);
-    bgfx::setViewFrameBuffer(shadow_view_id_, shadow_fbo_);
-    bgfx::touch(shadow_view_id_);
+    bgfx::setViewClear(static_cast<bgfx::ViewId>(shadow_view_id_), BGFX_CLEAR_DEPTH | BGFX_CLEAR_COLOR, 0xffffffff, 1.0f, 0);
+    bgfx::setViewRect(static_cast<bgfx::ViewId>(shadow_view_id_), 0, 0, shadow_map_size_, shadow_map_size_);
+    bgfx::setViewTransform(static_cast<bgfx::ViewId>(shadow_view_id_),
+                            glm::value_ptr(light_view), glm::value_ptr(light_proj));
+    bgfx::setViewFrameBuffer(static_cast<bgfx::ViewId>(shadow_view_id_), shadow_fbo_);
+    bgfx::touch(static_cast<bgfx::ViewId>(shadow_view_id_));
 }
 
 void SceneRenderer::EndShadowPass() {
     if (!shadow_initialized_) return;
 }
 
+void SceneRenderer::SetSceneViewsFBO(bgfx::FrameBufferHandle fbo) {
+    bgfx::setViewFrameBuffer(static_cast<bgfx::ViewId>(ViewId::Terrain), fbo);
+    bgfx::setViewFrameBuffer(static_cast<bgfx::ViewId>(ViewId::Props), fbo);
+    bgfx::setViewFrameBuffer(static_cast<bgfx::ViewId>(ViewId::Character), fbo);
+    bgfx::setViewFrameBuffer(static_cast<bgfx::ViewId>(ViewId::Particle), fbo);
+    bgfx::setViewFrameBuffer(static_cast<bgfx::ViewId>(ViewId::Scene), fbo);
+}
+
 void SceneRenderer::Shutdown() {
+    if (bgfx::isValid(shadow_program_)) bgfx::destroy(shadow_program_);
     if (bgfx::isValid(u_shadow_map_)) bgfx::destroy(u_shadow_map_);
     if (bgfx::isValid(shadow_map_)) bgfx::destroy(shadow_map_);
     if (bgfx::isValid(shadow_fbo_)) bgfx::destroy(shadow_fbo_);

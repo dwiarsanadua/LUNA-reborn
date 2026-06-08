@@ -1,5 +1,6 @@
 add_library(gx_geom STATIC
     Model.cpp
+    ModelManager.cpp
     MeshObject.cpp
     AnimationSystem.cpp
     Skeleton.cpp
@@ -7,6 +8,7 @@ add_library(gx_geom STATIC
 
 target_include_directories(gx_geom PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include/external
     /opt/homebrew/include
 )

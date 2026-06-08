@@ -22,8 +22,26 @@ def convert_hfl_to_hgt(hfl_path, hgt_path):
     return False
 
 def main():
-    src = sys.argv[1] if len(sys.argv) > 1 else '/Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/unpacked/map/'
-    dst = sys.argv[2] if len(sys.argv) > 2 else 'assets/maps/'
+    import argparse
+    parser = argparse.ArgumentParser(description='Convert HFL heightmaps to HGT')
+    parser.add_argument('--all', action='store_true', help='Process all heightmaps')
+    parser.add_argument('--src', default=os.environ.get('LUNA_LEGACY_MAP_SRC', str(Path(__file__).parent.parent.parent.parent / 'Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/unpacked/map/')), help='Source directory')
+    parser.add_argument('--dst', default=os.environ.get('LUNA_REBORN_ROOT', str(Path(__file__).parent.parent.parent)) + '/assets/maps', help='Output directory')
+    parser.add_argument('--file', type=str, help='Single file to convert')
+    args = parser.parse_args()
+
+    src = args.src
+    dst = args.dst
+    if args.file:
+        base = os.path.basename(args.file).replace('.hfl', '.hgt')
+        out = os.path.join(dst, base)
+        os.makedirs(dst, exist_ok=True)
+        if convert_hfl_to_hgt(args.file, out):
+            print(f'  OK: {os.path.basename(args.file)}')
+        else:
+            print(f'  FAIL: {os.path.basename(args.file)}')
+            return 1
+        return 0
     ok = fail = skip = 0
     for f in glob.glob(os.path.join(src, '*.hfl')):
         base = os.path.basename(f).replace('.hfl', '.hgt')

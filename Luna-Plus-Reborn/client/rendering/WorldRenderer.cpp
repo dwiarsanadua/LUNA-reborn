@@ -5,44 +5,15 @@
 #include <cstring>
 #include <glm/gtc/type_ptr.hpp>
 #include <engine/gx_render/VFS.h>
-
-static const bgfx::Memory* loadShader(const char* path) {
-    std::string searchPaths[] = {
-        std::string("build/bin/") + path,
-        std::string("bin/") + path,
-        path,
-        std::string("../") + path,
-        VFS::Resolve(std::string("assets/") + path)
-    };
-
-    for (const auto& p : searchPaths) {
-        std::ifstream file(p, std::ios::binary | std::ios::ate);
-        if (file) {
-            size_t size = file.tellg();
-            file.seekg(0);
-            auto* mem = bgfx::alloc(static_cast<uint32_t>(size));
-            file.read(reinterpret_cast<char*>(mem->data), size);
-            spdlog::info("Shader: loaded {} ({} bytes)", p, size);
-            return mem;
-        }
-    }
-    return nullptr;
-}
+#include <engine/gx_render/Shader.h>
 
 WorldRenderer::WorldRenderer() = default;
 WorldRenderer::~WorldRenderer() { Shutdown(); }
 
 void WorldRenderer::Init() {
-    auto vs = loadShader("shaders/vs_default.bin");
-    auto fs = loadShader("shaders/fs_unlit.bin");
-    if (vs && fs) {
-        program_ = bgfx::createProgram(bgfx::createShader(vs), bgfx::createShader(fs), true);
-    }
-
-    auto vs_post = loadShader("shaders/vs_post.bin");
-    auto fs_water = loadShader("shaders/fs_water.bin");
-    if (vs_post && fs_water) {
-        water_program_ = bgfx::createProgram(bgfx::createShader(vs_post), bgfx::createShader(fs_water), true);
+    program_ = ShaderUtils::LoadProgram("shaders/vs_default.bin", "shaders/fs_unlit.bin");
+    water_program_ = ShaderUtils::LoadProgram("shaders/vs_post.bin", "shaders/fs_water.bin");
+    if (bgfx::isValid(water_program_)) {
         spdlog::info("WorldRenderer: water program initialized");
     }
 
@@ -145,7 +116,7 @@ void WorldRenderer::CreateWaterPlane(int size) {
 void WorldRenderer::Render(const glm::mat4& view, const glm::mat4& proj) {
     bgfx::setViewTransform(view_id_, &view, &proj);
     bgfx::setViewClear(view_id_, BGFX_CLEAR_NONE, 0, 1.0f, 0);
-    bgfx::setViewRect(view_id_, 0, 0, 1280, 720);
+    bgfx::setViewRect(view_id_, 0, 0, bgfx::BackbufferRatio::Equal);
 
     // Ground grid
     if (bgfx::isValid(program_) && bgfx::isValid(ground_vb_)) {

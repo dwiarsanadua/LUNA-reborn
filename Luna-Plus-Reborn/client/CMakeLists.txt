@@ -8,6 +8,8 @@ add_executable(LunaPlusClient
     rendering/CameraSystem.cpp
     rendering/UIRenderer.cpp
     rendering/ParticleRenderer.cpp
+    rendering/PostProcessor.cpp
+    rendering/RenderQueue.cpp
     network/NetworkClient.cpp
     audio/AudioManager.cpp
     ui/ScreenManager.cpp

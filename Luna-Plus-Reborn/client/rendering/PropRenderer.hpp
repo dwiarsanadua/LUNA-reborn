@@ -32,6 +32,7 @@ public:
     int AddInstance(int mesh_idx, glm::vec3 pos, float scale = 1.0f, glm::vec3 rot = {0,0,0});
     void Render(const glm::mat4& view, const glm::mat4& proj);
     void Render(const glm::mat4& view, const glm::mat4& proj, const EnvData& env);
+    void RenderShadow(bgfx::ViewId view_id, const glm::mat4& shadow_mvp);
     void Shutdown();
     void ClearProps();
 
@@ -50,10 +51,12 @@ private:
     std::vector<PropInstance> instances_;
     std::unordered_map<std::string, bgfx::TextureHandle> tex_cache_;
     bgfx::ProgramHandle program_ = BGFX_INVALID_HANDLE;
+    bgfx::ProgramHandle shadow_program_ = BGFX_INVALID_HANDLE;
     bgfx::UniformHandle u_color_ = BGFX_INVALID_HANDLE;
     bgfx::UniformHandle u_light_dir_ = BGFX_INVALID_HANDLE;
     bgfx::UniformHandle s_tex_color_ = BGFX_INVALID_HANDLE;
     bgfx::UniformHandle s_tex_normal_ = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle u_shadow_mvp_ = BGFX_INVALID_HANDLE;
     bgfx::TextureHandle white_tex_ = BGFX_INVALID_HANDLE;
     bgfx::ViewId view_id_ = static_cast<bgfx::ViewId>(ViewId::Props);
     bgfx::VertexLayout layout_;

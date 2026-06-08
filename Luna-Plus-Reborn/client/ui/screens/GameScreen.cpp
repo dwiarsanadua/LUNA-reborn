@@ -1128,7 +1128,7 @@ void GameScreen::CastHotbarSkill(int slot) {
     if (!skill_id) return;
     if (!hero_.UseSkill(static_cast<int>(skill_id))) return;
     state_->hotbar_cooldowns[slot] = 2.5f;
-    CharRenderer_Move(0, hero_.GetX(), hero_.GetY(), hero_.GetZ(), false, CHAR_ATTACK);
+    CharRenderer_Move(0, hero_.GetX(), hero_.GetY(), hero_.GetZ(), false, CharAnim::Attack);
     if (network_ && network_->IsConnected() && !state_->offline_mode) {
         flatbuffers::FlatBufferBuilder fbb;
         luna::protocol::Vec3 pos{hero_.GetX(), hero_.GetY(), hero_.GetZ()};
@@ -1171,7 +1171,7 @@ void GameScreen::UpdateEntityInterpolation(float dt) {
         if (ip.t >= 1.0f) continue;
         ip.t = std::min(1.0f, ip.t + dt / ip.duration);
         glm::vec3 p = ip.from + (ip.to - ip.from) * ip.t;
-        CharRenderer_Move(id, p.x, p.y, p.z, true, CHAR_WALK);
+        CharRenderer_Move(id, p.x, p.y, p.z, true, CharAnim::Walk);
     }
 }
 
@@ -2176,7 +2176,7 @@ void GameScreen::DoCombat(float dt) {
 
     state_->combat_cast_time = 0.3f;
     state_->combat_anim_lock = 0.8f;
-    CharRenderer_Move(0, hero_.GetX(), hero_.GetY(), hero_.GetZ(), false, CHAR_ATTACK);
+    CharRenderer_Move(0, hero_.GetX(), hero_.GetY(), hero_.GetZ(), false, CharAnim::Attack);
 
     // Drain weapon durability on attack
     if (!state_->inventory.empty()) {

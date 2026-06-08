@@ -14,7 +14,7 @@ from pathlib import Path
 from datetime import datetime
 
 PIPELINE_DIR = Path(__file__).parent
-REBORN = Path("/Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn")
+REBORN = Path(os.environ.get('LUNA_REBORN_ROOT', Path(__file__).parent.parent.parent))
 STATUS_FILE = PIPELINE_DIR / "pipeline_status.json"
 
 logging.basicConfig(
@@ -47,6 +47,16 @@ STEPS = {
         'script': PIPELINE_DIR / 'convert_chardefs.py',
         'args': ['--all'],
         'description': 'Character Definition Conversion (.chx -> .json)',
+    },
+    'animations': {
+        'script': PIPELINE_DIR / 'convert_anm.py',
+        'args': ['--all'],
+        'description': 'Animation Conversion (.anm -> .anm.json)',
+    },
+    'audio': {
+        'script': PIPELINE_DIR / 'convert_audio.py',
+        'args': ['--format=copy', '--workers=4'],
+        'description': 'Audio Conversion (.wav/.mp3 -> copy/ogg)',
     },
     'inventory': {
         'script': PIPELINE_DIR / 'generate_inventory.py',

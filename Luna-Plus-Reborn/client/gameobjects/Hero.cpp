@@ -361,10 +361,10 @@ void Hero::Update(float dt) {
         }
     }
 
-    CharAnim anim = CHAR_IDLE;
-    if (state_ == HeroState::Attack || state_ == HeroState::Skill) anim = CHAR_ATTACK;
-    else if (state_ == HeroState::Die) anim = CHAR_DIE;
-    else if (moving_ || state_ == HeroState::Walk || state_ == HeroState::Run) anim = CHAR_WALK;
+    CharAnim anim = CharAnim::Idle;
+    if (state_ == HeroState::Attack || state_ == HeroState::Skill) anim = CharAnim::Attack;
+    else if (state_ == HeroState::Die) anim = CharAnim::Die;
+    else if (moving_ || state_ == HeroState::Walk || state_ == HeroState::Run) anim = CharAnim::Walk;
     CharRenderer_Move(0, x_, y_, z_, moving_ || state_ == HeroState::Walk || state_ == HeroState::Run, anim);
     
     if (game_state_) {

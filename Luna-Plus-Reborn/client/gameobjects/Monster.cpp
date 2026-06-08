@@ -62,7 +62,7 @@ float Monster::GetDistance(float px, float pz) const {
 void Monster::SetPosition(float x, float y, float z) {
     x_ = x; y_ = y; z_ = z;
     CharRenderer_Move(id_, x_, y_, z_, state_ == MonsterState::Chase || state_ == MonsterState::Attack,
-                      (state_ == MonsterState::Chase || state_ == MonsterState::Attack) ? CHAR_WALK : CHAR_IDLE);
+                      (state_ == MonsterState::Chase || state_ == MonsterState::Attack) ? CharAnim::Walk : CharAnim::Idle);
 }
 
 void Monster::TakeDamage(int dmg) {
@@ -215,7 +215,7 @@ void Monster::UpdateAI(float dt, float px, float pz) {
     
     CharRenderer_Move(id_, x_, y_, z_, 
                       state_ == MonsterState::Chase || state_ == MonsterState::Attack || state_ == MonsterState::Patrol,
-                      (state_ == MonsterState::Chase || state_ == MonsterState::Attack) ? CHAR_WALK : CHAR_IDLE);
+                      (state_ == MonsterState::Chase || state_ == MonsterState::Attack) ? CharAnim::Walk : CharAnim::Idle);
 }
 
 void Monster::ChaseTarget(float dt, float px, float pz) {

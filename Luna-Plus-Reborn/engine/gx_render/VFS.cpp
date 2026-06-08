@@ -1,5 +1,6 @@
 #include "VFS.h"
 #include <spdlog/spdlog.h>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 
@@ -40,7 +41,20 @@ void VFS::AddSearchRoot(const std::string& path) {
 }
 
 void VFS::InitFromExecutable() {
+    static bool initialized = false;
+    if (initialized) return;
+
     search_roots_.clear();
+
+    // Check env var first
+    const char* env_path = getenv("LUNA_ASSETS_PATH");
+    if (env_path && env_path[0] != '\0') {
+        AddSearchRoot(env_path);
+        base_path_ = search_roots_.front();
+        spdlog::info("VFS: initialized from LUNA_ASSETS_PATH={}", env_path);
+        initialized = true;
+        return;
+    }
 
     std::string exe_dir = "./";
 #if defined(__APPLE__)
@@ -64,23 +78,29 @@ void VFS::InitFromExecutable() {
     }
 #endif
 
-    const std::string candidates[] = {
-        exe_dir,
-        exe_dir + "../",
-        exe_dir + "../../",
-        exe_dir + "../../../",
-        "./",
-        "../",
-        "../../",
+    const std::vector<std::string> candidates = {
+        exe_dir + "assets/",
+        exe_dir + "../assets/",
+        "./assets/",
+        "../assets/",
     };
 
+    // Probe each candidate for known game data
     for (const auto& c : candidates) {
         AddSearchRoot(c);
+        if (fs::exists(c + "data/game_data.db")) {
+            base_path_ = search_roots_.front();
+            spdlog::info("VFS: initialized from {} (found game_data.db)", c);
+            initialized = true;
+            return;
+        }
     }
 
+    // Fallback — use first root even without verification
     base_path_ = search_roots_.front();
     spdlog::info("VFS: initialized with {} search root(s), primary={}",
                  search_roots_.size(), base_path_);
+    initialized = true;
 }
 
 std::string VFS::Resolve(const std::string& path) {

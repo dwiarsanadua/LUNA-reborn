@@ -6,25 +6,26 @@ Converts .dds/.tif/.tga textures to .png
 
 import os
 import sys
+import shutil
 import subprocess
 import argparse
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-TOOLS = {
-    'ffmpeg': '/opt/homebrew/bin/ffmpeg',
-    'sips': '/usr/bin/sips',
-}
+def find_tool(name):
+    return shutil.which(name) or os.environ.get(f'{name.upper()}_PATH', f'/opt/homebrew/bin/{name}')
 
 def convert_dds(src: Path, dst: Path) -> bool:
     dst.parent.mkdir(parents=True, exist_ok=True)
-    cmd = [TOOLS['ffmpeg'], '-y', '-i', str(src), '-frames:v', '1', str(dst)]
+    ffmpeg = find_tool('ffmpeg')
+    cmd = [ffmpeg, '-y', '-i', str(src), '-frames:v', '1', str(dst)]
     result = subprocess.run(cmd, capture_output=True, text=True)
     return result.returncode == 0
 
 def convert_tif_tga(src: Path, dst: Path) -> bool:
     dst.parent.mkdir(parents=True, exist_ok=True)
-    cmd = [TOOLS['sips'], '-s', 'format', 'png', str(src), '--out', str(dst)]
+    sips = find_tool('sips')
+    cmd = [sips, '-s', 'format', 'png', str(src), '--out', str(dst)]
     result = subprocess.run(cmd, capture_output=True, text=True)
     return result.returncode == 0
 
@@ -63,8 +64,10 @@ def main():
     parser.add_argument('--file', type=str, help='Single file to convert')
     args = parser.parse_args()
 
-    src_base = Path(args.input) if args.input else Path("/Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets")
-    dst_base = Path(args.output) if args.output else Path("/Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/assets/textures")
+    default_src = os.environ.get('LUNA_LEGACY_SRC', str(Path(__file__).parent.parent.parent.parent / 'Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets'))
+    default_dst = os.environ.get('LUNA_REBORN_ROOT', str(Path(__file__).parent.parent.parent)) + '/assets/textures'
+    src_base = Path(args.input) if args.input else Path(default_src)
+    dst_base = Path(args.output) if args.output else Path(default_dst)
 
     if args.file:
         path, status, err = convert_file(args.file, src_base, dst_base)

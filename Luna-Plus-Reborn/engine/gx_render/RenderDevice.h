@@ -20,15 +20,20 @@ struct RenderDeviceConfig {
 };
 
 enum class ViewId : bgfx::ViewId {
-    Shadow    = 0,
-    Terrain   = 1,
-    Props     = 2,
-    Character = 3,
-    Particle  = 4,
-    UI        = 5,
-    Debug     = 6,
-    Scene     = 7,
-    Count     = 8
+    Shadow      = 0,
+    Terrain     = 1,
+    Props       = 2,
+    Character   = 3,
+    Particle    = 4,
+    UI          = 5,
+    Debug       = 6,
+    Scene       = 7,
+    Sky         = 8,
+    PostFX      = 9,
+    PostFX2     = 10,
+    PostFX3     = 11,
+    PostFX4     = 12,
+    Count       = 13
 };
 
 class RenderDevice {

@@ -166,8 +166,9 @@ int main(int argc, char** argv) {
     sky.Init();
 
     // 9. CharacterRenderer
-    CharRenderer_Init();
-    CharRenderer_SetFBSize((uint16_t)device.GetWidth(), (uint16_t)device.GetHeight());
+    g_char_renderer = new CharacterRenderer();
+    g_char_renderer->Init();
+    g_char_renderer->SetFramebufferSize((uint16_t)device.GetWidth(), (uint16_t)device.GetHeight());
 
     // 10. UIRenderer
     UIRenderer ui; ui.Init();
@@ -178,7 +179,7 @@ int main(int argc, char** argv) {
         ui.height = (float)device.GetHeight();
         int rc = RunUiCaptureMode(device, ui, argv[2]);
         g_ui = nullptr;
-        CharRenderer_Shutdown();
+        g_char_renderer->Shutdown(); delete g_char_renderer; g_char_renderer = nullptr;
         map.Unload();
         props.Shutdown();
         terrain.Shutdown();
@@ -433,7 +434,7 @@ int main(int argc, char** argv) {
 
         // --- GAME STATE UPDATE BEFORE RENDER ---
         ClientFlow::Update(g_state, dt);
-        CharRenderer_SetFrameDelta(dt);
+        g_char_renderer->SetFrameDelta(dt);
         screenManager.Update(dt);
         sky.Update(dt);
         if (g_audio) g_audio->Update();
@@ -448,12 +449,13 @@ int main(int argc, char** argv) {
         const glm::mat4& view = cam.GetViewMatrix();
         const glm::mat4& proj = cam.GetProjectionMatrix();
         {
-            gfx.BeginFrame(view, proj, sky.GetLightDirection());
+            gfx.BeginFrame(view, proj);
             ambient.Update(dt, g_state.map_id ? g_state.map_id : 51, sky.GetTimeOfDay(),
                            g_state.player_x, 0, g_state.player_z);
             sky.Render(ui, view, proj);
-            gfx.Render(&terrain, &props, nullptr, view, proj);
+            gfx.Render(&terrain, &props, nullptr, view, proj, sky.GetLightDirection());
             gfx.RenderCharacters(time, view, proj);
+            gfx.RenderUI(ui);
         }
         ui.BeginFrame();
         screenManager.Render(ui, view, proj);
@@ -463,6 +465,7 @@ int main(int argc, char** argv) {
             char fps_buf[32]; snprintf(fps_buf, sizeof(fps_buf), "FPS: %.0f", fps);
             ui.DrawText(1200, 2, 0xff888888, "%s", fps_buf);
         }
+        ui.FlushBatch();
 
         if (Keyboard::IsActionPressed("screenshot")) {
             char path[256];
@@ -491,7 +494,7 @@ int main(int argc, char** argv) {
     g_network.Disconnect();
     g_audio = nullptr;
     ambient.Shutdown();
-    audio.Shutdown(); CharRenderer_Shutdown();
+    audio.Shutdown(); g_char_renderer->Shutdown(); delete g_char_renderer; g_char_renderer = nullptr;
     map.Unload(); props.Shutdown(); terrain.Shutdown(); gfx.Shutdown();
     ui.Shutdown(); particles.Shutdown(); device.Shutdown();
     spdlog::info("Shutdown");

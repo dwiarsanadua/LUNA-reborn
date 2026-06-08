@@ -18,18 +18,8 @@ OT_BONE     = 0xF5000000
 BASE_SZ     = 324
 FG_HDR_SZ   = 24
 
-SRC_BASE = Path("/Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/unpacked")
-DST_BASE = Path("/Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/assets/models")
-
-SOURCE_DIRS = {
-    'character': SRC_BASE / 'character',
-    'monster': SRC_BASE / 'monster',
-    'npc': SRC_BASE / 'npc',
-    'effect': SRC_BASE / 'effect',
-    'farm': SRC_BASE / 'farm',
-    'housing': SRC_BASE / 'housing',
-    'map': SRC_BASE / 'map',
-}
+SRC_BASE_DEFAULT = os.environ.get('LUNA_LEGACY_SRC', str(Path(__file__).parent.parent.parent.parent / 'Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/unpacked'))
+DST_BASE_DEFAULT = os.environ.get('LUNA_REBORN_ROOT', str(Path(__file__).parent.parent.parent)) + '/assets/models'
 
 def convert_mod(input_path: str, output_dir: str) -> tuple:
     name = os.path.splitext(os.path.basename(input_path))[0]
@@ -162,18 +152,33 @@ def main():
     parser.add_argument('--category', type=str, help='Specific category (character, monster, npc, etc.)')
     parser.add_argument('--workers', type=int, default=4, help='Parallel workers')
     parser.add_argument('--file', type=str, help='Single file to convert')
+    parser.add_argument('--src', default=SRC_BASE_DEFAULT, help='Source base directory')
+    parser.add_argument('--dst', default=DST_BASE_DEFAULT, help='Output base directory')
     args = parser.parse_args()
 
+    src_base = Path(args.src)
+    dst_base = Path(args.dst)
+
+    SOURCE_DIRS_LOCAL = {
+        'character': src_base / 'character',
+        'monster': src_base / 'monster',
+        'npc': src_base / 'npc',
+        'effect': src_base / 'effect',
+        'farm': src_base / 'farm',
+        'housing': src_base / 'housing',
+        'map': src_base / 'map',
+    }
+
     if args.file:
-        path, status, msg = convert_mod(args.file, str(DST_BASE))
+        path, status, msg = convert_mod(args.file, str(dst_base))
         print(f"{status}: {os.path.basename(path)} ({msg})")
         return 0 if status == 'ok' else 1
 
-    categories = [args.category] if args.category else list(SOURCE_DIRS.keys())
+    categories = [args.category] if args.category else list(SOURCE_DIRS_LOCAL.keys())
 
     all_mods = []
     for cat in categories:
-        src_dir = SOURCE_DIRS.get(cat)
+        src_dir = SOURCE_DIRS_LOCAL.get(cat)
         if not src_dir or not src_dir.exists():
             print(f"Source directory not found: {src_dir}")
             continue
@@ -192,12 +197,12 @@ def main():
     failed_list = []
 
     print(f"\nTotal: {total} models to convert")
-    print(f"Output: {DST_BASE}")
+    print(f"Output: {dst_base}")
     print()
 
     if args.workers > 1:
         with ProcessPoolExecutor(max_workers=args.workers) as executor:
-            futures = {executor.submit(convert_mod, f, str(DST_BASE)): f for f in all_mods}
+            futures = {executor.submit(convert_mod, f, str(dst_base)): f for f in all_mods}
             for future in as_completed(futures):
                 path, status, msg = future.result()
                 name = os.path.basename(path)
@@ -214,7 +219,7 @@ def main():
                     print(f"  FAIL {name} ({msg})")
     else:
         for f in all_mods:
-            path, status, msg = convert_mod(f, str(DST_BASE))
+            path, status, msg = convert_mod(f, str(dst_base))
             name = os.path.basename(path)
             if status == 'ok':
                 success += 1

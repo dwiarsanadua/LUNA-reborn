@@ -12,29 +12,7 @@
 
 #include <stb_image.h>
 #include <engine/gx_render/VFS.h>
-
-static const bgfx::Memory* loadShader(const char* path) {
-    std::string searchPaths[] = {
-        std::string("build/bin/") + path,
-        std::string("bin/") + path,
-        path,
-        std::string("../") + path,
-        VFS::Resolve(std::string("assets/") + path)
-    };
-
-    for (const auto& p : searchPaths) {
-        std::ifstream file(p, std::ios::binary | std::ios::ate);
-        if (file) {
-            size_t size = file.tellg();
-            file.seekg(0);
-            auto* mem = bgfx::alloc(static_cast<uint32_t>(size));
-            file.read(reinterpret_cast<char*>(mem->data), size);
-            spdlog::info("Shader: loaded {} ({} bytes)", p, size);
-            return mem;
-        }
-    }
-    return nullptr;
-}
+#include <engine/gx_render/Shader.h>
 
 bgfx::VertexLayout& TerrainRenderer::GetLayout() {
     static bgfx::VertexLayout layout;
@@ -355,13 +333,26 @@ void TerrainRenderer::Render(const glm::mat4& view, const glm::mat4& proj, const
 
         if (!bgfx::isValid(vb)) continue;
 
-        float mtx[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-        bgfx::setTransform(mtx);
-        bgfx::setVertexBuffer(0, vb);
-        bgfx::setIndexBuffer(ib);
-        bgfx::setState(BGFX_STATE_DEFAULT | BGFX_STATE_WRITE_Z);
-        bgfx::submit(view_id_, prog);
+        if (render_queue_) {
+            RenderItem item;
+            item.program = prog;
+            item.vb = vb;
+            item.ib = ib;
+            item.transform = glm::mat4(1.0f);
+            render_queue_->Push(item);
+        } else {
+            float mtx[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+            bgfx::setTransform(mtx);
+            bgfx::setVertexBuffer(0, vb);
+            bgfx::setIndexBuffer(ib);
+            bgfx::setState(BGFX_STATE_DEFAULT | BGFX_STATE_WRITE_Z);
+            bgfx::submit(view_id_, prog);
+        }
         visible_patches_++;
+    }
+
+    if (render_queue_) {
+        render_queue_->SubmitAll(view_id_, BGFX_STATE_DEFAULT | BGFX_STATE_WRITE_Z);
     }
 }
 
@@ -372,7 +363,7 @@ void TerrainRenderer::Render(const glm::mat4& view, const glm::mat4& proj, bgfx:
     Render(view, proj, env);
 }
 
-void TerrainRenderer::RenderShadow(const glm::mat4& light_mvp) {
+void TerrainRenderer::RenderShadow(bgfx::ViewId view_id, const glm::mat4& light_mvp) {
     if (!bgfx::isValid(shadow_program_)) return;
 
     for (auto& patch : patches_) {
@@ -387,19 +378,14 @@ void TerrainRenderer::RenderShadow(const glm::mat4& light_mvp) {
         bgfx::setVertexBuffer(0, vb);
         bgfx::setIndexBuffer(ib);
         bgfx::setState(BGFX_STATE_DEFAULT | BGFX_STATE_WRITE_Z);
-        bgfx::submit(static_cast<bgfx::ViewId>(ViewId::Shadow), shadow_program_);
+        bgfx::submit(view_id, shadow_program_);
     }
 }
 
 void TerrainRenderer::Init(int size, float height_scale) {
     size_ = size; height_scale_ = height_scale;
-    auto vs = loadShader("shaders/vs_terrain.bin");
-    auto fs = loadShader("shaders/fs_terrain.bin");
-    if (vs && fs) terrain_program_ = bgfx::createProgram(bgfx::createShader(vs), bgfx::createShader(fs), true);
-
-    auto vs_s = loadShader("shaders/vs_default.bin");
-    auto fs_s = loadShader("shaders/fs_unlit.bin");
-    if (vs_s && fs_s) shadow_program_ = bgfx::createProgram(bgfx::createShader(vs_s), bgfx::createShader(fs_s), true);
+    terrain_program_ = ShaderUtils::LoadProgram("shaders/vs_terrain.bin", "shaders/fs_terrain.bin");
+    shadow_program_ = ShaderUtils::LoadProgram("shaders/vs_default.bin", "shaders/fs_unlit.bin");
 
     s_tex_color_ = bgfx::createUniform("s_texColor", bgfx::UniformType::Sampler);
     s_tex_grass_ = bgfx::createUniform("s_texGrass", bgfx::UniformType::Sampler);
