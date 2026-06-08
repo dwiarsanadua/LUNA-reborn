@@ -20,6 +20,8 @@ add_library(game_core STATIC
     ecs/systems/ParticleSystem.cpp
     ecs/systems/AnimationSystem.cpp
     ecs/systems/GameDataDB.cpp
+    ecs/systems/FSMEngine.cpp
+    ecs/systems/WeatherSystem.cpp
     network/TcpServer.cpp
     network/LoginHandler.cpp
     network/CharacterDB.cpp

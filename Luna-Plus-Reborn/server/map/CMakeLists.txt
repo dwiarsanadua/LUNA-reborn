@@ -6,6 +6,7 @@ add_executable(MapServer
     systems/MovementSystem.cpp
     systems/ItemSystem.cpp
     systems/QuestSystem.cpp
+    systems/StallSystem.cpp
 )
 
 target_include_directories(MapServer PRIVATE

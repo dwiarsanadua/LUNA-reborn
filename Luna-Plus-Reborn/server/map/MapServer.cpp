@@ -6,11 +6,17 @@
 #include "systems/MovementSystem.h"
 #include "systems/ItemSystem.h"
 #include "systems/QuestSystem.h"
+#include <ecs/components/Inventory.hpp>
+#include <ecs/components/CharacterStats.hpp>
+#include <ecs/components/Tag.hpp>
 #include <entt/entt.hpp>
 #include <spdlog/spdlog.h>
 #include <glm/glm.hpp>
 #include <chrono>
 #include <thread>
+#include <random>
+
+static std::mt19937 s_dungeon_rng(std::random_device{}());
 
 MapServer::MapServer()
     : network_(std::make_unique<NetworkLayer>())
@@ -51,13 +57,22 @@ bool MapServer::Initialize(int map_id, uint16_t port) {
         ");"
     );
 
+    db_->Execute(
+        "CREATE TABLE IF NOT EXISTS dungeon_instances ("
+        "  instance_id INTEGER PRIMARY KEY,"
+        "  template_id INTEGER,"
+        "  state INTEGER DEFAULT 0,"
+        "  created_at INTEGER,"
+        "  completed_at INTEGER"
+        ");"
+    );
+
     if (!network_->Initialize(port)) {
         spdlog::error("MapServer: network init failed on port {}", port);
         return false;
     }
 
     network_->SetReceiveCallback([this](const uint8_t* data, size_t size) {
-        // Packet dispatch would parse type and route to correct system
         spdlog::debug("MapServer: packet received size={}", size);
     });
 
@@ -68,6 +83,10 @@ bool MapServer::Initialize(int map_id, uint16_t port) {
 
 void MapServer::Shutdown() {
     running_ = false;
+    for (auto& [id, dungeon] : dungeons_) {
+        CleanupDungeon(id);
+    }
+    dungeons_.clear();
     network_->Shutdown();
     db_->Shutdown();
 }
@@ -75,16 +94,43 @@ void MapServer::Shutdown() {
 void MapServer::Update(float dt) {
     network_->Update();
 
-    // ECS systems run in order: Movement -> AI -> Combat -> Cleanup
     movement_->Update(*registry_, dt);
     ai_->Update(*registry_, dt);
     combat_->Update(*registry_, dt);
+
+    // Update dungeon instances
+    std::vector<uint32_t> to_cleanup;
+    for (auto& [id, dungeon] : dungeons_) {
+        if (dungeon.state == DungeonState::WAITING) {
+            dungeon.state = DungeonState::ACTIVE;
+        }
+
+        if (dungeon.state == DungeonState::ACTIVE ||
+            dungeon.state == DungeonState::BOSS_ACTIVE) {
+            dungeon.elapsed_time += dt;
+
+            if (dungeon.elapsed_time >= dungeon.time_limit) {
+                dungeon.state = DungeonState::TIMEOUT;
+                spdlog::info("MapServer: dungeon {} timed out", id);
+                to_cleanup.push_back(id);
+            }
+        }
+
+        if (dungeon.state == DungeonState::BOSS_ACTIVE && dungeon.boss_defeated) {
+            dungeon.state = DungeonState::COMPLETED;
+            DistributeDungeonRewards(id);
+            to_cleanup.push_back(id);
+        }
+    }
+
+    for (auto id : to_cleanup) {
+        CleanupDungeon(id);
+    }
 
     // Auto-save player state every 60 seconds
     auto_save_timer_ += dt;
     if (auto_save_timer_ >= 60.0f) {
         auto_save_timer_ = 0.0f;
-        // Persist player entities
         auto view = registry_->view<PlayerData>();
         for (auto entity : view) {
             auto& pd = view.get<PlayerData>(entity);
@@ -127,7 +173,6 @@ void MapServer::DespawnPlayer(int entity_id) {
 
 void MapServer::SpawnMonster(int template_id, const glm::vec3& pos) {
     auto entity = registry_->create();
-    // Would load from Monster DB template
     spdlog::info("MapServer: monster {} spawned at ({},{},{})", template_id, pos.x, pos.y, pos.z);
 }
 
@@ -137,6 +182,146 @@ void MapServer::DespawnMonster(int entity_id) {
         if (static_cast<int>(entity) == entity_id) {
             registry_->destroy(entity);
             return;
+        }
+    }
+}
+
+// ─── Dungeon Instance Management ───────────────────────────────────────────────
+
+uint32_t MapServer::CreateDungeonInstance(uint32_t template_id,
+                                          const std::vector<uint32_t>& party_ids) {
+    DungeonInstance inst;
+    inst.instance_id = next_dungeon_id_++;
+    inst.dungeon_template_id = template_id;
+    inst.state = DungeonState::WAITING;
+    inst.party_member_ids = party_ids;
+    inst.boss_defeated = false;
+    inst.elapsed_time = 0.0f;
+    inst.time_limit = 1800.0f;
+
+    DungeonRewardEntry sample_reward;
+    sample_reward.item_id = 10001;
+    sample_reward.count = 1;
+    sample_reward.drop_chance = 0.5f;
+    inst.reward_table.push_back(sample_reward);
+
+    sample_reward.item_id = 10002;
+    sample_reward.count = 2;
+    sample_reward.drop_chance = 0.3f;
+    inst.reward_table.push_back(sample_reward);
+
+    uint32_t id = inst.instance_id;
+    dungeons_[id] = inst;
+
+    spdlog::info("MapServer: dungeon instance {} created (template={})",
+                 id, template_id);
+    return id;
+}
+
+bool MapServer::EnterDungeon(uint32_t instance_id, entt::entity player) {
+    auto it = dungeons_.find(instance_id);
+    if (it == dungeons_.end()) return false;
+    if (it->second.state != DungeonState::WAITING &&
+        it->second.state != DungeonState::ACTIVE) return false;
+
+    spdlog::info("MapServer: player {} enters dungeon {}",
+                 static_cast<uint32_t>(player), instance_id);
+    return true;
+}
+
+bool MapServer::TriggerBossEncounter(uint32_t instance_id, uint32_t boss_template_id) {
+    auto it = dungeons_.find(instance_id);
+    if (it == dungeons_.end()) return false;
+
+    auto& dungeon = it->second;
+    dungeon.state = DungeonState::BOSS_ACTIVE;
+
+    glm::vec3 boss_pos(50.0f, 0.0f, 50.0f);
+    auto boss_entity = registry_->create();
+    registry_->emplace<TagMonster>(boss_entity);
+    dungeon.boss_entity_id = static_cast<uint32_t>(boss_entity);
+    dungeon.boss_defeated = false;
+
+    spdlog::info("MapServer: boss encounter triggered in dungeon {} (boss template {})",
+                 instance_id, boss_template_id);
+    return true;
+}
+
+void MapServer::CompleteDungeon(uint32_t instance_id) {
+    auto it = dungeons_.find(instance_id);
+    if (it == dungeons_.end()) return;
+
+    auto& dungeon = it->second;
+    if (!dungeon.boss_defeated) {
+        auto boss = static_cast<entt::entity>(dungeon.boss_entity_id);
+        if (registry_->valid(boss)) {
+            registry_->destroy(boss);
+        }
+        dungeon.boss_defeated = true;
+    }
+    dungeon.state = DungeonState::COMPLETED;
+    DistributeDungeonRewards(instance_id);
+
+    spdlog::info("MapServer: dungeon {} completed", instance_id);
+}
+
+void MapServer::CleanupDungeon(uint32_t instance_id) {
+    auto it = dungeons_.find(instance_id);
+    if (it == dungeons_.end()) return;
+
+    auto& dungeon = it->second;
+    if (dungeon.boss_entity_id != 0) {
+        auto boss = static_cast<entt::entity>(dungeon.boss_entity_id);
+        if (registry_->valid(boss)) {
+            registry_->destroy(boss);
+        }
+    }
+
+    if (dungeon.dungeon_root != entt::null && registry_->valid(dungeon.dungeon_root)) {
+        registry_->destroy(dungeon.dungeon_root);
+    }
+
+    db_->Execute(
+        "INSERT INTO dungeon_instances (instance_id, template_id, state, created_at, completed_at) VALUES ("
+        + std::to_string(dungeon.instance_id) + ","
+        + std::to_string(dungeon.dungeon_template_id) + ","
+        + std::to_string(static_cast<int>(dungeon.state)) + ","
+        + std::to_string(static_cast<int>(dungeon.elapsed_time)) + ","
+        + std::to_string(static_cast<int>(std::time(nullptr))) + ")"
+    );
+
+    dungeons_.erase(it);
+    spdlog::info("MapServer: dungeon instance {} cleaned up", instance_id);
+}
+
+DungeonInstance* MapServer::GetDungeonInstance(uint32_t instance_id) {
+    auto it = dungeons_.find(instance_id);
+    return it != dungeons_.end() ? &it->second : nullptr;
+}
+
+void MapServer::DistributeDungeonRewards(uint32_t instance_id) {
+    auto it = dungeons_.find(instance_id);
+    if (it == dungeons_.end()) return;
+
+    auto& dungeon = it->second;
+    for (auto member_id : dungeon.party_member_ids) {
+        auto player = static_cast<entt::entity>(member_id);
+        if (!registry_->valid(player) || !registry_->all_of<Inventory>(player)) continue;
+
+        auto& inv = registry_->get<Inventory>(player);
+        for (auto& reward : dungeon.reward_table) {
+            float roll = static_cast<float>(s_dungeon_rng() % 1000) / 1000.0f;
+            if (roll <= reward.drop_chance) {
+                inv.AddItem(reward.item_id, reward.count);
+                spdlog::info("MapServer: dungeon reward {}x{} -> player {}",
+                             reward.item_id, reward.count, member_id);
+            }
+        }
+
+        if (registry_->all_of<CharacterStats>(player)) {
+            auto& stats = registry_->get<CharacterStats>(player);
+            uint32_t bonus_exp = static_cast<uint32_t>(100 + dungeon.elapsed_time * 0.5f);
+            stats.exp += bonus_exp;
         }
     }
 }
