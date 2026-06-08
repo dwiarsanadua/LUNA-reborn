@@ -20,7 +20,7 @@ struct RenderDeviceConfig {
 };
 
 enum class ViewId : bgfx::ViewId {
-    Clear     = 0,
+    Shadow    = 0,
     Terrain   = 1,
     Props     = 2,
     Character = 3,
@@ -66,6 +66,6 @@ private:
     GLFWwindow* window_ = nullptr;
     int width_ = 800, height_ = 600;
     int logical_width_ = 800, logical_height_ = 600;
-    bgfx::ViewId main_view_ = static_cast<bgfx::ViewId>(ViewId::Clear);
+    bgfx::ViewId main_view_ = static_cast<bgfx::ViewId>(ViewId::Debug);
     uint32_t clear_color_ = 0x000000FF;
 };

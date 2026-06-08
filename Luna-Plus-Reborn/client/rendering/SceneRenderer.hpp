@@ -33,7 +33,7 @@ public:
 
 private:
     bgfx::ViewId view_id_ = static_cast<bgfx::ViewId>(ViewId::Debug);
-    uint8_t shadow_view_id_ = 7;
+    uint8_t shadow_view_id_ = static_cast<uint8_t>(ViewId::Shadow);
     uint32_t clear_color_ = 0x6688AAFF;
 
     bgfx::FrameBufferHandle shadow_fbo_ = BGFX_INVALID_HANDLE;

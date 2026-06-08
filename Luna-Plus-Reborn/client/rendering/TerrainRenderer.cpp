@@ -386,7 +386,7 @@ void TerrainRenderer::RenderShadow(const glm::mat4& light_mvp) {
         bgfx::setVertexBuffer(0, vb);
         bgfx::setIndexBuffer(ib);
         bgfx::setState(BGFX_STATE_DEFAULT | BGFX_STATE_WRITE_Z);
-        bgfx::submit(static_cast<bgfx::ViewId>(ViewId::Clear), shadow_program_);
+        bgfx::submit(static_cast<bgfx::ViewId>(ViewId::Shadow), shadow_program_);
     }
 }
 

@@ -77,15 +77,17 @@ void RenderDevice::Shutdown() {
 void RenderDevice::BeginFrame() {
     glfwPollEvents();
     
-    // Ensure viewport and clear are set every frame
-    bgfx::setViewRect(0, 0, 0, (uint16_t)width_, (uint16_t)height_);
-    bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0xFF333333, 1.0f, 0);
+    // Use view 6 (Debug) for screen clear and debug text
+    // View 0 is reserved for shadow pass (handled by SceneRenderer)
+    bgfx::ViewId debugView = static_cast<bgfx::ViewId>(ViewId::Debug);
+    bgfx::setViewRect(debugView, 0, 0, (uint16_t)width_, (uint16_t)height_);
+    bgfx::setViewClear(debugView, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0xFF333333, 1.0f, 0);
     
     bgfx::dbgTextClear();
     bgfx::dbgTextPrintf(1, 1, 0x0f, "LUNA Plus Reborn - BGFX ACTIVE");
     bgfx::dbgTextPrintf(1, 2, 0x0f, "Resolution: %dx%d", width_, height_);
     
-    bgfx::touch(0);
+    bgfx::touch(debugView);
 }
 
 void RenderDevice::EndFrame() {
