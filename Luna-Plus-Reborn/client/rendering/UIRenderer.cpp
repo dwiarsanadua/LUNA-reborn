@@ -6,10 +6,10 @@
 #include <vector>
 #include <cstring>
 #include <algorithm>
+#include <set>
 
 #include <stb_image.h>
 
-// stb_truetype for font rasterization
 #define STB_TRUETYPE_IMPLEMENTATION
 #include <stb_truetype.h>
 
@@ -50,6 +50,7 @@ static const bgfx::Memory* loadShader(const char* path) {
 }
 
 void UIRenderer::BeginFrame() {
+    atlas_bind_count_ = 0;
     bgfx::setViewRect(view_id_, 0, 0, (uint16_t)width, (uint16_t)height);
     bgfx::setViewMode(view_id_, bgfx::ViewMode::Sequential);
     float identity[16]; std::memset(identity, 0, sizeof(identity));
@@ -77,11 +78,15 @@ void UIRenderer::DrawGlyph(float x, float y, uint32_t color, int char_index) {
         std::memcpy(tvb.data, verts, sizeof(verts)); std::memcpy(tib.data, idx, sizeof(idx));
         bgfx::setTexture(0, s_tex_, font_tex_); bgfx::setVertexBuffer(0, &tvb); bgfx::setIndexBuffer(&tib);
         bgfx::setState(BGFX_STATE_DEFAULT | BGFX_STATE_WRITE_Z | BGFX_STATE_BLEND_ALPHA); bgfx::submit(view_id_, prog);
+        atlas_bind_count_++;
     }
 }
 
 void UIRenderer::DrawImageUV(float x, float y, float w, float h, bgfx::TextureHandle tex, float u1, float v1, float u2, float v2, UIColor tint) {
-    if (!bgfx::isValid(tex) && !bgfx::isValid(white_tex_)) return;
+    bgfx::TextureHandle final_tex = tex;
+    if (!bgfx::isValid(final_tex)) final_tex = white_tex_;
+    if (!bgfx::isValid(final_tex)) return;
+
     bgfx::ProgramHandle prog = bgfx::isValid(ui_prog_) ? ui_prog_ : prog_;
     if (!bgfx::isValid(prog)) return;
     uint32_t col = (tint.a << 24) | (tint.b << 16) | (tint.g << 8) | tint.r;
@@ -92,8 +97,9 @@ void UIRenderer::DrawImageUV(float x, float y, float w, float h, bgfx::TextureHa
     bgfx::TransientVertexBuffer tvb; bgfx::TransientIndexBuffer tib;
     if (bgfx::allocTransientBuffers(&tvb, getLayout(), 4, &tib, 6)) {
         std::memcpy(tvb.data, verts, sizeof(verts)); std::memcpy(tib.data, idx, sizeof(idx));
-        bgfx::setTexture(0, s_tex_, tex); bgfx::setVertexBuffer(0, &tvb); bgfx::setIndexBuffer(&tib);
+        bgfx::setTexture(0, s_tex_, final_tex); bgfx::setVertexBuffer(0, &tvb); bgfx::setIndexBuffer(&tib);
         bgfx::setState(BGFX_STATE_DEFAULT | BGFX_STATE_WRITE_Z | BGFX_STATE_BLEND_ALPHA); bgfx::submit(view_id_, prog);
+        atlas_bind_count_++;
     }
 }
 
@@ -104,17 +110,14 @@ void UIRenderer::DrawImage(float x, float y, float w, float h, bgfx::TextureHand
 void UIRenderer::DrawNinePatch(float x, float y, float w, float h, const TextureInfo& tex, float l, float t, float r, float b, UIColor tint) {
     if (!bgfx::isValid(tex.handle)) return;
     float iw = 1.0f / tex.width, ih = 1.0f / tex.height;
-    // Corners
-    DrawImageUV(x, y, l, t, tex.handle, 0, 0, l*iw, t*ih, tint); // TL
-    DrawImageUV(x+w-r, y, r, t, tex.handle, 1.0f-r*iw, 0, 1.0f, t*ih, tint); // TR
-    DrawImageUV(x, y+h-b, l, b, tex.handle, 0, 1.0f-b*ih, l*iw, 1.0f, tint); // BL
-    DrawImageUV(x+w-r, y+h-b, r, b, tex.handle, 1.0f-r*iw, 1.0f-b*ih, 1.0f, 1.0f, tint); // BR
-    // Edges
-    DrawImageUV(x+l, y, w-l-r, t, tex.handle, l*iw, 0, 1.0f-r*iw, t*ih, tint); // Top
-    DrawImageUV(x+l, y+h-b, w-l-r, b, tex.handle, l*iw, 1.0f-b*ih, 1.0f-r*iw, 1.0f, tint); // Bottom
-    DrawImageUV(x, y+t, l, h-t-b, tex.handle, 0, t*ih, l*iw, 1.0f-b*ih, tint); // Left
-    DrawImageUV(x+w-r, y+t, r, h-t-b, tex.handle, 1.0f-r*iw, t*ih, 1.0f, 1.0f-b*ih, tint); // Right
-    // Center
+    DrawImageUV(x, y, l, t, tex.handle, 0, 0, l*iw, t*ih, tint);
+    DrawImageUV(x+w-r, y, r, t, tex.handle, 1.0f-r*iw, 0, 1.0f, t*ih, tint);
+    DrawImageUV(x, y+h-b, l, b, tex.handle, 0, 1.0f-b*ih, l*iw, 1.0f, tint);
+    DrawImageUV(x+w-r, y+h-b, r, b, tex.handle, 1.0f-r*iw, 1.0f-b*ih, 1.0f, 1.0f, tint);
+    DrawImageUV(x+l, y, w-l-r, t, tex.handle, l*iw, 0, 1.0f-r*iw, t*ih, tint);
+    DrawImageUV(x+l, y+h-b, w-l-r, b, tex.handle, l*iw, 1.0f-b*ih, 1.0f-r*iw, 1.0f, tint);
+    DrawImageUV(x, y+t, l, h-t-b, tex.handle, 0, t*ih, l*iw, 1.0f-b*ih, tint);
+    DrawImageUV(x+w-r, y+t, r, h-t-b, tex.handle, 1.0f-r*iw, t*ih, 1.0f, 1.0f-b*ih, tint);
     DrawImageUV(x+l, y+t, w-l-r, h-t-b, tex.handle, l*iw, t*ih, 1.0f-r*iw, 1.0f-b*ih, tint);
 }
 
@@ -157,12 +160,122 @@ float UIRenderer::MeasureText(const char* text) {
     return w;
 }
 
+AtlasRegion UIRenderer::PackInAtlas(int w, int h) {
+    AtlasRegion reg = {0,0,0,0, 0,0,0,0};
+
+    // Simple row-packing: if doesn't fit current row, advance to next
+    if (atlas_cursor_x_ + w > ATLAS_SIZE) {
+        atlas_cursor_x_ = 0;
+        atlas_cursor_y_ += atlas_row_h_ + 1;
+        atlas_row_h_ = 0;
+    }
+    if (atlas_cursor_y_ + h > ATLAS_SIZE) {
+        spdlog::warn("UIRenderer: atlas full, can't pack {}x{}", w, h);
+        return reg;
+    }
+
+    reg.x = atlas_cursor_x_;
+    reg.y = atlas_cursor_y_;
+    reg.w = w;
+    reg.h = h;
+    reg.u0 = (float)reg.x / ATLAS_SIZE;
+    reg.v0 = (float)reg.y / ATLAS_SIZE;
+    reg.u1 = (float)(reg.x + w) / ATLAS_SIZE;
+    reg.v1 = (float)(reg.y + h) / ATLAS_SIZE;
+
+    atlas_cursor_x_ += w + 1;
+    atlas_row_h_ = std::max(atlas_row_h_, h);
+    return reg;
+}
+
+void UIRenderer::UploadAtlas() {
+    if (atlas_data_.empty()) return;
+
+    if (bgfx::isValid(atlas_tex_)) {
+        bgfx::destroy(atlas_tex_);
+    }
+
+    atlas_tex_ = bgfx::createTexture2D(
+        ATLAS_SIZE, ATLAS_SIZE, false, 1,
+        bgfx::TextureFormat::RGBA8,
+        BGFX_SAMPLER_NONE,
+        bgfx::copy(atlas_data_.data(), (uint32_t)(atlas_data_.size() * sizeof(uint32_t))));
+
+    atlas_valid_ = bgfx::isValid(atlas_tex_);
+    spdlog::info("UIRenderer: texture atlas uploaded ({}x{})", ATLAS_SIZE, ATLAS_SIZE);
+}
+
+void UIRenderer::BuildTextureAtlas() {
+    atlas_data_.assign(ATLAS_SIZE * ATLAS_SIZE, 0);
+    atlas_cursor_x_ = 0;
+    atlas_cursor_y_ = 0;
+    atlas_row_h_ = 0;
+    atlas_regions_.clear();
+
+    // Process pending textures
+    for (auto& [name, path] : atlas_pending_) {
+        int w, h, n;
+        unsigned char* d = stbi_load(path.c_str(), &w, &h, &n, 4);
+        if (!d) continue;
+
+        if (w > ATLAS_SIZE || h > ATLAS_SIZE) {
+            // Too large for atlas, create individual texture
+            auto tex = bgfx::createTexture2D((uint16_t)w, (uint16_t)h, false, 1,
+                bgfx::TextureFormat::RGBA8, 0, bgfx::copy(d, w * h * 4));
+            TextureInfo info; info.handle = tex; info.width = w; info.height = h;
+            textures_[name] = info;
+            stbi_image_free(d);
+            continue;
+        }
+
+        AtlasRegion reg = PackInAtlas(w, h);
+        if (reg.w == 0 && reg.h == 0) {
+            auto tex = bgfx::createTexture2D((uint16_t)w, (uint16_t)h, false, 1,
+                bgfx::TextureFormat::RGBA8, 0, bgfx::copy(d, w * h * 4));
+            TextureInfo info; info.handle = tex; info.width = w; info.height = h;
+            textures_[name] = info;
+            stbi_image_free(d);
+            continue;
+        }
+
+        // Copy pixels into atlas
+        uint32_t* src = (uint32_t*)d;
+        for (int py = 0; py < h; py++) {
+            std::memcpy(&atlas_data_[(reg.y + py) * ATLAS_SIZE + reg.x],
+                       &src[py * w], w * sizeof(uint32_t));
+        }
+
+        atlas_regions_[name] = reg;
+
+        TextureInfo info;
+        info.handle = atlas_tex_; // Will be valid after upload
+        info.width = w;
+        info.height = h;
+        textures_[name] = info;
+
+        stbi_image_free(d);
+    }
+
+    atlas_pending_.clear();
+    UploadAtlas();
+
+    // Update texture handles to point to atlas
+    for (auto& [name, reg] : atlas_regions_) {
+        textures_[name].handle = atlas_tex_;
+    }
+}
+
 void UIRenderer::Init() {
     auto vs = loadShader("shaders/vs_ui.bin"); auto fs = loadShader("shaders/fs_ui.bin");
     if (vs && fs) ui_prog_ = bgfx::createProgram(bgfx::createShader(vs), bgfx::createShader(fs), true);
     s_tex_ = bgfx::createUniform("s_texColor", bgfx::UniformType::Sampler);
     uint32_t white = 0xffffffff; white_tex_ = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::makeRef(&white, 4));
-    CreateFont(); spdlog::info("UIRenderer: initialized");
+    CreateFont();
+
+    // Initialize atlas data
+    atlas_data_.resize(ATLAS_SIZE * ATLAS_SIZE, 0);
+
+    spdlog::info("UIRenderer: initialized with texture atlas ({}x{})", ATLAS_SIZE, ATLAS_SIZE);
 }
 
 void UIRenderer::CreateFont() {
@@ -180,39 +293,79 @@ void UIRenderer::CreateFont() {
         font_glyphs_[i].xadvance = chardata[i].xadvance; font_glyphs_[i].w = (float)(chardata[i].x1 - chardata[i].x0); font_glyphs_[i].h = (float)(chardata[i].y1 - chardata[i].y0);
     }
     font_ready_ = true;
+
+    // Build the texture atlas on font load
+    BuildTextureAtlas();
+
+    spdlog::info("UIRenderer: font created, texture atlas cached");
 }
 
 TextureInfo UIRenderer::LoadTexture(const std::string& name, const std::string& path) {
-    if (textures_.count(name)) return textures_[name];
-    // Try with original path, then with extensions swapped
-    std::string variants[] = { path, "", "", "" };
-    // Generate .tif variant if .png was requested
-    if (path.size() > 4) {
-        std::string base = path.substr(0, path.find_last_of('.'));
-        variants[1] = base + ".tif";
-        variants[2] = "assets/textures/" + base + ".tif";
-        variants[3] = "assets/textures/" + path;
+    // Check cache first
+    auto it = textures_.find(name);
+    if (it != textures_.end()) return it->second;
+
+    // Check if already in atlas
+    auto at = atlas_regions_.find(name);
+    if (at != atlas_regions_.end()) {
+        TextureInfo info;
+        info.handle = atlas_tex_;
+        info.width = at->second.w;
+        info.height = at->second.h;
+        textures_[name] = info;
+        return info;
     }
-    std::string search[] = { path, variants[1], variants[2], variants[3],
-                             "assets/textures/ui/" + path,
-                             "assets/textures/" + path,
-                             "assets_converted/mod_objs/" + path };
+
+    // Queue for atlas packing
+    std::string search[] = {
+        path,
+        "assets/textures/ui/" + path,
+        "assets/textures/" + path,
+        "assets_converted/mod_objs/" + path
+    };
+
     for (auto& p : search) {
         if (p.empty()) continue;
-        int w, h, n; unsigned char* d = stbi_load(p.c_str(), &w, &h, &n, 4);
+        int w, h, n;
+        unsigned char* d = stbi_load(p.c_str(), &w, &h, &n, 4);
         if (d) {
-            TextureInfo info; info.handle = bgfx::createTexture2D((uint16_t)w, (uint16_t)h, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::copy(d, w*h*4));
-            info.width = w; info.height = h; stbi_image_free(d); textures_[name] = info; return info;
+            stbi_image_free(d);
+
+            if (w <= 256 && h <= 256 && w > 0 && h > 0) {
+                // Small texture, queue for atlas
+                atlas_pending_.push_back({name, p});
+                return TextureInfo{}; // Will be available after BuildTextureAtlas
+            }
+
+            // Large texture, load individually
+            d = stbi_load(p.c_str(), &w, &h, &n, 4);
+            if (d) {
+                TextureInfo info;
+                info.handle = bgfx::createTexture2D((uint16_t)w, (uint16_t)h, false, 1,
+                    bgfx::TextureFormat::RGBA8, 0, bgfx::copy(d, w*h*4));
+                info.width = w; info.height = h;
+                stbi_image_free(d);
+                textures_[name] = info;
+                return info;
+            }
         }
     }
     return {};
 }
 
-void UIRenderer::Render() { bgfx::setViewRect(view_id_, 0, 0, (uint16_t)width, (uint16_t)height); }
+void UIRenderer::Render() {
+    bgfx::setViewRect(view_id_, 0, 0, (uint16_t)width, (uint16_t)height);
+}
+
 void UIRenderer::Shutdown() {
     static bool done = false; if (done) return; done = true;
-    for (auto& [n, t] : textures_) if (bgfx::isValid(t.handle)) bgfx::destroy(t.handle);
-    textures_.clear(); if (bgfx::isValid(font_tex_)) bgfx::destroy(font_tex_);
+    for (auto& [n, t] : textures_) if (bgfx::isValid(t.handle) && t.handle != atlas_tex_) bgfx::destroy(t.handle);
+    textures_.clear();
+    if (bgfx::isValid(atlas_tex_)) bgfx::destroy(atlas_tex_);
+    if (bgfx::isValid(font_tex_)) bgfx::destroy(font_tex_);
     if (bgfx::isValid(white_tex_)) bgfx::destroy(white_tex_); if (bgfx::isValid(s_tex_)) bgfx::destroy(s_tex_);
     if (bgfx::isValid(ui_prog_)) bgfx::destroy(ui_prog_);
+    atlas_data_.clear();
+    atlas_regions_.clear();
+    atlas_pending_.clear();
 }

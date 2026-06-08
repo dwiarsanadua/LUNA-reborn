@@ -5,6 +5,24 @@
 #include <string>
 #include <engine/gx_render/RenderDevice.h>
 
+struct TerrainPatch {
+    float min_x, min_z, max_x, max_z;
+    float center_x, center_z;
+
+    bgfx::VertexBufferHandle vb_high = BGFX_INVALID_HANDLE;
+    bgfx::IndexBufferHandle ib_high = BGFX_INVALID_HANDLE;
+    bgfx::VertexBufferHandle vb_med  = BGFX_INVALID_HANDLE;
+    bgfx::IndexBufferHandle ib_med  = BGFX_INVALID_HANDLE;
+    bgfx::VertexBufferHandle vb_low  = BGFX_INVALID_HANDLE;
+    bgfx::IndexBufferHandle ib_low  = BGFX_INVALID_HANDLE;
+
+    int num_indices_high = 0;
+    int num_indices_med  = 0;
+    int num_indices_low  = 0;
+
+    bool visible = true;
+};
+
 class TerrainRenderer {
 public:
     TerrainRenderer();
@@ -19,18 +37,21 @@ public:
     void Shutdown();
 
     float GetHeight(float x, float z) const;
+    int GetVisiblePatchCount() const { return visible_patches_; }
+    int GetTotalPatchCount() const { return (int)patches_.size(); }
 
     float width = 1280.0f;
     float height = 720.0f;
 
 private:
-    void BuildMesh();
+    void BuildPatches();
+    void BuildPatchMesh(TerrainPatch& patch, int patch_x, int patch_z, int vps, bool high_detail);
     float Noise(float x, float z) const;
     float FractalNoise(float x, float z, int octaves = 4) const;
     bgfx::TextureHandle LoadTileTexture(const std::string& name, int index);
+    void ExtractFrustumPlanes(const glm::mat4& vp, glm::vec4* planes) const;
+    bool IsBoxVisible(const glm::vec4* planes, float min_x, float min_y, float min_z, float max_x, float max_y, float max_z) const;
 
-    bgfx::VertexBufferHandle vb_ = BGFX_INVALID_HANDLE;
-    bgfx::IndexBufferHandle ib_ = BGFX_INVALID_HANDLE;
     bgfx::ProgramHandle program_ = BGFX_INVALID_HANDLE;
     bgfx::ProgramHandle terrain_program_ = BGFX_INVALID_HANDLE;
     bgfx::ProgramHandle shadow_program_ = BGFX_INVALID_HANDLE;
@@ -52,26 +73,16 @@ private:
 
     int size_ = 50;
     float height_scale_ = 8.0f;
-    int vertices_per_side_ = 64;
-    int vertices_per_side_high_ = 128;
-    int vertices_per_side_med_ = 64;
-    int vertices_per_side_low_ = 32;
-    int current_lod_ = 1; // 0=high, 1=med, 2=low
-    
-    // LOD buffers
-    bgfx::VertexBufferHandle vb_high_ = BGFX_INVALID_HANDLE;
-    bgfx::IndexBufferHandle ib_high_ = BGFX_INVALID_HANDLE;
-    bgfx::VertexBufferHandle vb_med_ = BGFX_INVALID_HANDLE;
-    bgfx::IndexBufferHandle ib_med_ = BGFX_INVALID_HANDLE;
-    bgfx::VertexBufferHandle vb_low_ = BGFX_INVALID_HANDLE;
-    bgfx::IndexBufferHandle ib_low_ = BGFX_INVALID_HANDLE;
-    bool lods_built_ = false;
-    
+    int patches_per_side_ = 4;
+    int verts_per_patch_high_ = 32;
+    int verts_per_patch_med_ = 16;
+    int verts_per_patch_low_ = 8;
+
+    std::vector<TerrainPatch> patches_;
+    int visible_patches_ = 0;
+
     struct Vertex { float x, y, z; float nx, ny, nz; uint32_t color; float u, v; };
-    
-    void BuildLODs();
-    void BuildMeshForLOD(int vps, std::vector<Vertex>& verts, std::vector<uint16_t>& idx);
-    void SelectLOD(float cam_dist);
+    static constexpr bgfx::VertexLayout& GetLayout();
 
     std::vector<float> hgt_data_;
     int hgt_width_ = 0, hgt_height_ = 0;

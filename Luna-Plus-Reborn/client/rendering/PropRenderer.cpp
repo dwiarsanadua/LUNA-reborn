@@ -4,8 +4,10 @@
 #include <sstream>
 #include <algorithm>
 #include <unordered_map>
+#include <unordered_set>
 #include <cstring>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <stb_image.h>
 
 static const bgfx::Memory* loadShader(const char* path) {
@@ -92,12 +94,19 @@ bool PropRenderer::Init() {
         .add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
         .add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
         .end();
+
+    spdlog::info("PropRenderer: initialized with GPU instancing support");
     return true;
 }
 
-bool PropRenderer::LoadObj(const std::string& path, glm::vec3 pos, float scale) {
+int PropRenderer::LoadObj(const std::string& path) {
+    // Check if mesh already loaded
+    for (size_t i = 0; i < meshes_.size(); i++) {
+        if (meshes_[i].name == path) return (int)i;
+    }
+
     std::ifstream file(path);
-    if (!file) { spdlog::error("PropRenderer: cannot open {}", path); return false; }
+    if (!file) { spdlog::error("PropRenderer: cannot open {}", path); return -1; }
 
     std::vector<glm::vec3> positions;
     std::vector<glm::vec3> normals;
@@ -140,7 +149,7 @@ bool PropRenderer::LoadObj(const std::string& path, glm::vec3 pos, float scale) 
         }
     }
 
-    if (faces.empty()) return false;
+    if (faces.empty()) return -1;
 
     struct Vertex { float x, y, z; float nx, ny, nz; uint32_t color; float u, v; };
     std::vector<Vertex> bverts;
@@ -151,12 +160,12 @@ bool PropRenderer::LoadObj(const std::string& path, glm::vec3 pos, float scale) 
             int vidx = faces[i].v[j];
             int nidx = faces[i].vn[j];
             int tidx = faces[i].vt[j];
-            
+
             glm::vec3 p = positions[vidx];
             glm::vec3 n = (nidx >= 0 && nidx < (int)normals.size()) ? normals[nidx] : glm::vec3(0, 1, 0);
             glm::vec2 t = (tidx >= 0 && tidx < (int)uvs.size()) ? uvs[tidx] : glm::vec2(0, 0);
-            
-            bverts.push_back({p.x * scale, p.y * scale, p.z * scale, n.x, n.y, n.z, 0xffffffff, t.x, t.y});
+
+            bverts.push_back({p.x, p.y, p.z, n.x, n.y, n.z, 0xffffffff, t.x, t.y});
             bidx.push_back((uint16_t)bverts.size() - 1);
         }
     }
@@ -171,13 +180,25 @@ bool PropRenderer::LoadObj(const std::string& path, glm::vec3 pos, float scale) 
     mesh.vb = bgfx::createVertexBuffer(bgfx::copy(bverts.data(), (uint32_t)(bverts.size() * sizeof(Vertex))), layout_);
     mesh.ib = bgfx::createIndexBuffer(bgfx::copy(bidx.data(), (uint32_t)(bidx.size() * sizeof(uint16_t))));
     mesh.num_indices = (uint32_t)bidx.size();
-    mesh.position = pos;
-    mesh.scale = scale;
     mesh.tex = LoadTextureForMesh(base);
     mesh.normal_tex = LoadNormalMap(base);
+    mesh.name = path;
 
-    props_.push_back(mesh);
-    return true;
+    int idx = (int)meshes_.size();
+    meshes_.push_back(mesh);
+    spdlog::info("PropRenderer: loaded mesh '{}' ({} indices, {} verts)", path, bidx.size(), bverts.size());
+    return idx;
+}
+
+int PropRenderer::AddInstance(int mesh_idx, glm::vec3 pos, float scale, glm::vec3 rot) {
+    if (mesh_idx < 0 || mesh_idx >= (int)meshes_.size()) return -1;
+    PropInstance inst;
+    inst.position = pos;
+    inst.scale = scale;
+    inst.rotation = rot;
+    inst.mesh_idx = (uint32_t)mesh_idx;
+    instances_.push_back(inst);
+    return (int)instances_.size() - 1;
 }
 
 void PropRenderer::Render(const glm::mat4& view, const glm::mat4& proj) {
@@ -187,6 +208,8 @@ void PropRenderer::Render(const glm::mat4& view, const glm::mat4& proj) {
 
 void PropRenderer::Render(const glm::mat4& view, const glm::mat4& proj, const EnvData& env) {
     if (!bgfx::isValid(program_)) return;
+    if (instances_.empty()) return;
+
     bgfx::setViewTransform(view_id_, &view, &proj);
     bgfx::setViewClear(view_id_, BGFX_CLEAR_NONE, 0, 1.0f, 0);
     bgfx::setViewRect(view_id_, 0, 0, (uint16_t)width, (uint16_t)height);
@@ -195,18 +218,74 @@ void PropRenderer::Render(const glm::mat4& view, const glm::mat4& proj, const En
         bgfx::setUniform(u_light_dir_, glm::value_ptr(env.light_dir));
     }
 
-    for (auto& prop : props_) {
-        if (!bgfx::isValid(prop.vb)) continue;
-        float mtx[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, prop.position.x,prop.position.y,prop.position.z,1};
-        bgfx::setTransform(mtx);
-        bgfx::setTexture(0, s_tex_color_, bgfx::isValid(prop.tex) ? prop.tex : white_tex_);
-        if (bgfx::isValid(s_tex_normal_)) {
-            bgfx::setTexture(1, s_tex_normal_, bgfx::isValid(prop.normal_tex) ? prop.normal_tex : white_tex_);
+    last_draw_calls_ = 0;
+
+    // Build instance groups: mesh_idx -> list of model matrices
+    struct InstanceGroup {
+        int mesh_idx;
+        std::vector<glm::mat4> transforms;
+    };
+
+    std::unordered_map<int, std::vector<glm::mat4>> groups;
+    for (auto& inst : instances_) {
+        glm::mat4 m = glm::translate(glm::mat4(1.0f), inst.position);
+        m = glm::rotate(m, inst.rotation.x, glm::vec3(1,0,0));
+        m = glm::rotate(m, inst.rotation.y, glm::vec3(0,1,0));
+        m = glm::rotate(m, inst.rotation.z, glm::vec3(0,0,1));
+        m = glm::scale(m, glm::vec3(inst.scale));
+        groups[(int)inst.mesh_idx].push_back(m);
+    }
+
+    // Submit each group as a single instanced draw call
+    for (auto& [mid, xforms] : groups) {
+        if (mid < 0 || mid >= (int)meshes_.size()) continue;
+        auto& mesh = meshes_[mid];
+        if (!bgfx::isValid(mesh.vb)) continue;
+        if (xforms.empty()) continue;
+
+        // Build instance data buffer: each instance is a 4x3 matrix (12 floats)
+        const uint32_t instance_stride = sizeof(float) * 12;
+        bgfx::InstanceDataBuffer idb;
+        bool ok = bgfx::allocInstanceDataBuffer(&idb, (uint16_t)xforms.size(), instance_stride);
+        if (!ok) {
+            // Fallback: render individually
+            for (auto& xf : xforms) {
+                const float* p = glm::value_ptr(xf);
+                float mtx[16];
+                memcpy(mtx, p, sizeof(mtx));
+                bgfx::setTransform(mtx);
+                bgfx::setTexture(0, s_tex_color_, bgfx::isValid(mesh.tex) ? mesh.tex : white_tex_);
+                if (bgfx::isValid(s_tex_normal_)) {
+                    bgfx::setTexture(1, s_tex_normal_, bgfx::isValid(mesh.normal_tex) ? mesh.normal_tex : white_tex_);
+                }
+                bgfx::setVertexBuffer(0, mesh.vb);
+                bgfx::setIndexBuffer(mesh.ib);
+                bgfx::setState(BGFX_STATE_DEFAULT | BGFX_STATE_WRITE_Z);
+                bgfx::submit(view_id_, program_);
+                last_draw_calls_++;
+            }
+            continue;
         }
-        bgfx::setVertexBuffer(0, prop.vb);
-        bgfx::setIndexBuffer(prop.ib);
+
+        uint8_t* data = idb.data;
+        for (auto& xf : xforms) {
+            // Write 4x3 matrix (row-major, last row implied)
+            const float* p = glm::value_ptr(xf);
+            memcpy(data, p, sizeof(float) * 12);
+            data += instance_stride;
+        }
+
+        // Single instanced draw call
+        bgfx::setTexture(0, s_tex_color_, bgfx::isValid(mesh.tex) ? mesh.tex : white_tex_);
+        if (bgfx::isValid(s_tex_normal_)) {
+            bgfx::setTexture(1, s_tex_normal_, bgfx::isValid(mesh.normal_tex) ? mesh.normal_tex : white_tex_);
+        }
+        bgfx::setVertexBuffer(0, mesh.vb);
+        bgfx::setIndexBuffer(mesh.ib);
+        bgfx::setInstanceDataBuffer(&idb);
         bgfx::setState(BGFX_STATE_DEFAULT | BGFX_STATE_WRITE_Z);
         bgfx::submit(view_id_, program_);
+        last_draw_calls_++;
     }
 }
 
@@ -215,13 +294,14 @@ void PropRenderer::Shutdown() {
     if (is_shutdown) return;
     is_shutdown = true;
 
-    for (auto& p : props_) {
-        if (bgfx::isValid(p.vb)) bgfx::destroy(p.vb);
-        if (bgfx::isValid(p.ib)) bgfx::destroy(p.ib);
-        if (bgfx::isValid(p.tex)) bgfx::destroy(p.tex);
-        if (bgfx::isValid(p.normal_tex)) bgfx::destroy(p.normal_tex);
+    for (auto& m : meshes_) {
+        if (bgfx::isValid(m.vb)) bgfx::destroy(m.vb);
+        if (bgfx::isValid(m.ib)) bgfx::destroy(m.ib);
+        if (bgfx::isValid(m.tex)) bgfx::destroy(m.tex);
+        if (bgfx::isValid(m.normal_tex)) bgfx::destroy(m.normal_tex);
     }
-    props_.clear();
+    meshes_.clear();
+    instances_.clear();
     for (auto& [n, t] : tex_cache_) if (bgfx::isValid(t)) bgfx::destroy(t);
     tex_cache_.clear();
     if (bgfx::isValid(white_tex_)) bgfx::destroy(white_tex_);
@@ -232,4 +312,6 @@ void PropRenderer::Shutdown() {
     if (bgfx::isValid(u_light_dir_)) bgfx::destroy(u_light_dir_);
 }
 
-void PropRenderer::ClearProps() { Shutdown(); }
+void PropRenderer::ClearProps() {
+    instances_.clear();
+}

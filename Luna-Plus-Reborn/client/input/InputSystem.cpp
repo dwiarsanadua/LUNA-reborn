@@ -2,7 +2,6 @@
 #include <GLFW/glfw3.h>
 #include <algorithm>
 #include <cmath>
-#include <cstring>
 
 InputSystem* InputSystem::instance_ = nullptr;
 
@@ -26,15 +25,17 @@ void InputSystem::Init(GLFWwindow* window) {
     scroll_ = 0;
     time_ = glfwGetTime();
 
-    // Initialize GLFW gamepad mappings from embedded string
-    const char* mappings =
-        "78696e70757401000000000000000000,Microsoft X-Box 360 pad,"
-        "a:b0,b:b1,x:b2,y:b3,leftshoulder:b4,rightshoulder:b5,"
-        "back:b6,start:b7,guide:b8,leftthumb:b9,rightthumb:b10,"
-        "dpup:b11,dpdown:b12,dpleft:b13,dpright:b14,"
-        "leftx:a0,lefty:a1,rightx:a2,righty:a3,lefttrigger:a4,righttrigger:a5,"
-        "platform:Windows,";
-    glfwUpdateGamepadMappings(mappings);
+    // Initialize gamepad states
+    for (int i = 0; i < MAX_GAMEPADS; i++) {
+        gamepads_[i].connected = false;
+        gamepads_[i].name = "Gamepad " + std::to_string(i + 1);
+    }
+
+    // Default sensitivity
+    for (int i = 0; i < MAX_GAMEPADS; i++) {
+        gamepad_config_.sensitivity_x[i] = 1.0f;
+        gamepad_config_.sensitivity_y[i] = 1.0f;
+    }
 }
 
 void InputSystem::Update(float dt) {
@@ -55,14 +56,36 @@ void InputSystem::Update(float dt) {
     mouse_dy_ = 0;
     scroll_ = 0;
     for (int i = 0; i < 8; i++) double_click_[i] = false;
-    camera_yaw_delta_ = 0;
-    camera_pitch_delta_ = 0;
 
-    // Poll gamepad
-    if (gamepad_enabled_) {
-        gamepad_prev_ = gamepad_;
-        PollGamepad();
-        MapGamepadToKeys();
+    // Poll gamepads
+    PollGamepads();
+
+    // UI navigation repeat logic
+    if (mode_ == InputMode::UI || mode_ == InputMode::Field) {
+        GamepadButton nav_btns[] = {
+            GamepadButton::DPadUp, GamepadButton::DPadDown,
+            GamepadButton::DPadLeft, GamepadButton::DPadRight
+        };
+        bool any_nav_down = false;
+        for (auto btn : nav_btns) {
+            if (IsGamepadButtonDown(btn)) {
+                any_nav_down = true;
+                if (btn == ui_last_nav_btn_) {
+                    ui_nav_timer_ += dt;
+                    ui_nav_repeated_ = (ui_nav_timer_ >= gamepad_config_.ui_nav_repeat_delay);
+                } else {
+                    ui_last_nav_btn_ = btn;
+                    ui_nav_timer_ = 0;
+                    ui_nav_repeated_ = false;
+                }
+                break;
+            }
+        }
+        if (!any_nav_down) {
+            ui_last_nav_btn_ = GamepadButton::COUNT;
+            ui_nav_timer_ = 0;
+            ui_nav_repeated_ = false;
+        }
     }
 }
 
@@ -73,6 +96,8 @@ void InputSystem::Shutdown() {
 void InputSystem::SetMode(InputMode mode) {
     mode_ = mode;
 }
+
+// ── Keyboard ───────────────────────────────────────────────────────────────
 
 bool InputSystem::IsKeyDown(int key) const {
     if (key < 0 || key >= MAX_KEYS) return false;
@@ -101,6 +126,8 @@ bool InputSystem::IsAnyKeyPressed() const {
     return false;
 }
 
+// ── Mouse ──────────────────────────────────────────────────────────────────
+
 bool InputSystem::IsMouseDown(int button) const {
     if (button < 0 || button >= 8) return false;
     return mouse_down_[button];
@@ -119,14 +146,13 @@ bool InputSystem::IsMouseDoubleClicked(int button) const {
 void InputSystem::UpdateKeyState(int key, int action) {
     if (key < 0 || key >= MAX_KEYS) return;
 
-    if (action == 1) { // PRESS
+    if (action == 1) {
         keys_down_[key] = true;
         key_hold_time_[key] = 0;
-    } else if (action == 0) { // RELEASE
+    } else if (action == 0) {
         keys_down_[key] = false;
         key_hold_time_[key] = 0;
     }
-    // action == 2 (REPEAT) — key stays down
 }
 
 void InputSystem::CheckDoubleClick(int button) {
@@ -138,7 +164,7 @@ void InputSystem::CheckDoubleClick(int button) {
 
     if (dt_click < 0.4 && dx < 10 && dy < 10) {
         double_click_[button] = true;
-        last_click_time_[button] = 0; // Reset to prevent triple-click
+        last_click_time_[button] = 0;
     } else {
         last_click_time_[button] = now;
         last_click_pos_[button][0] = mouse_x_;
@@ -146,13 +172,330 @@ void InputSystem::CheckDoubleClick(int button) {
     }
 }
 
-// --- Static GLFW callbacks ---
+// ── Gamepad API ────────────────────────────────────────────────────────────
+
+void InputSystem::PollGamepads() {
+    if (!gamepad_config_.enabled) return;
+
+    for (int i = 0; i < MAX_GAMEPADS; i++) {
+        bool was_connected = gamepads_[i].connected;
+
+        if (glfwJoystickIsGamepad(i)) {
+            gamepads_[i].connected = true;
+            gamepads_[i].name = glfwGetGamepadName(i) ? glfwGetGamepadName(i) : ("Gamepad " + std::to_string(i + 1));
+
+            GLFWgamepadstate state;
+            if (glfwGetGamepadState(i, &state)) {
+                // Save previous button states
+                for (int b = 0; b < 14; b++) {
+                    gamepads_[i].buttons_prev[b] = gamepads_[i].buttons[b];
+                }
+
+                // Axes mapping: GLFW axes -> our enum
+                // GLFW_GAMEPAD_AXIS_LEFT_X = 0
+                // GLFW_GAMEPAD_AXIS_LEFT_Y = 1
+                // GLFW_GAMEPAD_AXIS_RIGHT_X = 2
+                // GLFW_GAMEPAD_AXIS_RIGHT_Y = 3
+                // GLFW_GAMEPAD_AXIS_LEFT_TRIGGER = 4
+                // GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER = 5
+
+                // Apply deadzone to left stick
+                float lx = state.axes[GLFW_GAMEPAD_AXIS_LEFT_X];
+                float ly = state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y];
+                float lmag = std::sqrt(lx * lx + ly * ly);
+                float ldz = gamepads_[i].left_deadzone;
+                if (lmag < ldz) { lx = 0; ly = 0; }
+                else {
+                    float ladj = (lmag - ldz) / (1.0f - ldz);
+                    lx = (lx / lmag) * ladj;
+                    ly = (ly / lmag) * ladj;
+                }
+
+                float rx = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_X];
+                float ry = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y];
+                float rmag = std::sqrt(rx * rx + ry * ry);
+                float rdz = gamepads_[i].right_deadzone;
+                if (rmag < rdz) { rx = 0; ry = 0; }
+                else {
+                    float radj = (rmag - rdz) / (1.0f - rdz);
+                    rx = (rx / rmag) * radj;
+                    ry = (ry / rmag) * radj;
+                }
+
+                // Apply sensitivity
+                lx *= GetGamepadSensitivityX();
+                ly *= GetGamepadSensitivityY();
+                rx *= GetGamepadSensitivityX();
+                ry *= GetGamepadSensitivityY();
+
+                gamepads_[i].axes[(int)GamepadAxis::LeftStickX] = lx;
+                gamepads_[i].axes[(int)GamepadAxis::LeftStickY] = ly;
+                gamepads_[i].axes[(int)GamepadAxis::RightStickX] = rx;
+                gamepads_[i].axes[(int)GamepadAxis::RightStickY] = ry;
+
+                // Triggers
+                float lt = state.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER];
+                float rt = state.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER];
+                gamepads_[i].axes[(int)GamepadAxis::LeftTrigger] = lt;
+                gamepads_[i].axes[(int)GamepadAxis::RightTrigger] = rt;
+
+                // Buttons mapping: GLFW_GAMEPAD_BUTTON_* -> our enum
+                static const int glfw_to_our[14] = {
+                    GLFW_GAMEPAD_BUTTON_A,           // A
+                    GLFW_GAMEPAD_BUTTON_B,           // B
+                    GLFW_GAMEPAD_BUTTON_X,           // X
+                    GLFW_GAMEPAD_BUTTON_Y,           // Y
+                    GLFW_GAMEPAD_BUTTON_DPAD_UP,     // DPadUp
+                    GLFW_GAMEPAD_BUTTON_DPAD_DOWN,   // DPadDown
+                    GLFW_GAMEPAD_BUTTON_DPAD_LEFT,   // DPadLeft
+                    GLFW_GAMEPAD_BUTTON_DPAD_RIGHT,  // DPadRight
+                    GLFW_GAMEPAD_BUTTON_START,       // Start
+                    GLFW_GAMEPAD_BUTTON_BACK,        // Back
+                    GLFW_GAMEPAD_BUTTON_GUIDE,       // Guide
+                    GLFW_GAMEPAD_BUTTON_LEFT_THUMB,  // LeftStick
+                    GLFW_GAMEPAD_BUTTON_RIGHT_THUMB, // RightStick
+                    GLFW_GAMEPAD_BUTTON_LEFT_BUMPER, // LeftBumper
+                };
+
+                for (int b = 0; b < 14; b++) {
+                    bool is_down = state.buttons[glfw_to_our[b]] == GLFW_PRESS;
+                    gamepads_[i].buttons[b] = is_down;
+                    gamepads_[i].buttons_pressed[b] = is_down && !gamepads_[i].buttons_prev[b];
+                    gamepads_[i].buttons_released[b] = !is_down && gamepads_[i].buttons_prev[b];
+                }
+
+                // Right bumper (GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER is index 7, not in our direct mapping)
+                bool rb = state.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER] == GLFW_PRESS;
+                int rb_idx = (int)GamepadButton::RightBumper;
+                gamepads_[i].buttons_prev[rb_idx] = gamepads_[i].buttons[rb_idx];
+                gamepads_[i].buttons[rb_idx] = rb;
+                gamepads_[i].buttons_pressed[rb_idx] = rb && !gamepads_[i].buttons_prev[rb_idx];
+                gamepads_[i].buttons_released[rb_idx] = !rb && gamepads_[i].buttons_prev[rb_idx];
+            }
+        } else {
+            gamepads_[i].connected = false;
+        }
+
+        // Connection callback
+        if (gamepads_[i].connected != was_connected && gamepad_connect_cb_) {
+            gamepad_connect_cb_(i, gamepads_[i].connected);
+        }
+    }
+}
+
+const GamepadState& InputSystem::GetGamepadState(int index) const {
+    static GamepadState default_state{};
+    if (index < 0 || index >= MAX_GAMEPADS) return default_state;
+    return gamepads_[index];
+}
+
+int InputSystem::GetConnectedGamepadCount() const {
+    int count = 0;
+    for (int i = 0; i < MAX_GAMEPADS; i++) {
+        if (gamepads_[i].connected) count++;
+    }
+    return count;
+}
+
+void InputSystem::SetActiveGamepad(int index) {
+    if (index >= 0 && index < MAX_GAMEPADS) {
+        gamepad_config_.active_gamepad = index;
+    }
+}
+
+bool InputSystem::IsGamepadButtonDown(GamepadButton btn) const {
+    if (!gamepad_config_.enabled) return false;
+    int idx = gamepad_config_.active_gamepad;
+    if (idx < 0 || idx >= MAX_GAMEPADS) return false;
+    int b = (int)btn;
+    if (b < 0 || b >= 14) return false;
+    return gamepads_[idx].buttons[b];
+}
+
+bool InputSystem::IsGamepadButtonPressed(GamepadButton btn) const {
+    if (!gamepad_config_.enabled) return false;
+    int idx = gamepad_config_.active_gamepad;
+    if (idx < 0 || idx >= MAX_GAMEPADS) return false;
+    int b = (int)btn;
+    if (b < 0 || b >= 14) return false;
+    return gamepads_[idx].buttons_pressed[b];
+}
+
+bool InputSystem::IsGamepadButtonReleased(GamepadButton btn) const {
+    if (!gamepad_config_.enabled) return false;
+    int idx = gamepad_config_.active_gamepad;
+    if (idx < 0 || idx >= MAX_GAMEPADS) return false;
+    int b = (int)btn;
+    if (b < 0 || b >= 14) return false;
+    return gamepads_[idx].buttons_released[b];
+}
+
+float InputSystem::GetGamepadAxis(GamepadAxis axis) const {
+    if (!gamepad_config_.enabled) return 0;
+    int idx = gamepad_config_.active_gamepad;
+    if (idx < 0 || idx >= MAX_GAMEPADS) return 0;
+    int a = (int)axis;
+    if (a < 0 || a >= 6) return 0;
+    return gamepads_[idx].axes[a];
+}
+
+float InputSystem::GetGamepadAxisRaw(GamepadAxis axis) const {
+    if (!gamepad_config_.enabled) return 0;
+    int idx = gamepad_config_.active_gamepad;
+    if (idx < 0 || idx >= MAX_GAMEPADS) return 0;
+    int a = (int)axis;
+    if (a < 0 || a >= 6) return 0;
+
+    // Return raw axis value without deadzone/sensitivity
+    GLFWgamepadstate state;
+    if (!glfwGetGamepadState(idx, &state)) return 0;
+    return state.axes[a];
+}
+
+// ── UI Navigation ──────────────────────────────────────────────────────────
+
+bool InputSystem::IsUINavUp() const {
+    if (!gamepad_config_.enabled) return false;
+    int idx = gamepad_config_.active_gamepad;
+    if (idx < 0 || idx >= MAX_GAMEPADS) return false;
+
+    // D-Pad up or left stick up
+    bool dpad = IsGamepadButtonPressed(GamepadButton::DPadUp);
+    bool stick = gamepads_[idx].axes[(int)GamepadAxis::LeftStickY] > 0.5f;
+    bool repeat = (ui_last_nav_btn_ == GamepadButton::DPadUp && ui_nav_repeated_
+                   && ui_nav_timer_ >= gamepad_config_.ui_nav_repeat_rate);
+    return dpad || (stick && IsGamepadButtonPressed(GamepadButton::DPadUp)) || repeat;
+}
+
+bool InputSystem::IsUINavDown() const {
+    if (!gamepad_config_.enabled) return false;
+    int idx = gamepad_config_.active_gamepad;
+    if (idx < 0 || idx >= MAX_GAMEPADS) return false;
+
+    bool dpad = IsGamepadButtonPressed(GamepadButton::DPadDown);
+    bool stick = gamepads_[idx].axes[(int)GamepadAxis::LeftStickY] < -0.5f;
+    bool repeat = (ui_last_nav_btn_ == GamepadButton::DPadDown && ui_nav_repeated_
+                   && ui_nav_timer_ >= gamepad_config_.ui_nav_repeat_rate);
+    return dpad || (stick && IsGamepadButtonPressed(GamepadButton::DPadDown)) || repeat;
+}
+
+bool InputSystem::IsUINavLeft() const {
+    if (!gamepad_config_.enabled) return false;
+    bool dpad = IsGamepadButtonPressed(GamepadButton::DPadLeft);
+    bool repeat = (ui_last_nav_btn_ == GamepadButton::DPadLeft && ui_nav_repeated_
+                   && ui_nav_timer_ >= gamepad_config_.ui_nav_repeat_rate);
+    return dpad || repeat;
+}
+
+bool InputSystem::IsUINavRight() const {
+    if (!gamepad_config_.enabled) return false;
+    bool dpad = IsGamepadButtonPressed(GamepadButton::DPadRight);
+    bool repeat = (ui_last_nav_btn_ == GamepadButton::DPadRight && ui_nav_repeated_
+                   && ui_nav_timer_ >= gamepad_config_.ui_nav_repeat_rate);
+    return dpad || repeat;
+}
+
+bool InputSystem::IsUINavConfirm() const {
+    return IsGamepadButtonPressed(GamepadButton::A) || IsGamepadButtonPressed(GamepadButton::Start);
+}
+
+bool InputSystem::IsUINavCancel() const {
+    return IsGamepadButtonPressed(GamepadButton::B) || IsGamepadButtonPressed(GamepadButton::Back);
+}
+
+bool InputSystem::IsUINavStart() const {
+    return IsGamepadButtonPressed(GamepadButton::Start);
+}
+
+bool InputSystem::IsUINavSelect() const {
+    return IsGamepadButtonPressed(GamepadButton::Back);
+}
+
+float InputSystem::GetUINavScroll() const {
+    if (!gamepad_config_.enabled) return 0;
+    int idx = gamepad_config_.active_gamepad;
+    if (idx < 0 || idx >= MAX_GAMEPADS) return 0;
+
+    // Right stick Y or left stick Y for scroll
+    float ry = gamepads_[idx].axes[(int)GamepadAxis::RightStickY];
+    if (std::abs(ry) > 0.3f) return ry * gamepad_config_.ui_scroll_speed;
+    return 0;
+}
+
+float InputSystem::GetUINavHorizontal() const {
+    if (!gamepad_config_.enabled) return 0;
+    int idx = gamepad_config_.active_gamepad;
+    if (idx < 0 || idx >= MAX_GAMEPADS) return 0;
+    return gamepads_[idx].axes[(int)GamepadAxis::LeftStickX];
+}
+
+// ── Gamepad configuration ──────────────────────────────────────────────────
+
+float InputSystem::GetGamepadSensitivityX() const {
+    int idx = gamepad_config_.active_gamepad;
+    auto it = gamepad_config_.sensitivity_x.find(idx);
+    return (it != gamepad_config_.sensitivity_x.end()) ? it->second : 1.0f;
+}
+
+float InputSystem::GetGamepadSensitivityY() const {
+    int idx = gamepad_config_.active_gamepad;
+    auto it = gamepad_config_.sensitivity_y.find(idx);
+    return (it != gamepad_config_.sensitivity_y.end()) ? it->second : 1.0f;
+}
+
+void InputSystem::SetGamepadSensitivity(int gamepad_idx, float sx, float sy) {
+    if (gamepad_idx < 0 || gamepad_idx >= MAX_GAMEPADS) return;
+    gamepad_config_.sensitivity_x[gamepad_idx] = std::max(0.1f, std::min(10.0f, sx));
+    gamepad_config_.sensitivity_y[gamepad_idx] = std::max(0.1f, std::min(10.0f, sy));
+    if (gamepad_idx < MAX_GAMEPADS) {
+        gamepads_[gamepad_idx].sensitivity_x = gamepad_config_.sensitivity_x[gamepad_idx];
+        gamepads_[gamepad_idx].sensitivity_y = gamepad_config_.sensitivity_y[gamepad_idx];
+    }
+}
+
+void InputSystem::RemapButton(int gamepad_idx, GamepadButton original, int target_key) {
+    if (gamepad_idx < 0 || gamepad_idx >= MAX_GAMEPADS) return;
+    auto& remap_list = gamepad_config_.remap[gamepad_idx];
+
+    // Check if already remapped
+    for (auto& entry : remap_list) {
+        if (entry.original == original) {
+            entry.remapped_to_key = target_key;
+            return;
+        }
+    }
+
+    GamepadRemapEntry entry;
+    entry.original = original;
+    entry.remapped_to_key = target_key;
+    remap_list.push_back(entry);
+}
+
+void InputSystem::ClearRemap(int gamepad_idx, GamepadButton original) {
+    auto it = gamepad_config_.remap.find(gamepad_idx);
+    if (it == gamepad_config_.remap.end()) return;
+    auto& list = it->second;
+    list.erase(std::remove_if(list.begin(), list.end(),
+        [&](const GamepadRemapEntry& e) { return e.original == original; }), list.end());
+}
+
+int InputSystem::GetRemappedKey(int gamepad_idx, GamepadButton original) const {
+    auto it = gamepad_config_.remap.find(gamepad_idx);
+    if (it == gamepad_config_.remap.end()) return -1;
+    for (auto& entry : it->second) {
+        if (entry.original == original) return entry.remapped_to_key;
+    }
+    return -1;
+}
+
+// ── Static GLFW callbacks ──────────────────────────────────────────────────
 
 void InputSystem::GlfwKeyCallback(GLFWwindow*, int key, int scancode, int action, int mods) {
     auto* sys = GetInstance();
     if (!sys) return;
     sys->UpdateKeyState(key, action);
 
+    // Also check gamepad remapping
     KeyEvent e;
     e.key = key;
     e.scancode = scancode;
@@ -164,7 +507,6 @@ void InputSystem::GlfwKeyCallback(GLFWwindow*, int key, int scancode, int action
 }
 
 void InputSystem::GlfwCharCallback(GLFWwindow*, unsigned int codepoint) {
-    // Char input is handled directly by chat/input field
     (void)codepoint;
 }
 
@@ -173,10 +515,10 @@ void InputSystem::GlfwMouseButtonCallback(GLFWwindow*, int button, int action, i
     if (!sys) return;
     if (button < 0 || button >= 8) return;
 
-    if (action == 1) { // PRESS
+    if (action == 1) {
         sys->mouse_down_[button] = true;
         sys->CheckDoubleClick(button);
-    } else { // RELEASE
+    } else {
         sys->mouse_down_[button] = false;
     }
 
@@ -203,177 +545,4 @@ void InputSystem::GlfwScrollCallback(GLFWwindow*, double, double yoffset) {
     auto* sys = GetInstance();
     if (!sys) return;
     sys->scroll_ = (float)yoffset;
-}
-
-// --- Gamepad ---
-
-void InputSystem::PollGamepad() {
-    int jid = -1;
-    for (int i = GLFW_JOYSTICK_1; i <= GLFW_JOYSTICK_LAST; i++) {
-        if (glfwJoystickIsGamepad(i)) {
-            jid = i;
-            break;
-        }
-    }
-
-    if (jid < 0) {
-        gamepad_.connected = false;
-        gamepad_.joystick_id = -1;
-        return;
-    }
-
-    gamepad_.connected = true;
-    gamepad_.joystick_id = jid;
-
-    GLFWgamepadstate state;
-    if (!glfwGetGamepadState(jid, &state)) {
-        gamepad_.connected = false;
-        return;
-    }
-
-    // Buttons
-    gamepad_.a      = state.buttons[GLFW_GAMEPAD_BUTTON_A] != 0;
-    gamepad_.b      = state.buttons[GLFW_GAMEPAD_BUTTON_B] != 0;
-    gamepad_.x      = state.buttons[GLFW_GAMEPAD_BUTTON_X] != 0;
-    gamepad_.y      = state.buttons[GLFW_GAMEPAD_BUTTON_Y] != 0;
-    gamepad_.lb     = state.buttons[GLFW_GAMEPAD_BUTTON_LEFT_BUMPER] != 0;
-    gamepad_.rb     = state.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER] != 0;
-    gamepad_.back   = state.buttons[GLFW_GAMEPAD_BUTTON_BACK] != 0;
-    gamepad_.start  = state.buttons[GLFW_GAMEPAD_BUTTON_START] != 0;
-    gamepad_.guide  = state.buttons[GLFW_GAMEPAD_BUTTON_GUIDE] != 0;
-    gamepad_.dpad_up    = state.buttons[GLFW_GAMEPAD_BUTTON_DPAD_UP] != 0;
-    gamepad_.dpad_down  = state.buttons[GLFW_GAMEPAD_BUTTON_DPAD_DOWN] != 0;
-    gamepad_.dpad_left  = state.buttons[GLFW_GAMEPAD_BUTTON_DPAD_LEFT] != 0;
-    gamepad_.dpad_right = state.buttons[GLFW_GAMEPAD_BUTTON_DPAD_RIGHT] != 0;
-
-    // Axes with dead zone
-    auto apply_dead = [](float v, float dz) -> float {
-        if (std::abs(v) < dz) return 0.0f;
-        return (v > 0 ? 1.0f : -1.0f) * ((std::abs(v) - dz) / (1.0f - dz));
-    };
-
-    gamepad_.left_x  = apply_dead(state.axes[GLFW_GAMEPAD_AXIS_LEFT_X], DEAD_ZONE);
-    gamepad_.left_y  = apply_dead(state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y], DEAD_ZONE);
-    gamepad_.right_x = apply_dead(state.axes[GLFW_GAMEPAD_AXIS_RIGHT_X], DEAD_ZONE);
-    gamepad_.right_y = apply_dead(state.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y], DEAD_ZONE);
-    gamepad_.lt = apply_dead(state.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER], DEAD_ZONE);
-    gamepad_.rt = apply_dead(state.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER], DEAD_ZONE);
-
-    // Right stick drives camera orbit delta
-    camera_yaw_delta_   = gamepad_.right_x * 120.0f * dt_;
-    camera_pitch_delta_ = gamepad_.right_y * 120.0f * dt_;
-}
-
-void InputSystem::MapGamepadToKeys() {
-    // Left analog → WASD movement
-    bool move_left  = gamepad_.left_x < -DEAD_ZONE;
-    bool move_right = gamepad_.left_x >  DEAD_ZONE;
-    bool move_up    = gamepad_.left_y < -DEAD_ZONE;
-    bool move_down  = gamepad_.left_y >  DEAD_ZONE;
-
-    // Inject key state directly
-    keys_down_[GLFW_KEY_A] = move_left;
-    keys_down_[GLFW_KEY_D] = move_right;
-    keys_down_[GLFW_KEY_W] = move_up;
-    keys_down_[GLFW_KEY_S] = move_down;
-
-    // A → Space (attack)
-    if (gamepad_.a && !gamepad_prev_.a)
-        keys_down_[GLFW_KEY_SPACE] = true;
-    if (!gamepad_.a && gamepad_prev_.a)
-        keys_down_[GLFW_KEY_SPACE] = false;
-
-    // B → Esc (menu)
-    if (gamepad_.b && !gamepad_prev_.b)
-        keys_down_[GLFW_KEY_ESCAPE] = true;
-    if (!gamepad_.b && gamepad_prev_.b)
-        keys_down_[GLFW_KEY_ESCAPE] = false;
-
-    // X → I (inventory)
-    if (gamepad_.x && !gamepad_prev_.x)
-        keys_down_[GLFW_KEY_I] = true;
-    if (!gamepad_.x && gamepad_prev_.x)
-        keys_down_[GLFW_KEY_I] = false;
-
-    // Y → K (skills)
-    if (gamepad_.y && !gamepad_prev_.y)
-        keys_down_[GLFW_KEY_K] = true;
-    if (!gamepad_.y && gamepad_prev_.y)
-        keys_down_[GLFW_KEY_K] = false;
-
-    // D-pad → UI navigation (arrow keys)
-    if (gamepad_.dpad_up && !gamepad_prev_.dpad_up)
-        keys_down_[GLFW_KEY_UP] = true;
-    if (!gamepad_.dpad_up && gamepad_prev_.dpad_up)
-        keys_down_[GLFW_KEY_UP] = false;
-
-    if (gamepad_.dpad_down && !gamepad_prev_.dpad_down)
-        keys_down_[GLFW_KEY_DOWN] = true;
-    if (!gamepad_.dpad_down && gamepad_prev_.dpad_down)
-        keys_down_[GLFW_KEY_DOWN] = false;
-
-    if (gamepad_.dpad_left && !gamepad_prev_.dpad_left)
-        keys_down_[GLFW_KEY_LEFT] = true;
-    if (!gamepad_.dpad_left && gamepad_prev_.dpad_left)
-        keys_down_[GLFW_KEY_LEFT] = false;
-
-    if (gamepad_.dpad_right && !gamepad_prev_.dpad_right)
-        keys_down_[GLFW_KEY_RIGHT] = true;
-    if (!gamepad_.dpad_right && gamepad_prev_.dpad_right)
-        keys_down_[GLFW_KEY_RIGHT] = false;
-
-    gamepad_mapped_ = true;
-}
-
-bool InputSystem::IsGamepadButtonDown(int btn) const {
-    if (!gamepad_.connected) return false;
-    switch (btn) {
-        case GLFW_GAMEPAD_BUTTON_A: return gamepad_.a;
-        case GLFW_GAMEPAD_BUTTON_B: return gamepad_.b;
-        case GLFW_GAMEPAD_BUTTON_X: return gamepad_.x;
-        case GLFW_GAMEPAD_BUTTON_Y: return gamepad_.y;
-        case GLFW_GAMEPAD_BUTTON_LEFT_BUMPER: return gamepad_.lb;
-        case GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER: return gamepad_.rb;
-        case GLFW_GAMEPAD_BUTTON_BACK: return gamepad_.back;
-        case GLFW_GAMEPAD_BUTTON_START: return gamepad_.start;
-        case GLFW_GAMEPAD_BUTTON_DPAD_UP: return gamepad_.dpad_up;
-        case GLFW_GAMEPAD_BUTTON_DPAD_DOWN: return gamepad_.dpad_down;
-        case GLFW_GAMEPAD_BUTTON_DPAD_LEFT: return gamepad_.dpad_left;
-        case GLFW_GAMEPAD_BUTTON_DPAD_RIGHT: return gamepad_.dpad_right;
-        default: return false;
-    }
-}
-
-bool InputSystem::IsGamepadButtonPressed(int btn) const {
-    if (!gamepad_.connected) return false;
-    bool cur = IsGamepadButtonDown(btn);
-    bool prev = false;
-    switch (btn) {
-        case GLFW_GAMEPAD_BUTTON_A: prev = gamepad_prev_.a; break;
-        case GLFW_GAMEPAD_BUTTON_B: prev = gamepad_prev_.b; break;
-        case GLFW_GAMEPAD_BUTTON_X: prev = gamepad_prev_.x; break;
-        case GLFW_GAMEPAD_BUTTON_Y: prev = gamepad_prev_.y; break;
-        case GLFW_GAMEPAD_BUTTON_LEFT_BUMPER: prev = gamepad_prev_.lb; break;
-        case GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER: prev = gamepad_prev_.rb; break;
-        case GLFW_GAMEPAD_BUTTON_BACK: prev = gamepad_prev_.back; break;
-        case GLFW_GAMEPAD_BUTTON_START: prev = gamepad_prev_.start; break;
-        case GLFW_GAMEPAD_BUTTON_DPAD_UP: prev = gamepad_prev_.dpad_up; break;
-        case GLFW_GAMEPAD_BUTTON_DPAD_DOWN: prev = gamepad_prev_.dpad_down; break;
-        case GLFW_GAMEPAD_BUTTON_DPAD_LEFT: prev = gamepad_prev_.dpad_left; break;
-        case GLFW_GAMEPAD_BUTTON_DPAD_RIGHT: prev = gamepad_prev_.dpad_right; break;
-    }
-    return cur && !prev;
-}
-
-float InputSystem::GetGamepadAxis(int axis) const {
-    if (!gamepad_.connected) return 0.0f;
-    switch (axis) {
-        case GLFW_GAMEPAD_AXIS_LEFT_X: return gamepad_.left_x;
-        case GLFW_GAMEPAD_AXIS_LEFT_Y: return gamepad_.left_y;
-        case GLFW_GAMEPAD_AXIS_RIGHT_X: return gamepad_.right_x;
-        case GLFW_GAMEPAD_AXIS_RIGHT_Y: return gamepad_.right_y;
-        case GLFW_GAMEPAD_AXIS_LEFT_TRIGGER: return gamepad_.lt;
-        case GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER: return gamepad_.rt;
-        default: return 0.0f;
-    }
 }
