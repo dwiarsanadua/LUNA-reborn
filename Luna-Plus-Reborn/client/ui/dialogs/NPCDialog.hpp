@@ -1,5 +1,6 @@
 #pragma once
 #include <ui/Window.hpp>
+#include <ui/WindowManager.hpp>
 #include <ui/GameState.hpp>
 #include <ui/widgets/Label.hpp>
 #include <ui/widgets/Button.hpp>
@@ -19,7 +20,7 @@ class NPCDialog {
 public:
     NPCDialog();
     Window* GetWindow() { return window_; }
-    void Open(GameState* state, uint32_t npc_id, const std::string& npc_name);
+    void Open(GameState* state, uint32_t npc_id, const std::string& npc_name, WindowManager* wm = nullptr);
     void Close();
     void SetNode(int node_id);
     void UpdateFromState(GameState* state);

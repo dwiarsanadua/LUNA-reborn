@@ -1,5 +1,6 @@
 #pragma once
 #include <ui/Window.hpp>
+#include <ui/WindowManager.hpp>
 #include <ui/GameState.hpp>
 #include <ui/widgets/Grid.hpp>
 #include <ui/widgets/Label.hpp>
@@ -11,7 +12,7 @@
 class TradeDialog {
 public:
     Window* GetWindow() { return window_; }
-    void Open(GameState* state, TradingSystem* trading = nullptr);
+    void Open(GameState* state, TradingSystem* trading = nullptr, WindowManager* wm = nullptr);
     void Close() { window_ = nullptr; }
     void UpdateFromState(GameState* state);
 

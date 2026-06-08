@@ -3,13 +3,22 @@
 #include <iostream>
 
 UiElement UiScriptParser::ParseFile(const std::string& path) {
-    ParserContext ctx;
+    ParseContext ctx;
     ctx.file.open(path);
+    if (!ctx.file.is_open()) {
+        std::string alt = path;
+        if (alt.size() > 4 && alt.substr(alt.size() - 4) == ".txt")
+            alt = alt.substr(0, alt.size() - 4);
+        ctx.file.open(alt);
+    }
     if (!ctx.file.is_open()) {
         spdlog::error("UiScriptParser: Failed to open {}", path);
         return {};
     }
+    return ParseStream(ctx);
+}
 
+UiElement UiScriptParser::ParseStream(ParseContext& ctx) {
     while (std::getline(ctx.file, ctx.current_line)) {
         std::string line = Trim(ctx.current_line);
         if (line.empty() || line[0] == '@' || line[0] == ';') continue;
@@ -20,11 +29,10 @@ UiElement UiScriptParser::ParseFile(const std::string& path) {
             return root;
         }
     }
-
     return {};
 }
 
-UiElement UiScriptParser::ParseBlock(ParserContext& ctx, const std::string& name) {
+UiElement UiScriptParser::ParseBlock(ParseContext& ctx, const std::string& name) {
     UiElement elem;
     elem.type = name;
     

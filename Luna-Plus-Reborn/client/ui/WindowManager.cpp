@@ -6,6 +6,20 @@
 #include "widgets/Grid.hpp"
 #include <algorithm>
 #include <cstdio>
+#include <filesystem>
+#include <unordered_set>
+#include <spdlog/spdlog.h>
+namespace fs = std::filesystem;
+
+static void CollectAtlasIDs(const UiElement& elem, std::unordered_set<int>& ids) {
+    if (elem.basic_img.atlas != -1) ids.insert(elem.basic_img.atlas);
+    if (elem.over_img.atlas != -1) ids.insert(elem.over_img.atlas);
+    if (elem.press_img.atlas != -1) ids.insert(elem.press_img.atlas);
+    if (elem.icon_cell_bg.atlas != -1) ids.insert(elem.icon_cell_bg.atlas);
+    if (elem.dragover_bg.atlas != -1) ids.insert(elem.dragover_bg.atlas);
+    for (const auto& child : elem.children)
+        CollectAtlasIDs(child, ids);
+}
 
 Window* WindowManager::Open(const std::string& title, float x, float y, float w, float h) {
     if (auto* existing = Find(title)) {
@@ -67,6 +81,33 @@ Window* WindowManager::LoadFromScript(const std::string& path) {
     }
 
     return win;
+}
+
+void WindowManager::PreloadUI(const std::string& interface_path) {
+    std::string dir = interface_path + "/Windows";
+    if (!fs::is_directory(dir)) {
+        spdlog::warn("PreloadUI: directory not found {}", dir);
+        return;
+    }
+    std::unordered_set<int> all_atlases;
+    for (const auto& entry : fs::directory_iterator(dir)) {
+        std::string ext = entry.path().extension().string();
+        if (ext != ".txt") continue;
+        std::string path = entry.path().string();
+        UiElement root = UiScriptParser::ParseFile(path);
+        if (root.type.empty()) continue;
+        CollectAtlasIDs(root, all_atlases);
+    }
+    for (int atlas_id : all_atlases) {
+        if (preloaded_atlases_.count(atlas_id)) continue;
+        preloaded_atlases_.insert(atlas_id);
+        if (!g_ui) continue;
+        char atlas_name[32];
+        snprintf(atlas_name, sizeof(atlas_name), "b%d.tif", atlas_id);
+        g_ui->LoadTexture(atlas_name, atlas_name);
+    }
+    spdlog::info("PreloadUI: pre-loaded {} atlas textures from {} files",
+        all_atlases.size(), preloaded_atlases_.size());
 }
 
 void WindowManager::Close(const std::string& title) {

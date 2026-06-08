@@ -1,5 +1,6 @@
 #include "QuestDialog.hpp"
 #include <ui/UiScriptParser.hpp>
+#include <ui/ColorPalette.hpp>
 #include <ui/widgets/TabPanel.hpp>
 #include <cstdio>
 #include <algorithm>
@@ -155,8 +156,8 @@ void QuestDialog::Open(GameState* state, WindowManager* wm) {
     tabs->AddTab("Completed", done_list);
 
     // Detail text area (right side)
-    detail_label_ = window_->AddWidget<Label>("Select a quest to see details.", 270, 50, 0xff333333);
-    reward_label_ = window_->AddWidget<Label>("", 270, 240, 0xff886600);
+    detail_label_ = window_->AddWidget<Label>("Select a quest to see details.", 270, 50, ColorPalette::TEXT_DARK);
+    reward_label_ = window_->AddWidget<Label>("", 270, 240, ColorPalette::TEXT_BROWN);
 
     // Accept / Complete buttons
     auto* accept_btn = window_->AddWidget<Button>("Accept Quest", 270, 370, 110, 24);

@@ -39,12 +39,13 @@ public:
     static UiElement ParseFile(const std::string& path);
 
 private:
-    struct ParserContext {
+    struct ParseContext {
         std::ifstream file;
         std::string current_line;
     };
 
-    static UiElement ParseBlock(ParserContext& ctx, const std::string& name);
+    static UiElement ParseStream(ParseContext& ctx);
+    static UiElement ParseBlock(ParseContext& ctx, const std::string& name);
     static UiScriptUV ParseImage(const std::string& line);
     static UiScriptRect ParseRect(const std::string& line);
     static uint32_t ParseColor(const std::string& line);

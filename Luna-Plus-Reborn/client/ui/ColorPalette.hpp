@@ -22,6 +22,10 @@ constexpr uint32_t TEXT_DISABLED  = 0xff888888;
 constexpr uint32_t TEXT_HIGHLIGHT = 0xffffff00;
 constexpr uint32_t TEXT_ERROR     = 0xffff4444;
 constexpr uint32_t TEXT_LINK      = 0xff8888ff;
+constexpr uint32_t TEXT_GOLD      = 0xffffcc88;
+constexpr uint32_t TEXT_GOLD_BOLD = 0xffffcc00;
+constexpr uint32_t TEXT_DARK      = 0xff333333;
+constexpr uint32_t TEXT_BROWN     = 0xff886600;
 
 // ─── Item Rarity (dari Old) ───────────────────────────
 constexpr uint32_t ITEM_NORMAL    = 0xffffffff;

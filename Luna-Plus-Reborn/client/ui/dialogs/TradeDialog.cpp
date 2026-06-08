@@ -1,11 +1,15 @@
 #include "TradeDialog.hpp"
+#include <ui/ColorPalette.hpp>
 #include <cstdio>
 
-void TradeDialog::Open(GameState* state, TradingSystem* trading) {
+void TradeDialog::Open(GameState* state, TradingSystem* trading, WindowManager* wm) {
     trading_ = trading;
-    window_ = new Window("TRADE", 200, 100, 500, 400);
-    window_->SetClosable(true);
-    window_->SetMovable(true);
+    if (wm) window_ = wm->LoadFromScript("assets/interface/Windows/Trade.bin.txt");
+    if (!window_) {
+        window_ = new Window("TRADE", 200, 100, 500, 400);
+        window_->SetClosable(true);
+        window_->SetMovable(true);
+    }
 
     // Create trade session
     if (trading_) {
@@ -14,7 +18,7 @@ void TradeDialog::Open(GameState* state, TradingSystem* trading) {
     }
 
     // Your side
-    auto* my_label = window_->AddWidget<Label>("Your Items (click to add)", 10, 26, 0xffffcc88);
+    auto* my_label = window_->AddWidget<Label>("Your Items (click to add)", 10, 26, ColorPalette::TEXT_GOLD);
     (void)my_label;
     my_items_ = window_->AddWidget<Grid>(3, 4, 50, 35, 10, 46);
     my_items_->OnSlotEvent([this, state](int row, int col, const UIEvent& e) {
@@ -30,7 +34,7 @@ void TradeDialog::Open(GameState* state, TradingSystem* trading) {
             }
         }
     });
-    my_gold_label_ = window_->AddWidget<Label>("Gold: 0 — click to add 100g", 10, 195, 0xffffcc00);
+    my_gold_label_ = window_->AddWidget<Label>("Gold: 0 — click to add 100g", 10, 195, ColorPalette::TEXT_GOLD_BOLD);
     my_gold_label_->OnEvent([this, state](const UIEvent& e) {
         if (e.type == UIEvent::Click && trading_) {
             if (state->gold >= 100) {
@@ -43,10 +47,10 @@ void TradeDialog::Open(GameState* state, TradingSystem* trading) {
     });
 
     // Their side
-    auto* their_label = window_->AddWidget<Label>("NPC Trader's Items", 260, 26, 0xffffcc88);
+    auto* their_label = window_->AddWidget<Label>("NPC Trader's Items", 260, 26, ColorPalette::TEXT_GOLD);
     (void)their_label;
     their_items_ = window_->AddWidget<Grid>(3, 4, 50, 35, 260, 46);
-    their_gold_label_ = window_->AddWidget<Label>("Gold: 0", 260, 195, 0xffffcc00);
+    their_gold_label_ = window_->AddWidget<Label>("Gold: 0", 260, 195, ColorPalette::TEXT_GOLD_BOLD);
 
     // Confirm / Cancel buttons
     auto* confirm_btn = window_->AddWidget<Button>("Confirm", 140, 260, 80, 24);
@@ -74,7 +78,7 @@ void TradeDialog::Open(GameState* state, TradingSystem* trading) {
     });
 
     // Status line
-    status_label_ = window_->AddWidget<Label>("Add items from inventory to begin trading", 10, 300, 0xffcccccc);
+    status_label_ = window_->AddWidget<Label>("Add items from inventory to begin trading", 10, 300, ColorPalette::BTN_NORMAL);
 
     // Initially simulate NPC putting up some items
     if (trading_) {

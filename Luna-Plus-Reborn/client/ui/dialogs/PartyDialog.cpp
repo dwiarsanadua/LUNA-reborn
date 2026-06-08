@@ -1,5 +1,6 @@
 #include "PartyDialog.hpp"
 #include <ui/UiScriptParser.hpp>
+#include <ui/ColorPalette.hpp>
 #include <ui/widgets/ListBox.hpp>
 #include <ui/widgets/TabPanel.hpp>
 #include <cstdio>
@@ -30,5 +31,5 @@ void PartyDialog::Open(WindowManager* wm) {
     info_list->AddItem("Max Members: 6");
     tabs->AddTab("Settings", info_list);
 
-    window_->AddWidget<Label>("[1-6] Invite  [0] Leave Party", 10, 245, 0xff888888);
+    window_->AddWidget<Label>("[1-6] Invite  [0] Leave Party", 10, 245, ColorPalette::TEXT_DISABLED);
 }

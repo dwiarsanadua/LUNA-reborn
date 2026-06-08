@@ -1,5 +1,6 @@
 #include "StorageDialog.hpp"
 #include <ui/UiScriptParser.hpp>
+#include <ui/ColorPalette.hpp>
 #include <cstdio>
 #include <algorithm>
 
@@ -22,7 +23,7 @@ void StorageDialog::Open(GameState* state, WindowManager* wm) {
     tabs->AddTab("Storage", storage_grid_);
 
     // Info label
-    gold_label_ = window_->AddWidget<Label>("Gold: 0", 10, 320, 0xffffcc88);
+    gold_label_ = window_->AddWidget<Label>("Gold: 0", 10, 320, ColorPalette::TEXT_GOLD);
 
     // Initialize empty storage
     items_.resize(40);

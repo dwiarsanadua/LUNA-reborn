@@ -1,18 +1,22 @@
 #include "NPCDialog.hpp"
+#include <ui/ColorPalette.hpp>
 #include <spdlog/spdlog.h>
 
 NPCDialog::NPCDialog() {}
 
-void NPCDialog::Open(GameState* state, uint32_t npc_id, const std::string& npc_name) {
+void NPCDialog::Open(GameState* state, uint32_t npc_id, const std::string& npc_name, WindowManager* wm) {
     if (window_) return;
     state_ = state;
     current_npc_id_ = npc_id;
     current_npc_name_ = npc_name;
 
-    window_ = new Window("", 300, 300, 680, 240); // Standard bottom-center dialog
-    window_->SetMovable(true);
-    window_->SetClosable(true);
-    window_->SetTitleBarH(0); // No title bar for authentic feel
+    if (wm) window_ = wm->LoadFromScript("assets/interface/Windows/NpcImage.bin.txt");
+    if (!window_) {
+        window_ = new Window("", 300, 300, 680, 240);
+        window_->SetMovable(true);
+        window_->SetClosable(true);
+        window_->SetTitleBarH(0);
+    }
 
     window_->SetCustomBackground([this](UIRenderer& ui, float x, float y, float w, float h) {
         if (!bgfx::isValid(bg_tex_.handle)) {
@@ -26,7 +30,7 @@ void NPCDialog::Open(GameState* state, uint32_t npc_id, const std::string& npc_n
         }
     });
 
-    text_label_ = window_->AddWidget<Label>("", 120, 40, 0xffffffff);
+    text_label_ = window_->AddWidget<Label>("", 120, 40, ColorPalette::TEXT_NORMAL);
     
     BuildDialogTree();
     SetNode(0);

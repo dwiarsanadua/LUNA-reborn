@@ -1,5 +1,6 @@
 #include "SkillDialog.hpp"
 #include <ui/UiScriptParser.hpp>
+#include <ui/ColorPalette.hpp>
 #include <gameobjects/ClassAdvancement.hpp>
 #include <cstdio>
 #include <algorithm>
@@ -30,13 +31,13 @@ void SkillDialog::Open(GameState* state, WindowManager* wm) {
 
     char sp_buf[64];
     snprintf(sp_buf, sizeof(sp_buf), "Skill Points: %d", state->skill_points);
-    sp_label_ = window_->AddWidget<Label>(sp_buf, 10, 4, 0xff88ff88);
+    sp_label_ = window_->AddWidget<Label>(sp_buf, 10, 4, ColorPalette::NAME_NPC);
 
     const char* class_names[] = {"Warrior", "Mage", "Archer"};
     char class_buf[64];
     snprintf(class_buf, sizeof(class_buf), "Class: %s (Lv.%d)", 
         class_names[state->class_id % 3], state->level);
-    window_->AddWidget<Label>(class_buf, 300, 4, 0xffffcc88);
+    window_->AddWidget<Label>(class_buf, 300, 4, ColorPalette::TEXT_GOLD);
 
     tabs_ = window_->AddWidget<TabPanel>(10, 28, 310, 340);
 
@@ -59,7 +60,7 @@ void SkillDialog::Open(GameState* state, WindowManager* wm) {
         }
     });
 
-    detail_label_ = window_->AddWidget<Label>("Select a skill to learn", 330, 50, 0xffffffff);
+    detail_label_ = window_->AddWidget<Label>("Select a skill to learn", 330, 50, ColorPalette::TEXT_NORMAL);
 
     auto* learn_btn = window_->AddWidget<Button>("Learn Skill", 330, 250, 120, 24);
     learn_btn->SetColors({40,80,40,220}, {80,130,80,220}, {30,50,30,220});
@@ -119,7 +120,7 @@ void SkillDialog::Refresh(GameState* state) {
         GridSlot gs;
         gs.empty = false;
         gs.text = buf;
-        gs.color = learned ? 0xff88ff88 : (can_learn ? 0xffffff88 : 0xff888888);
+        gs.color = learned ? ColorPalette::NAME_NPC : (can_learn ? ColorPalette::TEXT_HIGHLIGHT : ColorPalette::TEXT_DISABLED);
         skill_grid_->SetSlot(r, c, gs);
     }
 
