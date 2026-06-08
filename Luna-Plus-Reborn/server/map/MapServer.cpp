@@ -7,6 +7,12 @@
 #include "systems/ItemSystem.h"
 #include "systems/QuestSystem.h"
 #include "systems/SpawnSystem.hpp"
+#include "systems/GridSystem.hpp"
+#include "systems/TriggerSystem.hpp"
+#include "systems/MapScriptRuntime.hpp"
+#include <ecs/systems/SkillSystem.hpp>
+#include <ecs/components/SkillBook.hpp>
+#include <ecs/components/QuestLog.hpp>
 #include <sqlite3.h>
 #include <ecs/components/Inventory.hpp>
 #include <ecs/components/CharacterStats.hpp>
@@ -30,6 +36,9 @@
 #include <Trade_generated.h>
 #include <Consignment_generated.h>
 #include <StreetStall_generated.h>
+#include <Quest_generated.h>
+#include <Trigger_generated.h>
+#include <Dungeon_generated.h>
 #include <ecs/components/AIComponent.hpp>
 #include <PacketType_generated.h>
 #include <spdlog/spdlog.h>
@@ -205,6 +214,10 @@ bool MapServer::Initialize(int map_id, uint16_t port) {
         }
     }
 
+    script_runtime_.Initialize();
+    triggers_.LoadForMap(*db_, map_id_);
+    quest_->LoadQuestTemplates("assets/data/game_data.db");
+
     running_ = true;
     SeedMarketData();
     RegisterWithDistribute();
@@ -214,6 +227,8 @@ bool MapServer::Initialize(int map_id, uint16_t port) {
 
 void MapServer::Shutdown() {
     running_ = false;
+    script_runtime_.Shutdown();
+    grid_.Clear();
     for (auto& [id, dungeon] : dungeons_) {
         CleanupDungeon(id);
     }
@@ -230,9 +245,12 @@ void MapServer::Update(float dt) {
     movement_->Update(*registry_, dt);
     ai_->Update(*registry_, dt);
     combat_->Update(*registry_, dt);
+    skill_sys_.UpdateCooldowns(*registry_, dt);
+    quest_->Update(*registry_, dt);
     BroadcastMonsterMovement(dt);
 
     if (player_joined_ && registry_->valid(player_entity_)) {
+        triggers_.Update(this, player_entity_, connected_player_.pos_x, connected_player_.pos_z);
         int hp = registry_->get<CharacterStats>(player_entity_).hp;
         if (hp != last_sent_hp_) {
             last_sent_hp_ = hp;
@@ -297,6 +315,7 @@ void MapServer::Update(float dt) {
         auto view = registry_->view<PlayerData>();
         for (auto entity : view) {
             auto& pd = view.get<PlayerData>(entity);
+            SavePlayerQuests(pd.id);
             std::string sql = "INSERT OR REPLACE INTO player_saves "
                 "(entity_id, account_id, name, level, class_id, map_id, pos_x, pos_y, pos_z, hp, max_hp) VALUES ("
                 + std::to_string(pd.id) + ","
@@ -333,6 +352,15 @@ void MapServer::SpawnPlayer(int entity_id, const PlayerData& data) {
     stats.physic_attack = 20.0f + data.level * 3.0f;
     stats.physic_defense = 5.0f + data.level;
     registry_->emplace<TagPlayer>(player_entity_);
+    auto& book = registry_->emplace<SkillBook>(player_entity_);
+    book.LearnSkill(1);
+    book.LearnSkill(10);
+    book.LearnSkill(11);
+    book.hotbar[0] = 1;
+    book.hotbar[1] = 10;
+    book.hotbar[2] = 11;
+    registry_->emplace<QuestLog>(player_entity_);
+    grid_.Insert(static_cast<uint32_t>(entity_id), data.pos_x, data.pos_z);
     SendNPCList(entity_id);
     spdlog::info("MapServer: player {} spawned, NPC list sent", data.name);
 }
@@ -342,6 +370,7 @@ void MapServer::DespawnPlayer(int entity_id) {
     for (auto entity : view) {
         auto& pd = view.get<PlayerData>(entity);
         if (pd.id == entity_id) {
+            SavePlayerQuests(entity_id);
             SavePlayerPosition(entity_id, pd.pos_x, pd.pos_y, pd.pos_z);
             registry_->destroy(entity);
             spdlog::info("MapServer: player {} despawned, position saved", entity_id);
@@ -615,7 +644,9 @@ void MapServer::BroadcastMonsterMovement(float dt) {
     auto view = registry_->view<TagMonster, Transform>();
     for (auto entity : view) {
         uint32_t eid = static_cast<uint32_t>(entt::to_entity(entity));
+        if (!visible_monsters_.count(eid)) continue;
         auto& xform = view.get<Transform>(entity);
+        grid_.Update(eid, xform.position.x, xform.position.z);
         auto& net = monster_net_[eid];
 
         if (!net.initialized) {
@@ -635,6 +666,7 @@ void MapServer::BroadcastMonsterMovement(float dt) {
         const char* anim = moved > 0.08f ? "walk" : "idle";
         SendEntityTransform(eid, xform.position.x, xform.position.y, xform.position.z, anim);
     }
+    UpdatePlayerVisibility();
 }
 
 void MapServer::GrantLootToPlayer(uint32_t item_id, uint16_t count) {
@@ -690,40 +722,27 @@ void MapServer::SendInventorySync() {
 
 void MapServer::BroadcastNewMonsterSpawns() {
     if (!player_joined_) return;
-    auto view = registry_->view<TagMonster, Transform, SpawnInfo, CharacterStats>();
+    auto view = registry_->view<TagMonster, Transform>();
     for (auto entity : view) {
         uint32_t eid = static_cast<uint32_t>(entt::to_entity(entity));
-        if (monster_net_.count(eid)) continue;
         auto& xform = view.get<Transform>(entity);
-        auto& spawn = view.get<SpawnInfo>(entity);
-        auto& stats = view.get<CharacterStats>(entity);
-        std::string model = "m224.chx";
-        std::string name = "Monster_" + std::to_string(spawn.monster_id);
-        SendEntitySpawn(eid, static_cast<int8_t>(luna::protocol::EntityType_Monster),
-            model, name, stats.level,
-            xform.position.x, xform.position.y, xform.position.z,
-            stats.max_hp > 0 ? static_cast<float>(stats.hp) / stats.max_hp : 1.0f);
-        monster_net_[eid] = {};
-        monster_net_[eid].last_sent = xform.position;
-        monster_net_[eid].initialized = true;
+        grid_.Insert(eid, xform.position.x, xform.position.z);
     }
+    UpdatePlayerVisibility();
 }
 
 void MapServer::SendWorldSnapshot() {
     if (!player_joined_) return;
-    auto monsters = registry_->view<TagMonster, Transform, SpawnInfo, CharacterStats>();
+    auto monsters = registry_->view<TagMonster, Transform>();
     for (auto entity : monsters) {
-        auto& xform = monsters.get<Transform>(entity);
-        auto& spawn = monsters.get<SpawnInfo>(entity);
-        auto& stats = monsters.get<CharacterStats>(entity);
         uint32_t eid = static_cast<uint32_t>(entt::to_entity(entity));
-        std::string model = "m224.chx";
-        std::string name = "Monster_" + std::to_string(spawn.monster_id);
-        SendEntitySpawn(eid, static_cast<int8_t>(luna::protocol::EntityType_Monster),
-            model, name, stats.level,
-            xform.position.x, xform.position.y, xform.position.z, 1.0f);
+        auto& xform = monsters.get<Transform>(entity);
+        grid_.Insert(eid, xform.position.x, xform.position.z);
     }
-    spdlog::info("MapServer: sent world snapshot to player {}", connected_player_.name);
+    visible_monsters_.clear();
+    monster_net_.clear();
+    UpdatePlayerVisibility();
+    spdlog::info("MapServer: sent AOI world snapshot to player {}", connected_player_.name);
 }
 
 void MapServer::HandlePacket(uint16_t type, const uint8_t* payload, size_t len) {
@@ -750,6 +769,7 @@ void MapServer::HandlePacket(uint16_t type, const uint8_t* payload, size_t len) 
         next_loot_slot_ = 10;
         last_sent_hp_ = -1;
         monster_net_.clear();
+        visible_monsters_.clear();
         has_party_ = false;
         party_.members.clear();
         party_.party_id = 0;
@@ -762,6 +782,7 @@ void MapServer::HandlePacket(uint16_t type, const uint8_t* payload, size_t len) 
         guild_.master_id = 0;
         trade_ = {};
         SpawnPlayer(connected_player_.id, connected_player_);
+        LoadPlayerQuests(connected_player_.id);
         SendWorldSnapshot();
         SendInventorySync();
         SendCharLifeUpdate();
@@ -772,6 +793,7 @@ void MapServer::HandlePacket(uint16_t type, const uint8_t* payload, size_t len) 
             static_cast<uint32_t>(connected_player_.id));
         fbb.Finish(ack);
         network_->SendPacket(PacketType_MP_USERCONN_GAMEIN_ACK, fbb.GetBufferPointer(), fbb.GetSize());
+        SendQuestList(0);
         return;
     }
 
@@ -791,6 +813,8 @@ void MapServer::HandlePacket(uint16_t type, const uint8_t* payload, size_t len) 
             if (registry_->valid(player_entity_)) {
                 auto& px = registry_->get<Transform>(player_entity_);
                 px.position = glm::vec3(connected_player_.pos_x, connected_player_.pos_y, connected_player_.pos_z);
+                grid_.Update(static_cast<uint32_t>(connected_player_.id), connected_player_.pos_x, connected_player_.pos_z);
+                UpdatePlayerVisibility();
             }
             SavePlayerPosition(connected_player_.id,
                 connected_player_.pos_x, connected_player_.pos_y, connected_player_.pos_z);
@@ -965,6 +989,27 @@ void MapServer::HandlePacket(uint16_t type, const uint8_t* payload, size_t len) 
         HandleStreetStallList(payload, len);
         return;
     }
+
+    if (type == PacketType_MP_QUEST_START_SYN) {
+        HandleQuestStart(payload, len);
+        return;
+    }
+    if (type == PacketType_MP_QUEST_END_SYN) {
+        HandleQuestEnd(payload, len);
+        return;
+    }
+    if (type == PacketType_MP_QUEST_LIST_SYN) {
+        HandleQuestList(payload, len);
+        return;
+    }
+    if (type == PacketType_MP_DUNGEON_ENTRANCE_SYN) {
+        HandleDungeonEntrance(payload, len);
+        return;
+    }
+    if (type == PacketType_MP_DUNGEON_INFO_SYN) {
+        HandleDungeonInfo(payload, len);
+        return;
+    }
 }
 
 void MapServer::SendEntityDespawn(uint32_t entity_id, int8_t reason) {
@@ -1010,8 +1055,18 @@ void MapServer::HandleCombatAttack(uint16_t ack_type, const uint8_t* payload, si
         if (best > 144.0f) return;
     }
 
-    auto& atk = registry_->get<CharacterStats>(player_entity_);
-    if (skill_id > 0 && atk.mp >= 10) atk.mp -= 10;
+    auto& def = registry_->get<CharacterStats>(target);
+    if (skill_id > 0) {
+        if (!skill_sys_.CanUseSkill(*registry_, player_entity_, skill_id)) {
+            flatbuffers::FlatBufferBuilder fbb;
+            auto result = CreateAttackResult(fbb,
+                static_cast<uint32_t>(connected_player_.id), target_id, 0,
+                DamageType_Skill, false, true, def.hp, 0);
+            fbb.Finish(result);
+            network_->SendPacket(ack_type, fbb.GetBufferPointer(), fbb.GetSize());
+            return;
+        }
+    }
 
     if (auto* ai = registry_->try_get<AIComponent>(target)) {
         uint32_t pid = static_cast<uint32_t>(entt::to_entity(player_entity_));
@@ -1021,9 +1076,12 @@ void MapServer::HandleCombatAttack(uint16_t ack_type, const uint8_t* payload, si
         ai->state_timer = 0.0f;
     }
 
-    auto& def = registry_->get<CharacterStats>(target);
     int32_t hp_before = def.hp;
-    combat_->HandleAttack(*registry_, player_entity_, target, skill_id);
+    if (skill_id > 0) {
+        skill_sys_.UseSkill(*registry_, player_entity_, target, skill_id);
+    } else {
+        combat_->HandleAttack(*registry_, player_entity_, target, skill_id);
+    }
     int32_t damage_dealt = std::max(0, hp_before - def.hp);
 
     auto& xform = registry_->get<Transform>(target);
@@ -1052,8 +1110,12 @@ void MapServer::HandleCombatAttack(uint16_t ack_type, const uint8_t* payload, si
         SendEntityDespawn(target_id, static_cast<int8_t>(DespawnReason_Death));
         if (registry_->all_of<SpawnInfo>(target)) {
             auto& spawn = registry_->get<SpawnInfo>(target);
+            OnMonsterKilled(spawn.monster_id);
             spawn_sys_->RespawnMonster(*registry_, spawn.spawn_rule_id, spawn.respawn_time);
+        } else {
+            OnMonsterKilled(target_id);
         }
+        grid_.Remove(target_id);
         registry_->destroy(target);
         spdlog::info("MapServer: monster {} defeated by {}", target_id, connected_player_.id);
     } else {
@@ -2053,4 +2115,315 @@ void MapServer::HandleChat(const uint8_t* payload, size_t len) {
         0);
     fbb.Finish(msg);
     network_->SendPacket(PacketType_MP_CHAT_ALL_ACK, fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void MapServer::TeleportPlayer(uint32_t map_id, float x, float y, float z) {
+    if (!player_joined_) return;
+    if (map_id && map_id != static_cast<uint32_t>(map_id_)) {
+        spdlog::info("MapServer: cross-map teleport requested to map {} (not implemented inline)", map_id);
+        return;
+    }
+    connected_player_.pos_x = x;
+    connected_player_.pos_y = y;
+    connected_player_.pos_z = z;
+    if (registry_->valid(player_entity_)) {
+        registry_->get<Transform>(player_entity_).position = glm::vec3(x, y, z);
+    }
+    grid_.Update(static_cast<uint32_t>(connected_player_.id), x, z);
+    SendEntityTransform(static_cast<uint32_t>(connected_player_.id), x, y, z, "teleport");
+}
+
+void MapServer::RunMapScript(const std::string& path, entt::entity player) {
+    if (player == entt::null) return;
+    script_runtime_.RunScript(path, static_cast<uint32_t>(entt::to_entity(player)));
+}
+
+void MapServer::OnMonsterKilled(uint32_t monster_template_id) {
+    if (!registry_->valid(player_entity_)) return;
+    auto* log = registry_->try_get<QuestLog>(player_entity_);
+    if (log) {
+        for (auto& entry : log->active_quests) {
+            if (entry.is_completed) continue;
+            for (size_t oi = 0; oi < entry.objectives.size(); ++oi) {
+                auto& obj = entry.objectives[oi];
+                if (obj.type != QuestObjective::KillMonster || obj.target_id != monster_template_id)
+                    continue;
+                if (obj.current_count >= obj.required_count) continue;
+                uint16_t before = obj.current_count;
+                obj.current_count = std::min<uint16_t>(
+                    static_cast<uint16_t>(before + 1), obj.required_count);
+                if (obj.current_count != before)
+                    SendQuestUpdate(entry.quest_id, static_cast<uint8_t>(oi),
+                        obj.current_count, obj.required_count);
+            }
+        }
+        quest_->Update(*registry_, 0.0f);
+        SavePlayerQuests(connected_player_.id);
+    }
+}
+
+void MapServer::SendQuestList(uint8_t result) {
+    using namespace luna::protocol;
+    if (!registry_->valid(player_entity_)) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    std::vector<flatbuffers::Offset<QuestEntryState>> active;
+    std::vector<uint32_t> completed;
+
+    if (auto* log = registry_->try_get<QuestLog>(player_entity_)) {
+        for (const auto& entry : log->active_quests) {
+            auto it = quest_->GetTemplates().find(entry.quest_id);
+            std::string name = it != quest_->GetTemplates().end() ? it->second.name : "Quest";
+            std::vector<flatbuffers::Offset<QuestObjectiveState>> objs;
+            for (const auto& obj : entry.objectives) {
+                objs.push_back(CreateQuestObjectiveState(fbb,
+                    static_cast<uint8_t>(obj.type), obj.target_id,
+                    obj.current_count, obj.required_count));
+            }
+            active.push_back(CreateQuestEntryState(fbb, entry.quest_id,
+                fbb.CreateString(name), entry.is_completed, entry.is_reward_taken,
+                fbb.CreateVector(objs)));
+        }
+        for (uint32_t cid : log->completed_quest_ids)
+            completed.push_back(cid);
+    }
+
+    auto resp = CreateQuestListResponse(fbb, result,
+        fbb.CreateVector(active), fbb.CreateVector(completed));
+    fbb.Finish(resp);
+    network_->SendPacket(PacketType_MP_QUEST_LIST_ACK, fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void MapServer::SendQuestUpdate(uint32_t quest_id, uint8_t obj_index, uint16_t current, uint16_t required) {
+    using namespace luna::protocol;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto n = CreateQuestUpdateNotify(fbb, quest_id, obj_index, current, required);
+    fbb.Finish(n);
+    network_->SendPacket(PacketType_MP_QUEST_UPDATE_NOTIFY, fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void MapServer::HandleQuestStart(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_ || !registry_->valid(player_entity_)) return;
+    auto req = flatbuffers::GetRoot<QuestStartRequest>(payload);
+    uint32_t qid = req->quest_id();
+    bool ok = quest_->StartQuest(*registry_, player_entity_, qid);
+    flatbuffers::FlatBufferBuilder fbb;
+    auto resp = CreateQuestStartResponse(fbb, ok ? 0 : 1, qid,
+        fbb.CreateString(ok ? "Quest started" : "Cannot start quest"));
+    fbb.Finish(resp);
+    network_->SendPacket(ok ? PacketType_MP_QUEST_START_ACK : PacketType_MP_QUEST_START_NACK,
+        fbb.GetBufferPointer(), fbb.GetSize());
+    if (ok) {
+        SendQuestList(0);
+        SavePlayerQuests(connected_player_.id);
+    }
+}
+
+void MapServer::HandleQuestEnd(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_ || !registry_->valid(player_entity_)) return;
+    auto req = flatbuffers::GetRoot<QuestCompleteRequest>(payload);
+    uint32_t qid = req->quest_id();
+    bool completed = quest_->CompleteQuest(*registry_, player_entity_, qid);
+    bool rewarded = completed && quest_->ClaimReward(*registry_, player_entity_, qid);
+    flatbuffers::FlatBufferBuilder fbb;
+    auto resp = CreateQuestCompleteResponse(fbb, rewarded ? 0 : 1, qid);
+    fbb.Finish(resp);
+    network_->SendPacket(rewarded ? PacketType_MP_QUEST_END_ACK : PacketType_MP_QUEST_END_NACK,
+        fbb.GetBufferPointer(), fbb.GetSize());
+    if (rewarded) {
+        SendInventorySync();
+        SendCharLifeUpdate();
+        SendQuestList(0);
+        SavePlayerQuests(connected_player_.id);
+    }
+}
+
+void MapServer::HandleQuestList(const uint8_t* payload, size_t len) {
+    (void)payload;
+    (void)len;
+    SendQuestList(player_joined_ ? 0 : 1);
+}
+
+void MapServer::HandleDungeonEntrance(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    auto req = flatbuffers::GetRoot<DungeonEntranceRequest>(payload);
+    uint32_t template_id = req->dungeon_template_id();
+    std::vector<uint32_t> party = {static_cast<uint32_t>(connected_player_.id)};
+    uint32_t instance_id = CreateDungeonInstance(template_id, party);
+    EnterDungeon(instance_id, player_entity_);
+    TriggerBossEncounter(instance_id, template_id + 1000);
+
+    flatbuffers::FlatBufferBuilder fbb;
+    auto resp = CreateDungeonEntranceResponse(fbb, 0, instance_id, template_id,
+        static_cast<uint16_t>(map_id_), 1800,
+        fbb.CreateString("Dungeon instance created"));
+    fbb.Finish(resp);
+    network_->SendPacket(PacketType_MP_DUNGEON_ENTRANCE_ACK, fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void MapServer::HandleDungeonInfo(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+    auto req = flatbuffers::GetRoot<DungeonInfoRequest>(payload);
+    uint32_t iid = req->instance_id();
+    auto* inst = GetDungeonInstance(iid);
+    flatbuffers::FlatBufferBuilder fbb;
+    if (!inst) {
+        auto resp = CreateDungeonInfoResponse(fbb, 1, iid, 0, 0, false);
+        fbb.Finish(resp);
+        network_->SendPacket(PacketType_MP_DUNGEON_INFO_NACK, fbb.GetBufferPointer(), fbb.GetSize());
+        return;
+    }
+    auto resp = CreateDungeonInfoResponse(fbb, 0, iid,
+        static_cast<uint8_t>(inst->state), static_cast<uint32_t>(inst->elapsed_time),
+        inst->state == DungeonState::BOSS_ACTIVE);
+    fbb.Finish(resp);
+    network_->SendPacket(PacketType_MP_DUNGEON_INFO_ACK, fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+namespace {
+
+std::string SerializeQuestProgress(const QuestEntry& entry) {
+    std::string s;
+    for (size_t i = 0; i < entry.objectives.size(); ++i) {
+        if (i) s += ';';
+        s += std::to_string(i) + ":" + std::to_string(entry.objectives[i].current_count);
+    }
+    return s;
+}
+
+void ApplyQuestProgress(QuestEntry& entry, const std::string& progress) {
+    size_t p = 0;
+    while (p < progress.size()) {
+        size_t semi = progress.find(';', p);
+        std::string tok = progress.substr(p, semi == std::string::npos ? std::string::npos : semi - p);
+        size_t colon = tok.find(':');
+        if (colon != std::string::npos) {
+            size_t idx = static_cast<size_t>(std::stoul(tok.substr(0, colon)));
+            uint16_t cnt = static_cast<uint16_t>(std::stoul(tok.substr(colon + 1)));
+            if (idx < entry.objectives.size())
+                entry.objectives[idx].current_count = std::min(cnt, entry.objectives[idx].required_count);
+        }
+        if (semi == std::string::npos) break;
+        p = semi + 1;
+    }
+}
+
+} // namespace
+
+void MapServer::SendTriggerNotify(uint32_t trigger_id, uint8_t trigger_type,
+                                  uint32_t param0, uint32_t param1, const std::string& message) {
+    using namespace luna::protocol;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto n = CreateTriggerNotify(fbb, trigger_id, trigger_type, param0, param1,
+        fbb.CreateString(message));
+    fbb.Finish(n);
+    network_->SendPacket(PacketType_MP_TRIGGER_NOTIFY, fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void MapServer::LoadPlayerQuests(int character_id) {
+    if (!registry_->valid(player_entity_)) return;
+    auto& log = registry_->get<QuestLog>(player_entity_);
+    log.active_quests.clear();
+    log.completed_quest_ids.clear();
+
+    auto rows = db_->Query(
+        "SELECT quest_id,state,progress FROM player_quests WHERE character_id=" +
+        std::to_string(character_id));
+    const auto& templates = quest_->GetTemplates();
+    for (const auto& row : rows) {
+        if (row.size() < 3) continue;
+        uint32_t qid = static_cast<uint32_t>(std::atoi(row[0].c_str()));
+        int state = std::atoi(row[1].c_str());
+        if (state >= 2) {
+            log.completed_quest_ids.push_back(qid);
+            continue;
+        }
+        auto it = templates.find(qid);
+        if (it == templates.end()) continue;
+        QuestEntry entry;
+        entry.quest_id = qid;
+        entry.giver_npc_id = it->second.giver_npc_id;
+        entry.completer_npc_id = it->second.completer_npc_id;
+        for (const auto& obj : it->second.objectives)
+            entry.objectives.push_back(obj);
+        ApplyQuestProgress(entry, row[2]);
+        if (state == 1) entry.is_completed = true;
+        log.active_quests.push_back(std::move(entry));
+    }
+    spdlog::info("MapServer: loaded {} active quests for character {}", log.active_quests.size(), character_id);
+}
+
+void MapServer::SavePlayerQuests(int character_id) {
+    if (!registry_->valid(player_entity_)) return;
+    auto* log = registry_->try_get<QuestLog>(player_entity_);
+    if (!log) return;
+
+    db_->Execute("DELETE FROM player_quests WHERE character_id=" + std::to_string(character_id));
+    for (const auto& entry : log->active_quests) {
+        int state = entry.is_completed ? 1 : 0;
+        std::string progress = SerializeQuestProgress(entry);
+        db_->Execute(
+            "INSERT INTO player_quests (character_id,quest_id,state,progress) VALUES (" +
+            std::to_string(character_id) + "," + std::to_string(entry.quest_id) + "," +
+            std::to_string(state) + ",'" + progress + "')");
+    }
+    for (uint32_t cid : log->completed_quest_ids) {
+        db_->Execute(
+            "INSERT OR REPLACE INTO player_quests (character_id,quest_id,state,progress) VALUES (" +
+            std::to_string(character_id) + "," + std::to_string(cid) + ",2,'')");
+    }
+}
+
+void MapServer::UpdatePlayerVisibility() {
+    if (!player_joined_) return;
+    using namespace luna::protocol;
+
+    float px = connected_player_.pos_x;
+    float pz = connected_player_.pos_z;
+    float r2 = aoi_radius_ * aoi_radius_;
+
+    std::unordered_set<uint32_t> now_visible;
+    for (uint32_t eid : grid_.QueryRadius(px, pz, aoi_radius_)) {
+        auto entity = static_cast<entt::entity>(eid);
+        if (!registry_->valid(entity) || !registry_->all_of<TagMonster, Transform>(entity))
+            continue;
+        auto& xform = registry_->get<Transform>(entity);
+        float dx = xform.position.x - px;
+        float dz = xform.position.z - pz;
+        if (dx * dx + dz * dz <= r2)
+            now_visible.insert(eid);
+    }
+
+    for (uint32_t old_id : visible_monsters_) {
+        if (now_visible.count(old_id)) continue;
+        SendEntityDespawn(old_id, static_cast<int8_t>(DespawnReason_Despawn));
+        monster_net_.erase(old_id);
+    }
+
+    auto view = registry_->view<TagMonster, Transform, SpawnInfo, CharacterStats>();
+    for (auto entity : view) {
+        uint32_t eid = static_cast<uint32_t>(entt::to_entity(entity));
+        if (!now_visible.count(eid) || visible_monsters_.count(eid)) continue;
+        auto& xform = view.get<Transform>(entity);
+        auto& spawn = view.get<SpawnInfo>(entity);
+        auto& stats = view.get<CharacterStats>(entity);
+        std::string model = "m224.chx";
+        std::string name = "Monster_" + std::to_string(spawn.monster_id);
+        SendEntitySpawn(eid, static_cast<int8_t>(EntityType_Monster),
+            model, name, stats.level,
+            xform.position.x, xform.position.y, xform.position.z,
+            stats.max_hp > 0 ? static_cast<float>(stats.hp) / stats.max_hp : 1.0f);
+        monster_net_[eid] = {};
+        monster_net_[eid].last_sent = xform.position;
+        monster_net_[eid].initialized = true;
+    }
+
+    visible_monsters_ = std::move(now_visible);
 }

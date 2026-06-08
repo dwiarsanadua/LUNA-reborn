@@ -5,8 +5,13 @@
 #include <memory>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <glm/glm.hpp>
 #include <entt/entt.hpp>
+#include "systems/GridSystem.hpp"
+#include "systems/TriggerSystem.hpp"
+#include "systems/MapScriptRuntime.hpp"
+#include <ecs/systems/SkillSystem.hpp>
 
 // entt::entity used for connected player tracking
 
@@ -81,6 +86,13 @@ public:
     MovementSystem& GetMovementSystem();
     ItemSystem& GetItemSystem();
     QuestSystem& GetQuestSystem();
+    entt::registry& GetRegistry() { return *registry_; }
+    int GetMapId() const { return map_id_; }
+
+    void TeleportPlayer(uint32_t map_id, float x, float y, float z);
+    void RunMapScript(const std::string& path, entt::entity player);
+    void SendTriggerNotify(uint32_t trigger_id, uint8_t trigger_type,
+                           uint32_t param0, uint32_t param1, const std::string& message = {});
 
     Database& GetDatabase();
     NetworkLayer& GetNetworkLayer();
@@ -106,6 +118,10 @@ private:
     std::unique_ptr<ItemSystem> item_;
     std::unique_ptr<QuestSystem> quest_;
     std::unique_ptr<SpawnSystem> spawn_sys_;
+    GridSystem grid_;
+    TriggerSystem triggers_;
+    MapScriptRuntime script_runtime_;
+    SkillSystem skill_sys_;
 
     float auto_save_timer_ = 0.0f;
     float respawn_timer_ = 0.0f;
@@ -177,6 +193,17 @@ private:
     void HandleStreetStallClose(const uint8_t* payload, size_t len);
     void HandleStreetStallList(const uint8_t* payload, size_t len);
     void ReturnStallItems(uint32_t owner_id);
+    void HandleQuestStart(const uint8_t* payload, size_t len);
+    void HandleQuestEnd(const uint8_t* payload, size_t len);
+    void HandleQuestList(const uint8_t* payload, size_t len);
+    void HandleDungeonEntrance(const uint8_t* payload, size_t len);
+    void HandleDungeonInfo(const uint8_t* payload, size_t len);
+    void SendQuestList(uint8_t result);
+    void SendQuestUpdate(uint32_t quest_id, uint8_t obj_index, uint16_t current, uint16_t required);
+    void OnMonsterKilled(uint32_t monster_template_id);
+    void LoadPlayerQuests(int character_id);
+    void SavePlayerQuests(int character_id);
+    void UpdatePlayerVisibility();
 
     struct PlayerInvSlot {
         uint8_t slot = 0;
@@ -301,6 +328,8 @@ private:
         bool initialized = false;
     };
     std::unordered_map<uint32_t, MonsterNetState> monster_net_;
+    std::unordered_set<uint32_t> visible_monsters_;
+    float aoi_radius_ = 80.0f;
     float monster_broadcast_interval_ = 0.12f;
     uint8_t next_loot_slot_ = 10;
 };

@@ -1,6 +1,7 @@
 add_library(game_core STATIC
     ecs/components/Inventory.cpp
     ecs/components/Equipment.cpp
+    ecs/components/QuestLog.cpp
     ecs/systems/MovementSystem.cpp
     ecs/systems/CombatSystem.cpp
     ecs/systems/AISystem.cpp

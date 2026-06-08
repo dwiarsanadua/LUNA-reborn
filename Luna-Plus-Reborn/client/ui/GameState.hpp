@@ -226,4 +226,27 @@ struct GameState {
     bool equipment_dirty = false;
     std::vector<std::string> skill_list;
     std::vector<std::string> quest_list;
+
+    struct NetworkQuestObjective {
+        uint8_t type = 0;
+        uint32_t target_id = 0;
+        uint16_t current = 0;
+        uint16_t required = 0;
+    };
+    struct NetworkQuestEntry {
+        uint32_t quest_id = 0;
+        std::string name;
+        bool is_completed = false;
+        bool is_reward_taken = false;
+        std::vector<NetworkQuestObjective> objectives;
+    };
+    std::vector<NetworkQuestEntry> network_quests;
+    std::vector<uint32_t> completed_quest_ids;
+
+    uint32_t dungeon_instance_id = 0;
+    uint32_t dungeon_template_id = 0;
+    uint8_t dungeon_state = 0;
+    uint32_t dungeon_elapsed_sec = 0;
+    bool dungeon_boss_active = false;
+    std::string last_trigger_message;
 };

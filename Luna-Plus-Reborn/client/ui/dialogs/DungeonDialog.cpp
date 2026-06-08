@@ -1,5 +1,12 @@
 #include "DungeonDialog.hpp"
+#include <gameobjects/DungeonSystem.hpp>
 #include <cstdio>
+
+void DungeonDialog::SetNetworkCallbacks(std::function<void(uint32_t)> enter_fn,
+                                        std::function<void(uint32_t)> info_fn) {
+    on_enter_dungeon_ = std::move(enter_fn);
+    on_request_info_ = std::move(info_fn);
+}
 
 void DungeonDialog::Open(GameState* state, WindowManager* wm, DungeonSystem* dungeon) {
     dungeon_ = dungeon;
@@ -36,7 +43,12 @@ void DungeonDialog::Open(GameState* state, WindowManager* wm, DungeonSystem* dun
     auto* enter_btn = window_->AddWidget<Button>("Enter Dungeon", 14, 400, 130, 24);
     enter_btn->SetColors({40,80,40,220}, {80,130,80,220}, {30,50,30,220});
     enter_btn->OnEvent([this, state](const UIEvent& e) {
-        if (e.type == UIEvent::Click && dungeon_) {
+        if (e.type == UIEvent::Click) {
+            if (on_enter_dungeon_) {
+                on_enter_dungeon_(state->dungeon_template_id ? state->dungeon_template_id : 1);
+                return;
+            }
+            if (!dungeon_) return;
             auto dungeons = dungeon_->GetAvailableDungeons();
             if (!dungeons.empty()) {
                 auto& d = dungeons[0];

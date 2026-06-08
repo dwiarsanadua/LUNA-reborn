@@ -1,7 +1,9 @@
 #include "QuestSystem.h"
 #include <spdlog/spdlog.h>
 #include <algorithm>
-#include <ecs/systems/GameDataDB.hpp>
+#include <fstream>
+#include <sstream>
+#include <cstdio>
 #include <ecs/components/Inventory.hpp>
 
 QuestSystem::QuestSystem() {
@@ -9,51 +11,100 @@ QuestSystem::QuestSystem() {
 }
 
 void QuestSystem::LoadQuestTemplates(const std::string& db_path) {
-    // In production, load from game_data.db quests table
-    // Example quest templates:
-    QuestTemplate qt1;
-    qt1.quest_id = 1;
-    qt1.name = "Wolf Hunt";
-    qt1.description = "Kill 10 wolves";
-    qt1.min_level = 1;
-    qt1.giver_npc_id = 100;
-    qt1.completer_npc_id = 100;
-    qt1.reward_exp = 500;
-    qt1.reward_gold = 100;
-    qt1.reward_items = {1001};
-    qt1.reward_item_counts = {5};
-    qt1.is_repeatable = false;
+    (void)db_path;
+    quest_templates_.clear();
 
-    QuestObjective obj1;
-    obj1.type = QuestObjective::KillMonster;
-    obj1.target_id = 101; // wolf monster ID
-    obj1.required_count = 10;
-    obj1.current_count = 0;
-    obj1.description = "Kill wolves (0/10)";
-    qt1.objectives.push_back(obj1);
-    quest_templates_[1] = qt1;
+    auto load_seed = [this](const std::string& path) {
+        std::ifstream in(path);
+        if (!in) return false;
+        std::stringstream ss;
+        ss << in.rdbuf();
+        std::string blob = ss.str();
+        size_t pos = 0;
+        int loaded = 0;
+        while ((pos = blob.find("\"quest_id\"", pos)) != std::string::npos) {
+            size_t obj_start = blob.rfind('{', pos);
+            size_t obj_end = blob.find('}', pos);
+            if (obj_start == std::string::npos || obj_end == std::string::npos) break;
+            std::string obj = blob.substr(obj_start, obj_end - obj_start + 1);
 
-    QuestTemplate qt2;
-    qt2.quest_id = 2;
-    qt2.name = "Gather Herbs";
-    qt2.description = "Collect 5 medicinal herbs";
-    qt2.min_level = 3;
-    qt2.giver_npc_id = 101;
-    qt2.completer_npc_id = 101;
-    qt2.reward_exp = 1200;
-    qt2.reward_gold = 300;
-    qt2.reward_items = {2001};
-    qt2.reward_item_counts = {1};
-    qt2.is_repeatable = true;
+            auto num = [&](const char* key, int fallback = 0) {
+                std::string pat = std::string("\"") + key + "\"";
+                size_t p = obj.find(pat);
+                if (p == std::string::npos) return fallback;
+                p = obj.find(':', p);
+                return p == std::string::npos ? fallback : std::atoi(obj.c_str() + p + 1);
+            };
 
-    QuestObjective obj2;
-    obj2.type = QuestObjective::CollectItem;
-    obj2.target_id = 3001; // herb item ID
-    obj2.required_count = 5;
-    obj2.current_count = 0;
-    obj2.description = "Collect herbs (0/5)";
-    qt2.objectives.push_back(obj2);
-    quest_templates_[2] = qt2;
+            QuestTemplate qt;
+            qt.quest_id = static_cast<uint32_t>(num("quest_id"));
+            if (qt.quest_id == 0) { pos = obj_end + 1; continue; }
+            size_t name_p = obj.find("\"name\"");
+            if (name_p != std::string::npos) {
+                name_p = obj.find('"', obj.find(':', name_p) + 1);
+                size_t name_e = obj.find('"', name_p + 1);
+                if (name_p != std::string::npos && name_e != std::string::npos)
+                    qt.name = obj.substr(name_p + 1, name_e - name_p - 1);
+            }
+            qt.min_level = num("min_level", 1);
+            qt.giver_npc_id = static_cast<uint32_t>(num("giver_npc_id"));
+            qt.completer_npc_id = static_cast<uint32_t>(num("completer_npc_id", qt.giver_npc_id));
+            qt.reward_exp = static_cast<uint64_t>(num("reward_exp"));
+            qt.reward_gold = static_cast<uint32_t>(num("reward_gold"));
+            qt.is_repeatable = num("repeatable") != 0;
+
+            QuestObjective obj_kill;
+            obj_kill.type = QuestObjective::KillMonster;
+            obj_kill.target_id = static_cast<uint32_t>(num("kill_monster_id", 101));
+            obj_kill.required_count = static_cast<uint16_t>(num("kill_count", 10));
+            obj_kill.current_count = 0;
+            char buf[64];
+            snprintf(buf, sizeof(buf), "Kill (%d/%d)", 0, obj_kill.required_count);
+            obj_kill.description = buf;
+            qt.objectives.push_back(obj_kill);
+
+            if (num("collect_item_id") > 0) {
+                QuestObjective obj_col;
+                obj_col.type = QuestObjective::CollectItem;
+                obj_col.target_id = static_cast<uint32_t>(num("collect_item_id"));
+                obj_col.required_count = static_cast<uint16_t>(num("collect_count", 1));
+                obj_col.description = "Collect items";
+                qt.objectives.push_back(obj_col);
+            }
+
+            uint32_t reward_item = static_cast<uint32_t>(num("reward_item_id"));
+            if (reward_item) {
+                qt.reward_items.push_back(reward_item);
+                qt.reward_item_counts.push_back(static_cast<uint32_t>(num("reward_item_count", 1)));
+            }
+
+            quest_templates_[qt.quest_id] = std::move(qt);
+            ++loaded;
+            pos = obj_end + 1;
+        }
+        return loaded > 0;
+    };
+
+    if (!load_seed("assets/data/quest_templates_seed.json")) {
+        QuestTemplate qt1;
+        qt1.quest_id = 1;
+        qt1.name = "Wolf Hunt";
+        qt1.description = "Kill 10 wolves";
+        qt1.min_level = 1;
+        qt1.giver_npc_id = 100;
+        qt1.completer_npc_id = 100;
+        qt1.reward_exp = 500;
+        qt1.reward_gold = 100;
+        qt1.reward_items = {1001};
+        qt1.reward_item_counts = {5};
+        QuestObjective obj1;
+        obj1.type = QuestObjective::KillMonster;
+        obj1.target_id = 101;
+        obj1.required_count = 10;
+        obj1.description = "Kill wolves (0/10)";
+        qt1.objectives.push_back(obj1);
+        quest_templates_[1] = qt1;
+    }
 
     spdlog::info("QuestSystem: loaded {} quest templates", quest_templates_.size());
 }

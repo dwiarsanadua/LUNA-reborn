@@ -55,6 +55,11 @@ public:
     std::vector<DungeonInstance> GetAvailableDungeons() const;
     bool IsInDungeon(uint32_t character_id) const;
     uint32_t FindInstanceByMember(uint32_t character_id) const;
+
+    void ApplyEntranceResponse(uint32_t instance_id, uint32_t template_id,
+                               uint16_t map_id, uint32_t time_limit_sec);
+    void ApplyInfoResponse(uint32_t instance_id, uint8_t state,
+                           uint32_t elapsed_sec, bool boss_active);
     
     // Leaderboard
     void AddLeaderboardEntry(const DungeonLeaderboardEntry& entry);

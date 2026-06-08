@@ -109,6 +109,30 @@ uint32_t DungeonSystem::FindInstanceByMember(uint32_t character_id) const {
     return 0;
 }
 
+void DungeonSystem::ApplyEntranceResponse(uint32_t instance_id, uint32_t template_id,
+                                          uint16_t map_id, uint32_t time_limit_sec) {
+    DungeonInstance inst;
+    inst.id = instance_id;
+    inst.map_id = static_cast<int>(map_id ? map_id : template_id);
+    inst.name = "Dungeon " + std::to_string(template_id);
+    inst.time_limit = static_cast<float>(time_limit_sec > 0 ? time_limit_sec : 1800);
+    inst.active = true;
+    inst.creator_id = 0;
+    instances_.push_back(inst);
+    if (instance_id >= next_id_) next_id_ = instance_id + 1;
+}
+
+void DungeonSystem::ApplyInfoResponse(uint32_t instance_id, uint8_t state,
+                                      uint32_t elapsed_sec, bool boss_active) {
+    if (auto* inst = GetInstance(instance_id)) {
+        inst->elapsed = static_cast<float>(elapsed_sec);
+        inst->active = state != 3 && state != 4;
+        inst->completed = state == 3;
+        inst->failed = state == 4;
+        (void)boss_active;
+    }
+}
+
 void DungeonSystem::AddLeaderboardEntry(const DungeonLeaderboardEntry& entry) {
     leaderboard_.push_back(entry);
 }

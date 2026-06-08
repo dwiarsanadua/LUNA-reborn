@@ -1,0 +1,11 @@
+include "Types.fbs";
+
+namespace luna.protocol;
+
+table TriggerNotify {
+    trigger_id: uint32;
+    trigger_type: uint8;
+    param0: uint32;
+    param1: uint32;
+    message: string;
+}

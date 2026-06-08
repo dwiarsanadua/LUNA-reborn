@@ -90,6 +90,74 @@ std::vector<QuestDef> QuestDialog::GetAvailableQuests(int level) {
     return available;
 }
 
+void QuestDialog::SetNetworkCallbacks(std::function<void(uint32_t)> start_fn,
+                                      std::function<void(uint32_t)> complete_fn,
+                                      std::function<void()> refresh_fn) {
+    on_start_quest_ = std::move(start_fn);
+    on_complete_quest_ = std::move(complete_fn);
+    on_refresh_ = std::move(refresh_fn);
+}
+
+void QuestDialog::RefreshLists(GameState* state) {
+    if (!avail_list_ || !quest_list_ || !done_list_) return;
+
+    avail_list_->Clear();
+    quest_list_->Clear();
+    done_list_->Clear();
+
+    current_quests_ = GetAvailableQuests(state->level);
+    for (auto& q : current_quests_) {
+        bool active = false;
+        for (const auto& nq : state->network_quests) {
+            if (nq.quest_id == q.id) { active = true; break; }
+        }
+        if (active) continue;
+        bool done = std::find(state->completed_quest_ids.begin(),
+                              state->completed_quest_ids.end(), q.id) != state->completed_quest_ids.end();
+        if (done) continue;
+        char buf[128];
+        snprintf(buf, sizeof(buf), "[Lv.%d] %s", q.required_level, q.name.c_str());
+        avail_list_->AddItem(buf);
+    }
+
+    if (!state->network_quests.empty()) {
+        for (const auto& nq : state->network_quests) {
+            char buf[128];
+            snprintf(buf, sizeof(buf), "%s%s", nq.name.c_str(), nq.is_completed ? " (Ready)" : "");
+            quest_list_->AddItem(buf);
+        }
+    } else {
+        for (auto& q : state->quest_list) quest_list_->AddItem(q);
+    }
+
+    for (uint32_t cid : state->completed_quest_ids) {
+        for (auto& q : current_quests_) {
+            if (q.id == cid) {
+                done_list_->AddItem(q.name);
+                break;
+            }
+        }
+    }
+}
+
+void QuestDialog::ShowNetworkQuestDetail(const GameState::NetworkQuestEntry& q) {
+    if (!detail_label_) return;
+    std::string obj_text;
+    for (size_t i = 0; i < q.objectives.size(); ++i) {
+        const auto& o = q.objectives[i];
+        char ob[128];
+        snprintf(ob, sizeof(ob), "\n  Obj %zu: %u/%u", i + 1, o.current, o.required);
+        obj_text += ob;
+    }
+    char buf[512];
+    snprintf(buf, sizeof(buf), "%s\n\nStatus: %s%s",
+        q.name.c_str(),
+        q.is_completed ? "Complete — turn in for reward" : "In progress",
+        obj_text.c_str());
+    detail_label_->SetText(buf);
+    if (reward_label_) reward_label_->SetText("Server-authoritative quest");
+}
+
 bool QuestDialog::TryCompleteQuest(GameState* state, const QuestDef& quest) {
     // Check if quest is in the player's list
     auto it = std::find(state->quest_list.begin(), state->quest_list.end(), quest.name);
@@ -138,24 +206,14 @@ void QuestDialog::Open(GameState* state, WindowManager* wm) {
     // Tab panel
     auto* tabs = window_->AddWidget<TabPanel>(15, 40, 240, 300);
 
-    // Available quests
-    auto* avail_list = new ListBox(0, 0, 240, 260);
-    current_quests_ = GetAvailableQuests(state->level);
-    for (auto& q : current_quests_) {
-        char buf[128];
-        snprintf(buf, sizeof(buf), "[Lv.%d] %s", q.required_level, q.name.c_str());
-        avail_list->AddItem(buf);
-    }
-    tabs->AddTab("Available", avail_list);
-
-    // In Progress
+    avail_list_ = new ListBox(0, 0, 240, 260);
     quest_list_ = new ListBox(0, 0, 240, 260);
-    for (auto& q : state->quest_list) quest_list_->AddItem(q);
+    done_list_ = new ListBox(0, 0, 240, 260);
+    tabs->AddTab("Available", avail_list_);
     tabs->AddTab("In Progress", quest_list_);
-
-    // Completed
-    auto* done_list = new ListBox(0, 0, 240, 260);
-    tabs->AddTab("Completed", done_list);
+    tabs->AddTab("Completed", done_list_);
+    RefreshLists(state);
+    if (on_refresh_) on_refresh_();
 
     // Detail text area (right side)
     detail_label_ = window_->AddWidget<Label>("Select a quest to see details.", 270, 50, ColorPalette::TEXT_DARK);
@@ -164,19 +222,30 @@ void QuestDialog::Open(GameState* state, WindowManager* wm) {
     // Accept / Complete buttons
     auto* accept_btn = window_->AddWidget<Button>("Accept Quest", 270, 370, 110, 24);
     accept_btn->SetColors({40,80,40,220}, {80,130,80,220}, {30,50,30,220});
-    accept_btn->OnEvent([this, state, tabs, avail_list](const UIEvent& e) {
+    accept_btn->OnEvent([this, state, tabs](const UIEvent& e) {
         if (e.type == UIEvent::Click) {
-            int idx = tabs->GetActive();
-            if (idx == 0) {
-                if (avail_list && avail_list->GetSelected() >= 0 && avail_list->GetSelected() < (int)current_quests_.size()) {
-                    auto& q = current_quests_[avail_list->GetSelected()];
-                    state->quest_list.push_back(q.name);
-                    state->chat_messages.push_back("Quest accepted: " + q.name);
-                    if (detail_label_) detail_label_->SetText("Quest accepted! Check 'In Progress' tab.");
-                    // Update progress list
-                    quest_list_->Clear();
-                    for (auto& qn : state->quest_list) quest_list_->AddItem(qn);
+            if (tabs->GetActive() != 0 || !avail_list_) return;
+            int sel = avail_list_->GetSelected();
+            if (sel < 0) return;
+            int shown = 0;
+            for (auto& q : current_quests_) {
+                bool active = false;
+                for (const auto& nq : state->network_quests) {
+                    if (nq.quest_id == q.id) { active = true; break; }
                 }
+                if (active) continue;
+                bool done = std::find(state->completed_quest_ids.begin(),
+                                      state->completed_quest_ids.end(), q.id) != state->completed_quest_ids.end();
+                if (done) continue;
+                if (shown++ != sel) continue;
+                if (on_start_quest_) {
+                    on_start_quest_(q.id);
+                    return;
+                }
+                state->quest_list.push_back(q.name);
+                state->chat_messages.push_back("Quest accepted: " + q.name);
+                RefreshLists(state);
+                return;
             }
         }
     });
@@ -185,29 +254,27 @@ void QuestDialog::Open(GameState* state, WindowManager* wm) {
     complete_btn->SetColors({80,80,40,220}, {130,130,80,220}, {50,50,30,220});
     complete_btn->OnEvent([this, state, tabs](const UIEvent& e) {
         if (e.type == UIEvent::Click) {
-            int idx = tabs->GetActive();
-            if (idx == 1) {
-                if (quest_list_ && quest_list_->GetSelected() >= 0) {
-                    // Find matching quest from pool
-                    for (auto& q : current_quests_) {
-                        if (q.name == quest_list_->GetItem(quest_list_->GetSelected())) {
-                            if (TryCompleteQuest(state, q)) {
-                                quest_list_->Clear();
-                                for (auto& qn : state->quest_list) quest_list_->AddItem(qn);
-                                if (detail_label_) detail_label_->SetText("Quest completed! Check rewards.");
-                            }
-                            break;
-                        }
-                    }
+            if (tabs->GetActive() != 1 || !quest_list_) return;
+            int sel = quest_list_->GetSelected();
+            if (sel < 0) return;
+            if (!state->network_quests.empty()) {
+                if (sel < (int)state->network_quests.size()) {
+                    const auto& nq = state->network_quests[sel];
+                    if (on_complete_quest_ && nq.is_completed)
+                        on_complete_quest_(nq.quest_id);
+                }
+                return;
+            }
+            std::string picked = quest_list_->GetItem(sel);
+            for (auto& q : current_quests_) {
+                if (q.name == picked && TryCompleteQuest(state, q)) {
+                    RefreshLists(state);
+                    if (detail_label_) detail_label_->SetText("Quest completed! Check rewards.");
+                    break;
                 }
             }
         }
     });
-
-    // Click on available quests shows detail
-    // (Since ListBox doesn't have a callback, we'll handle via tabs)
-    (void)avail_list;
-    (void)done_list;
 }
 
 void QuestDialog::ShowQuestDetail(GameState* state, int index) {
@@ -226,7 +293,5 @@ void QuestDialog::ShowQuestDetail(GameState* state, int index) {
 }
 
 void QuestDialog::UpdateFromState(GameState* state) {
-    if (!quest_list_) return;
-    quest_list_->Clear();
-    for (auto& q : state->quest_list) quest_list_->AddItem(q);
+    RefreshLists(state);
 }

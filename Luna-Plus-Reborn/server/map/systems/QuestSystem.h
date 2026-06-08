@@ -43,6 +43,7 @@ public:
 
     bool CanStartQuest(entt::registry& registry, entt::entity entity, uint32_t quest_id);
     void Update(entt::registry& registry, float dt);
+    const std::unordered_map<uint32_t, QuestTemplate>& GetTemplates() const { return quest_templates_; }
 
 private:
     std::unordered_map<uint32_t, QuestTemplate> quest_templates_;

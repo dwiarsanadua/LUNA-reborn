@@ -92,6 +92,31 @@ def check_phase4_ui() -> dict:
     }
 
 
+def check_phase5_server() -> dict:
+    issues = []
+    reborn = REBORN
+    required = [
+        reborn / "server/map/systems/GridSystem.hpp",
+        reborn / "server/map/systems/TriggerSystem.hpp",
+        reborn / "server/map/systems/MapScriptRuntime.hpp",
+        reborn / "game/network/protocol/Quest.fbs",
+        reborn / "game/network/protocol/Dungeon.fbs",
+        reborn / "assets/data/quest_templates_seed.json",
+        reborn / "assets/data/map_triggers_seed.json",
+        reborn / "tools/asset_pipeline/bootstrap_phase5.py",
+    ]
+    for path in required:
+        if not path.is_file():
+            issues.append(f"Phase5: missing {path.relative_to(reborn)}")
+
+    quest_fbs = (reborn / "game/network/protocol/PacketType.fbs").read_text()
+    for token in ("MP_QUEST_START_SYN", "MP_DUNGEON_ENTRANCE_SYN", "MP_TRIGGER_NOTIFY"):
+        if token not in quest_fbs:
+            issues.append(f"Phase5: PacketType missing {token}")
+
+    return {"issues": issues, "status": "ok" if not issues else "error"}
+
+
 def validate_assets_report() -> dict:
     report = {
         'timestamp': datetime.now().isoformat(),
@@ -132,6 +157,9 @@ def validate_assets_report() -> dict:
     phase4 = check_phase4_ui()
     issues.extend(phase4["issues"])
     report['phase4'] = phase4
+    phase5 = check_phase5_server()
+    issues.extend(phase5["issues"])
+    report['phase5'] = phase5
     report['issues'] = issues
     return report
 
@@ -140,7 +168,18 @@ def main():
     parser.add_argument('--report', action='store_true', help='Generate JSON report')
     parser.add_argument('--verbose', action='store_true', help='Verbose output')
     parser.add_argument('--phase4', action='store_true', help='Enforce Phase 4 UI gates only')
+    parser.add_argument('--phase5', action='store_true', help='Enforce Phase 5 server gates only')
     args = parser.parse_args()
+
+    if args.phase5:
+        phase5 = check_phase5_server()
+        print("Phase 5 server validation:")
+        if phase5['issues']:
+            for issue in phase5['issues']:
+                print(f"  ! {issue}")
+            return 1
+        print("  OK")
+        return 0
 
     if args.phase4:
         phase4 = check_phase4_ui()
@@ -188,6 +227,9 @@ def main():
     if 'phase4' in report:
         p4 = report['phase4']
         print(f"Phase 4 UI: {p4['status'].upper()} ({p4['text_layouts']} text / {p4['total_layouts']} total layouts)")
+    if 'phase5' in report:
+        p5 = report['phase5']
+        print(f"Phase 5 Server: {p5['status'].upper()}")
     print()
 
     if report['issues']:

@@ -24,6 +24,9 @@
 #include <Trade_generated.h>
 #include <Consignment_generated.h>
 #include <StreetStall_generated.h>
+#include <Quest_generated.h>
+#include <Dungeon_generated.h>
+#include <Trigger_generated.h>
 #include <PacketType_generated.h>
 #include <algorithm>
 #include <string>
@@ -86,6 +89,11 @@ void GameScreen::Enter() {
         state_->pk_mode = (mode != PKMode::Peaceful);
     });
     InitializeWorld();
+    if (!state_->offline_mode && network_ && network_->IsConnected()) {
+        SetupQuestNetworkCallbacks();
+        SetupDungeonNetworkCallbacks();
+        RequestQuestList();
+    }
 }
 
 void GameScreen::Exit() {
@@ -306,6 +314,45 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         }
         return true;
     }
+    case luna::protocol::PacketType_MP_QUEST_LIST_ACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::QuestListResponse>(payload.data());
+        ApplyQuestListResponse(resp);
+        return true;
+    }
+    case luna::protocol::PacketType_MP_QUEST_START_ACK:
+    case luna::protocol::PacketType_MP_QUEST_START_NACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::QuestStartResponse>(payload.data());
+        ApplyQuestStartResponse(resp);
+        return true;
+    }
+    case luna::protocol::PacketType_MP_QUEST_END_ACK:
+    case luna::protocol::PacketType_MP_QUEST_END_NACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::QuestCompleteResponse>(payload.data());
+        ApplyQuestCompleteResponse(resp);
+        return true;
+    }
+    case luna::protocol::PacketType_MP_QUEST_UPDATE_NOTIFY: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::QuestUpdateNotify>(payload.data());
+        ApplyQuestUpdateNotify(resp);
+        return true;
+    }
+    case luna::protocol::PacketType_MP_DUNGEON_ENTRANCE_ACK:
+    case luna::protocol::PacketType_MP_DUNGEON_ENTRANCE_NACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::DungeonEntranceResponse>(payload.data());
+        ApplyDungeonEntranceResponse(resp);
+        return true;
+    }
+    case luna::protocol::PacketType_MP_DUNGEON_INFO_ACK:
+    case luna::protocol::PacketType_MP_DUNGEON_INFO_NACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::DungeonInfoResponse>(payload.data());
+        ApplyDungeonInfoResponse(resp);
+        return true;
+    }
+    case luna::protocol::PacketType_MP_TRIGGER_NOTIFY: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::TriggerNotify>(payload.data());
+        ApplyTriggerNotify(resp);
+        return true;
+    }
     default: return false;
     }
 }
@@ -356,7 +403,12 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
     }
     else if (key == 74) {
         state_->quest_open = !state_->quest_open;
-        if (state_->quest_open) quest_dlg_.Open(state_, &wm_);
+        if (state_->quest_open) {
+            SetupQuestNetworkCallbacks();
+            quest_dlg_.Open(state_, &wm_);
+            if (!state_->offline_mode && network_ && network_->IsConnected())
+                RequestQuestList();
+        }
         if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_UI, "window_open1.wav");
     }
     else if (key == 67) { // C key - Character Dialog
@@ -529,7 +581,10 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
     }
     else if (key == 88) { // X key - Dungeons
         state_->dungeon_open = !state_->dungeon_open;
-        if (state_->dungeon_open) dungeon_dlg_.Open(state_, &wm_, &dungeon_sys_);
+        if (state_->dungeon_open) {
+            SetupDungeonNetworkCallbacks();
+            dungeon_dlg_.Open(state_, &wm_, &dungeon_sys_);
+        }
         if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_UI, "window_open1.wav");
     }
     else if (key == 82) { // R key - Housing
@@ -2441,4 +2496,183 @@ void GameScreen::InitScriptDialogs() {
     reg("favor_icon", "assets/interface/Windows/FavorIconDlg.bin.txt", "Favor", 320, 180, 360, 260);
     reg("date_matching", "assets/interface/Windows/DateMatchingDlg.bin.txt", "Date Matching", 240, 120, 440, 360);
     reg("date_zone", "assets/interface/Windows/DateZoneListDlg.bin.txt", "Date Zone", 240, 120, 440, 360);
+}
+
+void GameScreen::SetupQuestNetworkCallbacks() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) {
+        quest_dlg_.SetNetworkCallbacks({}, {}, {});
+        return;
+    }
+    quest_dlg_.SetNetworkCallbacks(
+        [this](uint32_t qid) { SendQuestStart(qid); },
+        [this](uint32_t qid) { SendQuestComplete(qid); },
+        [this]() { RequestQuestList(); });
+}
+
+void GameScreen::SetupDungeonNetworkCallbacks() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) {
+        dungeon_dlg_.SetNetworkCallbacks({}, {});
+        return;
+    }
+    dungeon_dlg_.SetNetworkCallbacks(
+        [this](uint32_t tid) { SendDungeonEntrance(tid); },
+        [this](uint32_t iid) { RequestDungeonInfo(iid); });
+}
+
+void GameScreen::RequestQuestList() {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateQuestListRequest(fbb, GetSelectedCharId());
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_QUEST_LIST_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendQuestStart(uint32_t quest_id, uint32_t npc_id) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateQuestStartRequest(fbb, GetSelectedCharId(), quest_id, npc_id);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_QUEST_START_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendQuestComplete(uint32_t quest_id) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateQuestCompleteRequest(fbb, GetSelectedCharId(), quest_id);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_QUEST_END_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::SendDungeonEntrance(uint32_t template_id) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateDungeonEntranceRequest(
+        fbb, GetSelectedCharId(), template_id, state_->party_id);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_DUNGEON_ENTRANCE_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::RequestDungeonInfo(uint32_t instance_id) {
+    if (!network_ || !network_->IsConnected() || state_->offline_mode) return;
+    flatbuffers::FlatBufferBuilder fbb;
+    auto req = luna::protocol::CreateDungeonInfoRequest(fbb, GetSelectedCharId(), instance_id);
+    fbb.Finish(req);
+    network_->SendPacket(luna::protocol::PacketType_MP_DUNGEON_INFO_SYN,
+        fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void GameScreen::ApplyQuestListResponse(const luna::protocol::QuestListResponse* resp) {
+    if (!resp) return;
+    state_->network_quests.clear();
+    state_->completed_quest_ids.clear();
+    if (resp->active()) {
+        for (auto q : *resp->active()) {
+            GameState::NetworkQuestEntry entry;
+            entry.quest_id = q->quest_id();
+            entry.name = q->name() ? q->name()->str() : "Quest";
+            entry.is_completed = q->is_completed();
+            entry.is_reward_taken = q->is_reward_taken();
+            if (q->objectives()) {
+                for (auto o : *q->objectives()) {
+                    GameState::NetworkQuestObjective obj;
+                    obj.type = o->objective_type();
+                    obj.target_id = o->target_id();
+                    obj.current = o->current_count();
+                    obj.required = o->required_count();
+                    entry.objectives.push_back(obj);
+                }
+            }
+            state_->network_quests.push_back(std::move(entry));
+        }
+    }
+    if (resp->completed_ids()) {
+        for (auto cid : *resp->completed_ids())
+            state_->completed_quest_ids.push_back(cid);
+    }
+    if (state_->quest_open)
+        quest_dlg_.UpdateFromState(state_);
+}
+
+void GameScreen::ApplyQuestStartResponse(const luna::protocol::QuestStartResponse* resp) {
+    if (!resp) return;
+    if (resp->result() != 0) {
+        std::string msg = resp->message() ? resp->message()->str() : "Cannot start quest";
+        state_->chat_messages.push_back(msg);
+    } else {
+        state_->chat_messages.push_back("Quest started (#" + std::to_string(resp->quest_id()) + ")");
+        RequestQuestList();
+    }
+    if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
+}
+
+void GameScreen::ApplyQuestCompleteResponse(const luna::protocol::QuestCompleteResponse* resp) {
+    if (!resp) return;
+    if (resp->result() != 0) {
+        state_->chat_messages.push_back("Quest turn-in failed (#" + std::to_string(resp->quest_id()) + ")");
+    } else {
+        state_->chat_messages.push_back("Quest completed! Rewards granted.");
+        RequestQuestList();
+    }
+    if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
+}
+
+void GameScreen::ApplyQuestUpdateNotify(const luna::protocol::QuestUpdateNotify* resp) {
+    if (!resp) return;
+    for (auto& q : state_->network_quests) {
+        if (q.quest_id != resp->quest_id()) continue;
+        if (resp->objective_index() < q.objectives.size()) {
+            auto& obj = q.objectives[resp->objective_index()];
+            obj.current = resp->current_count();
+            obj.required = resp->required_count();
+        }
+        char buf[128];
+        snprintf(buf, sizeof(buf), "Quest progress: %u/%u", resp->current_count(), resp->required_count());
+        state_->chat_messages.push_back(buf);
+        break;
+    }
+    if (state_->quest_open)
+        quest_dlg_.UpdateFromState(state_);
+    if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
+}
+
+void GameScreen::ApplyDungeonEntranceResponse(const luna::protocol::DungeonEntranceResponse* resp) {
+    if (!resp) return;
+    if (resp->result() != 0) {
+        std::string msg = resp->message() ? resp->message()->str() : "Dungeon entrance denied";
+        state_->chat_messages.push_back(msg);
+        return;
+    }
+    state_->dungeon_instance_id = resp->instance_id();
+    state_->dungeon_template_id = resp->dungeon_template_id();
+    state_->in_dungeon = true;
+    state_->dungeon_map = resp->map_id();
+    dungeon_sys_.ApplyEntranceResponse(resp->instance_id(), resp->dungeon_template_id(),
+        resp->map_id(), resp->time_limit_sec());
+    state_->chat_messages.push_back("Entered dungeon instance #" + std::to_string(resp->instance_id()));
+    if (state_->dungeon_open)
+        dungeon_dlg_.UpdateFromState(state_);
+}
+
+void GameScreen::ApplyDungeonInfoResponse(const luna::protocol::DungeonInfoResponse* resp) {
+    if (!resp || resp->result() != 0) return;
+    state_->dungeon_instance_id = resp->instance_id();
+    state_->dungeon_state = resp->state();
+    state_->dungeon_elapsed_sec = resp->elapsed_sec();
+    dungeon_sys_.ApplyInfoResponse(resp->instance_id(), resp->state(),
+        resp->elapsed_sec(), resp->boss_active());
+    if (state_->dungeon_open)
+        dungeon_dlg_.UpdateFromState(state_);
+}
+
+void GameScreen::ApplyTriggerNotify(const luna::protocol::TriggerNotify* resp) {
+    if (!resp) return;
+    std::string msg = resp->message() ? resp->message()->str() : "";
+    if (msg.empty())
+        msg = "Trigger #" + std::to_string(resp->trigger_id()) + " activated";
+    state_->chat_messages.push_back("[Trigger] " + msg);
+    if (state_->chat_messages.size() > 50) state_->chat_messages.erase(state_->chat_messages.begin());
 }

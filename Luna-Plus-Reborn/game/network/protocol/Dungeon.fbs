@@ -1,0 +1,31 @@
+include "Types.fbs";
+
+namespace luna.protocol;
+
+table DungeonEntranceRequest {
+    character_id: uint32;
+    dungeon_template_id: uint32;
+    party_id: uint32;
+}
+
+table DungeonEntranceResponse {
+    result: uint8;
+    instance_id: uint32;
+    dungeon_template_id: uint32;
+    map_id: uint16;
+    time_limit_sec: uint32;
+    message: string;
+}
+
+table DungeonInfoRequest {
+    character_id: uint32;
+    instance_id: uint32;
+}
+
+table DungeonInfoResponse {
+    result: uint8;
+    instance_id: uint32;
+    state: uint8;
+    elapsed_sec: uint32;
+    boss_active: bool;
+}

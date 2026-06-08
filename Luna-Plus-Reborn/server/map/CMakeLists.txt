@@ -7,18 +7,27 @@ add_executable(MapServer
     systems/ItemSystem.cpp
     systems/QuestSystem.cpp
     systems/StallSystem.cpp
+    systems/GridSystem.cpp
+    systems/TriggerSystem.cpp
+    systems/MapScriptRuntime.cpp
 )
 
 target_include_directories(MapServer PRIVATE
     ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/game
+    ${CMAKE_SOURCE_DIR}/engine
     ${CMAKE_BINARY_DIR}/game/fbs
+)
+
+target_compile_definitions(MapServer PRIVATE
+    GAME_DATA_PATH="${CMAKE_SOURCE_DIR}/assets/data/game_data.db"
 )
 
 target_link_libraries(MapServer PRIVATE
     gx_network
     gx_physics
     gx_geom
+    gx_scripting
     Database
     game_core
     EnTT::EnTT

@@ -12,6 +12,13 @@ struct GuildResponse;
 struct TradeResponse;
 struct ConsignmentResponse;
 struct StreetStallResponse;
+struct QuestListResponse;
+struct QuestStartResponse;
+struct QuestCompleteResponse;
+struct QuestUpdateNotify;
+struct DungeonEntranceResponse;
+struct DungeonInfoResponse;
+struct TriggerNotify;
 }
 
 struct EntityInterp {
@@ -141,6 +148,8 @@ private:
     void SendTradeSetGold(uint32_t gold);
     void SendTradeConfirm();
     void SetupTradeNetworkCallbacks();
+    void SetupQuestNetworkCallbacks();
+    void SetupDungeonNetworkCallbacks();
     void ApplyConsignmentResponse(const luna::protocol::ConsignmentResponse* resp,
         bool mine_only, bool bids_only);
     void ApplyStreetStallResponse(const luna::protocol::StreetStallResponse* resp);
@@ -155,6 +164,18 @@ private:
     void SendStreetStallBuy(uint32_t owner_id, uint8_t stall_slot);
     void SendStreetStallClose();
     void RequestStreetStallList();
+    void RequestQuestList();
+    void SendQuestStart(uint32_t quest_id, uint32_t npc_id = 0);
+    void SendQuestComplete(uint32_t quest_id);
+    void SendDungeonEntrance(uint32_t template_id);
+    void RequestDungeonInfo(uint32_t instance_id);
+    void ApplyQuestListResponse(const luna::protocol::QuestListResponse* resp);
+    void ApplyQuestStartResponse(const luna::protocol::QuestStartResponse* resp);
+    void ApplyQuestCompleteResponse(const luna::protocol::QuestCompleteResponse* resp);
+    void ApplyQuestUpdateNotify(const luna::protocol::QuestUpdateNotify* resp);
+    void ApplyDungeonEntranceResponse(const luna::protocol::DungeonEntranceResponse* resp);
+    void ApplyDungeonInfoResponse(const luna::protocol::DungeonInfoResponse* resp);
+    void ApplyTriggerNotify(const luna::protocol::TriggerNotify* resp);
     uint32_t GetSelectedCharId() const;
     void CastHotbarSkill(int slot);
     void ApplySkillDamage(uint32_t skill_id);

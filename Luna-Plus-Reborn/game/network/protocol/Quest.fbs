@@ -1,0 +1,57 @@
+include "Types.fbs";
+
+namespace luna.protocol;
+
+table QuestObjectiveState {
+    objective_type: uint8;
+    target_id: uint32;
+    current_count: uint16;
+    required_count: uint16;
+}
+
+table QuestEntryState {
+    quest_id: uint32;
+    name: string;
+    is_completed: bool;
+    is_reward_taken: bool;
+    objectives: [QuestObjectiveState];
+}
+
+table QuestListRequest {
+    character_id: uint32;
+}
+
+table QuestListResponse {
+    result: uint8;
+    active: [QuestEntryState];
+    completed_ids: [uint32];
+}
+
+table QuestStartRequest {
+    character_id: uint32;
+    quest_id: uint32;
+    npc_id: uint32;
+}
+
+table QuestStartResponse {
+    result: uint8;
+    quest_id: uint32;
+    message: string;
+}
+
+table QuestCompleteRequest {
+    character_id: uint32;
+    quest_id: uint32;
+}
+
+table QuestCompleteResponse {
+    result: uint8;
+    quest_id: uint32;
+}
+
+table QuestUpdateNotify {
+    quest_id: uint32;
+    objective_index: uint8;
+    current_count: uint16;
+    required_count: uint16;
+}
