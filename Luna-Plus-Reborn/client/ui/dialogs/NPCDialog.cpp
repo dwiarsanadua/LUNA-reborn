@@ -12,6 +12,7 @@ void NPCDialog::Open(GameState* state, uint32_t npc_id, const std::string& npc_n
 
     if (wm) window_ = wm->LoadFromScript("assets/interface/Windows/NpcImage.bin.txt");
     if (!window_) {
+        spdlog::warn("NPCDialog: failed to load UI script, using C++ fallback");
         window_ = new Window("", 300, 300, 680, 240);
         window_->SetMovable(true);
         window_->SetClosable(true);

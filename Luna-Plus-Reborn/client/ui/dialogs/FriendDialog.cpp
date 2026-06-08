@@ -3,6 +3,7 @@
 #include <ui/widgets/ListBox.hpp>
 #include <ui/widgets/InputField.hpp>
 #include <ui/widgets/TabPanel.hpp>
+#include <spdlog/spdlog.h>
 
 void FriendDialog::Open(WindowManager* wm) {
     if (window_) return;
@@ -11,6 +12,7 @@ void FriendDialog::Open(WindowManager* wm) {
     if (wm) window_ = wm->LoadFromScript("assets/interface/Windows/Friend.bin.txt");
 
     if (!window_) {
+        spdlog::warn("FriendDialog: failed to load UI script, using C++ fallback");
         window_ = new Window("FRIENDS", 400, 150, 300, 300);
         window_->SetClosable(true);
         window_->SetMovable(true);

@@ -2,6 +2,7 @@
 #include <ui/UiScriptParser.hpp>
 #include <ui/ColorPalette.hpp>
 #include <ui/widgets/TabPanel.hpp>
+#include <spdlog/spdlog.h>
 #include <cstdio>
 #include <algorithm>
 
@@ -112,6 +113,7 @@ void QuestDialog::Open(GameState* state, WindowManager* wm) {
     if (wm) window_ = wm->LoadFromScript("assets/interface/Windows/Quest.bin.txt");
 
     if (!window_) {
+        spdlog::warn("QuestDialog: failed to load UI script, using C++ fallback");
         window_ = new Window("", 600, 50, 522, 420);
         window_->SetClosable(true);
         window_->SetMovable(true);

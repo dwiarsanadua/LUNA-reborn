@@ -1,5 +1,6 @@
 #include "InventoryDialog.hpp"
 #include <ui/UiScriptParser.hpp>
+#include <spdlog/spdlog.h>
 #include <cstdio>
 #include <algorithm>
 
@@ -14,6 +15,7 @@ void InventoryDialog::Open(GameState* state, WindowManager* wm) {
     }
 
     if (!window_) {
+        spdlog::warn("InventoryDialog: failed to load UI script, using C++ fallback");
         window_ = wm->Open("Inventory", 40, 50, 355, 361);
         window_->SetClosable(true);
         window_->SetMovable(true);

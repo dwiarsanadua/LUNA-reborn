@@ -2,6 +2,7 @@
 #include <ui/UiScriptParser.hpp>
 #include <ui/widgets/ListBox.hpp>
 #include <ui/widgets/TabPanel.hpp>
+#include <spdlog/spdlog.h>
 #include <cstdio>
 
 void GuildDialog::Open(WindowManager* wm, SiegeSystem* siege) {
@@ -10,6 +11,7 @@ void GuildDialog::Open(WindowManager* wm, SiegeSystem* siege) {
     if (wm) window_ = wm->LoadFromScript("assets/interface/Windows/Guild.bin.txt");
 
     if (!window_) {
+        spdlog::warn("GuildDialog: failed to load UI script, using C++ fallback");
         window_ = new Window("GUILD", 300, 100, 380, 380);
         window_->SetClosable(true);
         window_->SetMovable(true);

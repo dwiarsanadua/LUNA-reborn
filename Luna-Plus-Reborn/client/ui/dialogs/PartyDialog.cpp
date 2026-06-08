@@ -3,6 +3,7 @@
 #include <ui/ColorPalette.hpp>
 #include <ui/widgets/ListBox.hpp>
 #include <ui/widgets/TabPanel.hpp>
+#include <spdlog/spdlog.h>
 #include <cstdio>
 
 void PartyDialog::Open(WindowManager* wm) {
@@ -12,6 +13,7 @@ void PartyDialog::Open(WindowManager* wm) {
     if (wm) window_ = wm->LoadFromScript("assets/interface/Windows/PartySet.bin.txt");
 
     if (!window_) {
+        spdlog::warn("PartyDialog: failed to load UI script, using C++ fallback");
         window_ = new Window("PARTY", 200, 150, 300, 280);
         window_->SetClosable(true);
         window_->SetMovable(true);

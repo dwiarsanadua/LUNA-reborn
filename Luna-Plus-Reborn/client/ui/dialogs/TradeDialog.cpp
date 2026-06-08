@@ -1,11 +1,13 @@
 #include "TradeDialog.hpp"
 #include <ui/ColorPalette.hpp>
+#include <spdlog/spdlog.h>
 #include <cstdio>
 
 void TradeDialog::Open(GameState* state, TradingSystem* trading, WindowManager* wm) {
     trading_ = trading;
     if (wm) window_ = wm->LoadFromScript("assets/interface/Windows/Trade.bin.txt");
     if (!window_) {
+        spdlog::warn("TradeDialog: failed to load UI script, using C++ fallback");
         window_ = new Window("TRADE", 200, 100, 500, 400);
         window_->SetClosable(true);
         window_->SetMovable(true);

@@ -1,5 +1,6 @@
 #include "OptionsDialog.hpp"
 #include <ui/UiScriptParser.hpp>
+#include <spdlog/spdlog.h>
 #include <config/ConfigManager.hpp>
 #include <cstdio>
 
@@ -9,6 +10,7 @@ void OptionsDialog::Open(WindowManager* wm) {
     if (wm) window_ = wm->LoadFromScript("assets/interface/Windows/Option.bin.txt");
 
     if (!window_) {
+        spdlog::warn("OptionsDialog: failed to load UI script, using C++ fallback");
         window_ = new Window("OPTIONS", 200, 80, 400, 350);
         window_->SetClosable(true);
         window_->SetMovable(true);

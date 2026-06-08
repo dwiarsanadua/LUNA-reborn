@@ -1,4 +1,5 @@
 #include "CharacterDialog.hpp"
+#include <spdlog/spdlog.h>
 #include <cstdio>
 
 void CharacterDialog::Open(GameState* state, WindowManager* wm) {
@@ -7,6 +8,7 @@ void CharacterDialog::Open(GameState* state, WindowManager* wm) {
     }
 
     if (!window_) {
+        spdlog::warn("CharacterDialog: failed to load UI script, using C++ fallback");
         window_ = wm->Open("Character", 350, 60, 400, 420);
         window_->SetClosable(true);
         window_->SetMovable(true);

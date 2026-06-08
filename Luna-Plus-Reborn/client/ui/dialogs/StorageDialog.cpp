@@ -1,6 +1,7 @@
 #include "StorageDialog.hpp"
 #include <ui/UiScriptParser.hpp>
 #include <ui/ColorPalette.hpp>
+#include <spdlog/spdlog.h>
 #include <cstdio>
 #include <algorithm>
 
@@ -11,6 +12,7 @@ void StorageDialog::Open(GameState* state, WindowManager* wm) {
     if (wm) window_ = wm->LoadFromScript("assets/interface/Windows/Storage.bin.txt");
 
     if (!window_) {
+        spdlog::warn("StorageDialog: failed to load UI script, using C++ fallback");
         window_ = new Window("STORAGE", 300, 100, 400, 350);
         window_->SetClosable(true);
         window_->SetMovable(true);
