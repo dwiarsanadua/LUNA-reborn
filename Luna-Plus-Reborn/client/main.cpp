@@ -61,10 +61,10 @@ int main() {
     srand((unsigned int)time(nullptr));
     mkdir("logs", 0777);
 
-    // 1. ConfigManager / Logger
-    ConfigManager::Init();
+    // 1. Logger / ConfigManager
     Luna::InitLog("client", "client.log");
     spdlog::info("LUNA Plus Reborn — v1.1.0");
+    ConfigManager::Init();
 
     // 2. Input systems (before audio)
     Localization::Init();
@@ -122,7 +122,17 @@ int main() {
     map.SetAudio(&audio);
     map.SetSpawnSystem(&spawn_sys);
     map.SetRegistry(&registry);
-    // GameDataDB initialized with EngineMap internally (avoids struct conflicts)
+    // GameDataDB — init before map load so EngineMap uses external DB
+    GameDataDB gamedb;
+    if (gamedb.Open("data/game_data.db")) {
+        gamedb.LoadMonsterTemplates();
+        gamedb.LoadNPCTemplates();
+        gamedb.LoadMapData();
+        map.SetGameDataDB(&gamedb);
+        spdlog::info("GameDataDB: initialized");
+    } else {
+        spdlog::warn("GameDataDB: failed to open data/game_data.db, using internal fallback");
+    }
     // Initial map load from state
     if (g_state.map_id != 0) {
         map.Load(std::to_string(g_state.map_id));
@@ -221,19 +231,7 @@ int main() {
     gameScreen->SetUI(&ui);
     screenManager.Register("game", std::move(gameScreen));
 
-    // 12. GameDataDB
-    GameDataDB gamedb;
-    if (gamedb.Open("data/game_data.db")) {
-        gamedb.LoadMonsterTemplates();
-        gamedb.LoadNPCTemplates();
-        gamedb.LoadMapData();
-        map.SetGameDataDB(&gamedb);
-        spdlog::info("GameDataDB: initialized");
-    } else {
-        spdlog::warn("GameDataDB: failed to open data/game_data.db");
-    }
-
-    // 13. Enter Login Screen
+    // 12. Enter Login Screen
     screenManager.SwitchTo("login");
 
     static Luna::PacketDispatcher client_dispatcher;
