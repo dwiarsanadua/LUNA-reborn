@@ -6,6 +6,8 @@
 #include <Login_generated.h>
 #include <PacketType_generated.h>
 #include <spdlog/spdlog.h>
+#include <bgfx/bgfx.h>
+#include <stb_image.h>
 
 void LoginScreen::Init(GameState* state, NetworkClient* network) {
     state_ = state;
@@ -47,36 +49,58 @@ void LoginScreen::Render(UIRenderer& ui) {
     float lw = ui.logicalWidth;
     float lh = ui.logicalHeight;
 
-    // Background - use original launcher image if possible
-    TextureInfo bg = ui.LoadTexture("login_bg", "Launcher_01_01.png");
-    if (!bgfx::isValid(bg.handle)) {
-        bg = ui.LoadTexture("login_bg", "login.png");
-    }
+    // Cache login textures across frames (static so they load once)
+    static bgfx::TextureHandle s_bg = BGFX_INVALID_HANDLE;
+    static bgfx::TextureHandle s_bar = BGFX_INVALID_HANDLE;
+    static bgfx::TextureHandle s_btn = BGFX_INVALID_HANDLE;
     
-    if (bgfx::isValid(bg.handle)) {
-        ui.DrawImage(0, 0, lw, lh, bg.handle);
-    } else if (set_clear_color_) {
-        set_clear_color_(0x0a0a1eFF);
-    }
+    auto LoadOnce = [&](bgfx::TextureHandle& cache, const std::string& name) {
+        if (bgfx::isValid(cache)) return cache;
+        std::string paths[] = {
+            "assets/textures/ui/Launcher/" + name,
+            "assets/textures/ui/" + name,
+            "assets/textures/" + name,
+            "assets/textures/unpacked/image/" + name,
+            "assets/textures/unpacked/map/" + name,
+        };
+        for (auto& p : paths) {
+            int w, h, n;
+            unsigned char* d = stbi_load(p.c_str(), &w, &h, &n, 4);
+            if (d) {
+                cache = bgfx::createTexture2D((uint16_t)w, (uint16_t)h, false, 1,
+                    bgfx::TextureFormat::RGBA8, BGFX_SAMPLER_NONE,
+                    bgfx::copy(d, w * h * 4));
+                stbi_image_free(d);
+                spdlog::info("LoginScreen: cached {}", p);
+                return cache;
+            }
+        }
+        return cache;
+    };
+
+    // Load all textures once (cached statically)
+    LoadOnce(s_bg, "Launcher_01_01.png");
+    if (!bgfx::isValid(s_bg)) LoadOnce(s_bg, "login.png");
+    LoadOnce(s_bar, "login_bar00.png");
+    LoadOnce(s_btn, "login_bar01.png");
+    
+    // Background
+    if (bgfx::isValid(s_bg)) ui.DrawImage(0, 0, lw, lh, s_bg);
     
     // Bottom bar
-    TextureInfo bar = ui.LoadTexture("login_bar", "login_bar00.png");
-    if (bgfx::isValid(bar.handle)) {
-        ui.DrawImage(0, lh - 120.0f, lw, 120, bar.handle);
-    }
+    if (bgfx::isValid(s_bar)) ui.DrawImage(0, lh - 120.0f, lw, 120, s_bar);
 
     // Title
     ui.DrawTextCentered(lh * 0.2f, 0xffffcc88, "LUNA Plus Reborn");
     ui.DrawTextCentered(lh * 0.2f + 25.0f, 0xff888888, "v1.1.0 (GitHub Build)");
     
-    // Account buttons - use original button style
-    TextureInfo btnTex = ui.LoadTexture("btn_normal", "login_bar01.png");
+    // Account buttons
     const char* names[3] = {"admin", "test", "demo"};
     for (int i = 0; i < 3; i++) {
         float by = lh * 0.45f + i * 50;
         bool sel = (i == state_->selected_account);
-        if (bgfx::isValid(btnTex.handle)) {
-            ui.DrawImage(lw * 0.5f - 200, by, 400, 40, btnTex.handle, sel ? UIColor{255,255,200,255} : UIColor{200,200,200,255});
+        if (bgfx::isValid(s_btn)) {
+            ui.DrawImage(lw * 0.5f - 200, by, 400, 40, s_btn, sel ? UIColor{255,255,200,255} : UIColor{200,200,200,255});
         }
         ui.DrawTextCentered(by + 10, sel ? 0xffffffff : 0xffaaaaaa, names[i]);
     }
