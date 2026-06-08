@@ -14,6 +14,7 @@
 #include <Chat_generated.h>
 #include <Entity_generated.h>
 #include <Movement_generated.h>
+#include <Combat_generated.h>
 #include <PacketType_generated.h>
 #include <algorithm>
 #include <string>
@@ -100,7 +101,7 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         state_->gold = inv->gold();
         return true;
     }
-    case 0x1001: {
+    case luna::protocol::PacketType_MP_ENTITY_SPAWN: {
         auto spawn = flatbuffers::GetRoot<luna::protocol::EntitySpawn>(payload.data());
         RemoteEntity e;
         e.id = spawn->entity_id();
@@ -118,16 +119,28 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         CharRenderer_Spawn(e.id, modelPath, e.x, e.y, e.z, colors[state_->next_entity_id++ % 5]);
         return true;
     }
-    case 0x1004: { // EntityTransform
+    case luna::protocol::PacketType_MP_ENTITY_TRANSFORM: {
         auto trans = flatbuffers::GetRoot<luna::protocol::EntityTransform>(payload.data());
         uint32_t eid = trans->entity_id();
+        if (!state_->offline_mode && trans->position()) {
+            uint32_t player_id = 0;
+            if (!state_->characters.empty() && state_->selected_char < (int)state_->characters.size())
+                player_id = state_->characters[state_->selected_char].id;
+            if (eid == player_id || eid == 0) {
+                hero_.SetPosition(trans->position()->x(), trans->position()->y(), trans->position()->z());
+                state_->player_x = hero_.GetX();
+                state_->player_y = hero_.GetY();
+                state_->player_z = hero_.GetZ();
+                return true;
+            }
+        }
         for (auto& e : state_->entities) {
             if (e.id == eid) {
                 if (trans->position()) {
                     e.x = trans->position()->x();
                     e.y = trans->position()->y();
                     e.z = trans->position()->z();
-                    CharRenderer_Move(e.id, e.x, e.y, e.z, true); // Assuming moving
+                    CharRenderer_Move(e.id, e.x, e.y, e.z, true);
                 }
                 break;
             }
@@ -572,7 +585,8 @@ void GameScreen::InitializeWorld() {
         state_->learned_skills.push_back(static_cast<int>(state_->hotbar_skills[0]));
         if (state_->hotbar_skills[1]) state_->learned_skills.push_back(static_cast<int>(state_->hotbar_skills[1]));
     }
-    SpawnMonstersFromMap();
+    if (state_->offline_mode)
+        SpawnMonstersFromMap();
     fade_dlg_.FadeIn(0.8f);
     spdlog::info("GameScreen: world initialized on map {}", state_->map_id);
 }
@@ -585,6 +599,14 @@ void GameScreen::CastHotbarSkill(int slot) {
     if (!hero_.UseSkill(static_cast<int>(skill_id))) return;
     state_->hotbar_cooldowns[slot] = 2.5f;
     CharRenderer_Move(0, hero_.GetX(), hero_.GetY(), hero_.GetZ(), false, CHAR_ATTACK);
+    if (network_ && network_->IsConnected() && !state_->offline_mode) {
+        flatbuffers::FlatBufferBuilder fbb;
+        luna::protocol::Vec3 pos{hero_.GetX(), hero_.GetY(), hero_.GetZ()};
+        auto req = luna::protocol::CreateAttackRequest(fbb, hero_.GetTarget(), static_cast<uint16_t>(skill_id), &pos);
+        fbb.Finish(req);
+        network_->SendPacket(luna::protocol::PacketType_MP_COMBAT_ATTACK_SYN,
+            fbb.GetBufferPointer(), fbb.GetSize());
+    }
 }
 
 void GameScreen::ApplySkillDamage(uint32_t skill_id) {
@@ -668,8 +690,18 @@ void GameScreen::Update(float dt) {
         network_->Disconnect();
         uint32_t mid = state_->map_id ? state_->map_id : 51;
         uint16_t map_port = static_cast<uint16_t>(8200 + mid);
-        if (network_->Connect("127.0.0.1", map_port))
+        if (network_->Connect("127.0.0.1", map_port)) {
             spdlog::info("Connected to MapServer on port {} (map {})", map_port, mid);
+            if (!state_->characters.empty() && state_->selected_char < (int)state_->characters.size()) {
+                auto& ch = state_->characters[state_->selected_char];
+                flatbuffers::FlatBufferBuilder fbb;
+                auto req = luna::protocol::CreateEnterWorldRequestDirect(
+                    fbb, state_->session_token.c_str(), ch.id);
+                fbb.Finish(req);
+                network_->SendPacket(luna::protocol::PacketType_MP_USERCONN_GAMEIN_SYN,
+                    fbb.GetBufferPointer(), fbb.GetSize());
+            }
+        }
         if (audio_) {
             switch (state_->map_id) {
                 case 13: audio_->PlayBGM("14_Red_Orc_Outpost"); break;
@@ -937,6 +969,7 @@ void GameScreen::SpawnMonstersFromMap() {
             float oz = (static_cast<float>(rand() % 200) - 100.0f) * s.spawn_radius / 100.0f;
             uint32_t id = state_->next_entity_id++;
             monsters_.emplace_back(id, tmpl->name, ox, oz, tmpl->level, MonsterType::Normal, model);
+            monsters_.back().SetNavMesh(&navmesh_);
         }
     }
 
@@ -950,8 +983,14 @@ void GameScreen::SpawnMonstersFromMap() {
             std::string model = ModelResolver::ResolveMonsterModel(tmpl->model_file);
             uint32_t id = state_->next_entity_id++;
             monsters_.emplace_back(id, tmpl->name, d.x, d.z, tmpl->level, MonsterType::Normal, model);
+            monsters_.back().SetNavMesh(&navmesh_);
         }
     }
+
+    navmesh_.ClearObstacles();
+    navmesh_.AddObstacle(0.0f, 0.0f, 3.0f);
+    for (const auto& m : monsters_)
+        navmesh_.AddObstacle(m.GetX(), m.GetZ(), 1.5f);
 
     spdlog::info("GameScreen: {} monsters spawned for map {}", monsters_.size(), map_id);
 }

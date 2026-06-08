@@ -71,6 +71,8 @@ public:
     void SendNPCList(int player_entity_id);
     bool CheckEncounterTrigger(float player_x, float player_z);
     void SavePlayerPosition(int entity_id, float x, float y, float z);
+    void HandlePacket(uint16_t type, const uint8_t* payload, size_t len);
+    void SendWorldSnapshot();
 
     CombatSystem& GetCombatSystem();
     AISystem& GetAISystem();
@@ -110,4 +112,11 @@ private:
     uint32_t next_dungeon_id_ = 1;
 
     void DistributeDungeonRewards(uint32_t instance_id);
+    void SendEntitySpawn(uint32_t entity_id, int8_t entity_type,
+                         const std::string& model_id, const std::string& name,
+                         uint16_t level, float x, float y, float z, float hp_pct);
+    void SendEntityTransform(uint32_t entity_id, float x, float y, float z);
+
+    bool player_joined_ = false;
+    PlayerData connected_player_{};
 };

@@ -53,8 +53,17 @@ public:
     bool IsInitialized() const { return initialized_; }
 
 private:
+    int WorldToGridX(float x) const;
+    int WorldToGridZ(float z) const;
+    void GridToWorld(int gx, int gz, float& x, float& z) const;
+    bool IsGridWalkable(int gx, int gz) const;
+    void SetBlocked(int gx, int gz, bool blocked);
+
     bool initialized_ = false;
     float world_size_ = 200.0f;
     float grid_size_ = 1.0f;
+    int grid_w_ = 0;
+    int grid_h_ = 0;
+    std::vector<uint8_t> blocked_;
     std::vector<glm::vec2> obstacles_;
 };

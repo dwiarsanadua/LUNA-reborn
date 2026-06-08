@@ -2,7 +2,29 @@
 #include <spdlog/spdlog.h>
 #include <flatbuffers/flatbuffers.h>
 #include <Login_generated.h>
+#include <PacketType_generated.h>
 #include <cstring>
+
+static uint32_t crc32_table[256];
+static bool crc32_ready = false;
+
+static void InitCrc32() {
+    for (uint32_t i = 0; i < 256; i++) {
+        uint32_t crc = i;
+        for (int j = 0; j < 8; j++)
+            crc = (crc & 1) ? (crc >> 1) ^ 0xEDB88320u : (crc >> 1);
+        crc32_table[i] = crc;
+    }
+    crc32_ready = true;
+}
+
+static uint32_t PacketCrc32(const uint8_t* data, size_t size) {
+    if (!crc32_ready) InitCrc32();
+    uint32_t crc = 0xFFFFFFFFu;
+    for (size_t i = 0; i < size; i++)
+        crc = crc32_table[(crc ^ data[i]) & 0xFFu] ^ (crc >> 8);
+    return crc ^ 0xFFFFFFFFu;
+}
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -46,13 +68,13 @@ void NetworkClient::Send(const uint8_t* data, size_t len) {
 }
 
 void NetworkClient::SendPacket(uint16_t type, const uint8_t* payload, size_t len) {
-    PacketHeader hdr{};
-    hdr.magic = 0x4C4E50;
+    LunaPacketHeader hdr{};
+    hdr.magic = LUNA_PACKET_MAGIC;
     hdr.length = static_cast<uint16_t>(len);
     hdr.type = type;
     hdr.sequence = 0;
-    hdr.checksum = 0;
-    Send(reinterpret_cast<uint8_t*>(&hdr), sizeof(hdr));
+    hdr.checksum = (payload && len > 0) ? PacketCrc32(payload, len) : 0;
+    Send(reinterpret_cast<uint8_t*>(&hdr), LUNA_PACKET_HEADER_SIZE);
     if (payload && len > 0) Send(payload, len);
 }
 
@@ -62,7 +84,7 @@ bool NetworkClient::Login(const std::string& username, const std::string& passwo
     flatbuffers::FlatBufferBuilder fbb;
     auto req = luna::protocol::CreateLoginRequestDirect(fbb, username.c_str(), &pv);
     fbb.Finish(req);
-    SendPacket(0x0101, fbb.GetBufferPointer(), fbb.GetSize());
+    SendPacket(luna::protocol::PacketType_MP_USERCONN_LOGIN_SYN, fbb.GetBufferPointer(), fbb.GetSize());
     return true;
 }
 
@@ -83,14 +105,18 @@ void NetworkClient::ReadThread() {
         ssize_t n = ::recv(sock_, buf.data(), buf.size(), 0);
         if (n <= 0) { connected_ = false; break; }
         read_buf_.insert(read_buf_.end(), buf.data(), buf.data() + n);
-        while (read_buf_.size() >= sizeof(PacketHeader)) {
-            PacketHeader hdr;
-            std::memcpy(&hdr, read_buf_.data(), sizeof(hdr));
-            if (hdr.magic != 0x4C4E50) { read_buf_.clear(); break; }
-            size_t total = sizeof(PacketHeader) + hdr.length;
+        while (read_buf_.size() >= LUNA_PACKET_HEADER_SIZE) {
+            LunaPacketHeader hdr;
+            std::memcpy(&hdr, read_buf_.data(), LUNA_PACKET_HEADER_SIZE);
+            if (hdr.magic != LUNA_PACKET_MAGIC) { read_buf_.clear(); break; }
+            size_t total = LUNA_PACKET_HEADER_SIZE + hdr.length;
             if (read_buf_.size() < total) break;
-            std::vector<uint8_t> payload(read_buf_.begin() + sizeof(PacketHeader),
-                                          read_buf_.begin() + total);
+            const uint8_t* body = read_buf_.data() + LUNA_PACKET_HEADER_SIZE;
+            if (hdr.length > 0 && PacketCrc32(body, hdr.length) != hdr.checksum) {
+                read_buf_.erase(read_buf_.begin(), read_buf_.begin() + total);
+                continue;
+            }
+            std::vector<uint8_t> payload(body, body + hdr.length);
             read_buf_.erase(read_buf_.begin(), read_buf_.begin() + total);
             // Push to thread-safe queue instead of calling handler directly
             {

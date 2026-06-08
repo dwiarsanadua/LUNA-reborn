@@ -23,17 +23,6 @@ static std::string GenerateUUID() {
     return uuid;
 }
 
-static std::vector<uint8_t> BuildResponse(uint16_t type, flatbuffers::FlatBufferBuilder& fbb) {
-    uint8_t type_bytes[2];
-    type_bytes[0] = (type >> 8) & 0xFF;
-    type_bytes[1] = type & 0xFF;
-    std::vector<uint8_t> resp(2 + fbb.GetSize());
-    resp[0] = type_bytes[0];
-    resp[1] = type_bytes[1];
-    std::memcpy(resp.data() + 2, fbb.GetBufferPointer(), fbb.GetSize());
-    return resp;
-}
-
 AgentServer::AgentServer()
     : network_(std::make_unique<NetworkLayer>())
     , db_(std::make_unique<Database>())
@@ -79,18 +68,12 @@ bool AgentServer::Initialize(uint16_t port) {
     }
 
     using namespace luna::protocol;
-    network_->SetReceiveCallback([this](const uint8_t* data, size_t size) {
-        if (size < 2) return;
-        uint16_t type = (data[0] << 8) | data[1];
-        const uint8_t* payload = data + 2;
-        size_t payload_len = size - 2;
-
+    network_->SetReceiveCallback([this](uint16_t type, const uint8_t* payload, size_t payload_len) {
         switch (type) {
         case PacketType_MP_USERCONN_LOGIN_SYN: {
             auto req = flatbuffers::GetRoot<LoginRequest>(payload);
             std::string username = req->username() ? req->username()->str() : "";
-            // In production, hash would be verified; here we use raw password
-            std::string password = "admin"; // would come from a password field
+            std::string password = "admin";
             auto result = HandleLogin(username, password);
 
             flatbuffers::FlatBufferBuilder fbb;
@@ -98,26 +81,26 @@ bool AgentServer::Initialize(uint16_t port) {
                 result.success ? LoginResult_LOGIN_OK : LoginResult_LOGIN_FAILED,
                 result.success ? fbb.CreateString(result.session_token) : 0);
             fbb.Finish(resp);
-            auto out = BuildResponse(PacketType_MP_USERCONN_LOGIN_ACK, fbb);
-            network_->Send(out.data(), out.size());
+            network_->SendPacket(PacketType_MP_USERCONN_LOGIN_ACK,
+                fbb.GetBufferPointer(), fbb.GetSize());
             break;
         }
         case PacketType_MP_USERCONN_CHARACTERLIST_SYN: {
-            auto req = flatbuffers::GetRoot<ServerListRequest>(payload);
+            auto req = flatbuffers::GetRoot<CharacterListRequest>(payload);
             std::string token = req->session_token() ? req->session_token()->str() : "";
             auto chars = HandleCharacterList(token);
 
             flatbuffers::FlatBufferBuilder fbb;
             std::vector<flatbuffers::Offset<CharacterInfo>> fb_chars;
             for (auto& c : chars) {
-                auto pos = Vec3(c.pos_x, c.pos_y, c.pos_z);
+                Vec3 pos(c.pos_x, c.pos_y, c.pos_z);
                 fb_chars.push_back(CreateCharacterInfoDirect(fbb, c.id, c.name.c_str(),
                     c.level, c.class_id, c.gender, c.map_id, &pos, c.hp, c.max_hp));
             }
-            auto resp = CreateCharacterListResponseDirect(fbb, &fb_chars, 0);
+            auto resp = CreateCharacterListResponseDirect(fbb, &fb_chars, 4);
             fbb.Finish(resp);
-            auto out = BuildResponse(PacketType_MP_USERCONN_CHARACTERLIST_ACK, fbb);
-            network_->Send(out.data(), out.size());
+            network_->SendPacket(PacketType_MP_USERCONN_CHARACTERLIST_ACK,
+                fbb.GetBufferPointer(), fbb.GetSize());
             break;
         }
         case PacketType_MP_USERCONN_CHARACTER_MAKE_SYN: {
@@ -134,8 +117,8 @@ bool AgentServer::Initialize(uint16_t port) {
             ci.add_level(1);
             auto resp = CreateCreateCharacterResponse(fbb, result_status, ci.Finish());
             fbb.Finish(resp);
-            auto out = BuildResponse(PacketType_MP_USERCONN_CHARACTER_MAKE_ACK, fbb);
-            network_->Send(out.data(), out.size());
+            network_->SendPacket(PacketType_MP_USERCONN_CHARACTER_MAKE_ACK,
+                fbb.GetBufferPointer(), fbb.GetSize());
             break;
         }
         case PacketType_MP_USERCONN_CHARACTER_DELETE_SYN: {
@@ -147,8 +130,25 @@ bool AgentServer::Initialize(uint16_t port) {
             flatbuffers::FlatBufferBuilder fbb;
             auto resp = CreateDeleteCharacterResponse(fbb, ok ? 0 : 1);
             fbb.Finish(resp);
-            auto out = BuildResponse(PacketType_MP_USERCONN_CHARACTER_DELETE_ACK, fbb);
-            network_->Send(out.data(), out.size());
+            network_->SendPacket(PacketType_MP_USERCONN_CHARACTER_DELETE_ACK,
+                fbb.GetBufferPointer(), fbb.GetSize());
+            break;
+        }
+        case PacketType_MP_USERCONN_GAMEIN_SYN: {
+            auto req = flatbuffers::GetRoot<EnterWorldRequest>(payload);
+            std::string token = req->session_token() ? req->session_token()->str() : "";
+            CharData ch{};
+            bool ok = HandleEnterWorld(token, static_cast<int>(req->character_id()), ch);
+            flatbuffers::FlatBufferBuilder fbb;
+            Vec3 pos(ch.pos_x, ch.pos_y, ch.pos_z);
+            auto resp = CreateEnterWorldResponse(fbb,
+                ok ? 0 : 1,
+                static_cast<uint16_t>(ch.map_id ? ch.map_id : 51),
+                &pos,
+                static_cast<uint32_t>(ch.id));
+            fbb.Finish(resp);
+            network_->SendPacket(ok ? PacketType_MP_USERCONN_GAMEIN_ACK : PacketType_MP_USERCONN_GAMEIN_NACK,
+                fbb.GetBufferPointer(), fbb.GetSize());
             break;
         }
         default:
@@ -247,6 +247,28 @@ bool AgentServer::HandleDeleteCharacter(const std::string& session_token, int ch
     return db_->Execute(
         "DELETE FROM characters WHERE id=" + std::to_string(char_id) +
         " AND account_id=" + std::to_string(account_id));
+}
+
+bool AgentServer::HandleEnterWorld(const std::string& session_token, int char_id, CharData& out) {
+    int account_id = ValidateSession(session_token);
+    if (account_id < 0) return false;
+    auto rows = db_->Query(
+        "SELECT id, name, level, class_id, gender, map_id, pos_x, pos_y, pos_z, hp, max_hp "
+        "FROM characters WHERE id=" + std::to_string(char_id) +
+        " AND account_id=" + std::to_string(account_id));
+    if (rows.empty()) return false;
+    out.id = std::stoi(rows[0][0]);
+    out.name = rows[0][1];
+    out.level = std::stoi(rows[0][2]);
+    out.class_id = std::stoi(rows[0][3]);
+    out.gender = std::stoi(rows[0][4]);
+    out.map_id = std::stoi(rows[0][5]);
+    out.pos_x = std::stof(rows[0][6]);
+    out.pos_y = std::stof(rows[0][7]);
+    out.pos_z = std::stof(rows[0][8]);
+    out.hp = std::stoi(rows[0][9]);
+    out.max_hp = std::stoi(rows[0][10]);
+    return true;
 }
 
 std::string AgentServer::CreateSession(int account_id) {

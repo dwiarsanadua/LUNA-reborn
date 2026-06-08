@@ -1,4 +1,5 @@
 #pragma once
+#include "NavMeshSystem.hpp"
 #include <string>
 #include <glm/glm.hpp>
 #include <cstdint>
@@ -82,6 +83,7 @@ public:
 
     // Physics integration
     void SetPhysicsWorld(PhysicsWorld* pw) { physics_world_ = pw; }
+    void SetNavMesh(class NavMeshSystem* nav) { navmesh_ = nav; }
 
 private:
     uint32_t id_ = 0;
@@ -116,8 +118,11 @@ private:
     struct ThreatEntry { uint32_t id; int damage; };
     std::vector<ThreatEntry> threat_table_;
     
-    // Physics
+    // Physics / pathfinding
     PhysicsWorld* physics_world_ = nullptr;
+    class NavMeshSystem* navmesh_ = nullptr;
+    NavPath chase_path_;
+    float path_replan_timer_ = 0.0f;
 
     // Boss phases
     std::vector<BossPhase> phases_;

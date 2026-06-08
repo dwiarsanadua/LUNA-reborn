@@ -102,14 +102,14 @@ bool OnPacket(uint16_t type, const std::vector<uint8_t>& payload,
     if (type == PacketType_MP_USERCONN_GAMEIN_ACK || type == 0x0208) {
         uint32_t map_id = state.map_id ? state.map_id : 51;
         float x = 0, y = 0, z = 0;
-        if (type == 0x0208) {
-            auto resp = flatbuffers::GetRoot<EnterWorldResponse>(payload.data());
+        auto resp = flatbuffers::GetRoot<EnterWorldResponse>(payload.data());
+        if (resp) {
             if (resp->position()) {
                 x = resp->position()->x();
                 y = resp->position()->y();
                 z = resp->position()->z();
             }
-            map_id = resp->map_id();
+            if (resp->map_id()) map_id = resp->map_id();
         }
         OnEnterWorldData(state, map_id, x, y, z);
         state.connecting = !state.offline_mode;

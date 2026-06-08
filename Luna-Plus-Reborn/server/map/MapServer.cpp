@@ -10,8 +10,15 @@
 #include <sqlite3.h>
 #include <ecs/components/Inventory.hpp>
 #include <ecs/components/CharacterStats.hpp>
+#include <ecs/components/SpawnInfo.hpp>
+#include <ecs/components/Transform.hpp>
 #include <ecs/components/Tag.hpp>
 #include <entt/entt.hpp>
+#include <flatbuffers/flatbuffers.h>
+#include <Character_generated.h>
+#include <Entity_generated.h>
+#include <Movement_generated.h>
+#include <PacketType_generated.h>
 #include <spdlog/spdlog.h>
 #include <glm/glm.hpp>
 #include <chrono>
@@ -77,8 +84,8 @@ bool MapServer::Initialize(int map_id, uint16_t port) {
         return false;
     }
 
-    network_->SetReceiveCallback([](const uint8_t* data, size_t size) {
-        spdlog::debug("MapServer: packet received size={}", size);
+    network_->SetReceiveCallback([this](uint16_t type, const uint8_t* data, size_t size) {
+        HandlePacket(type, data, size);
     });
 
     // Load monster spawns and NPCs via SpawnSystem + direct DB
@@ -468,3 +475,91 @@ ItemSystem& MapServer::GetItemSystem() { return *item_; }
 QuestSystem& MapServer::GetQuestSystem() { return *quest_; }
 Database& MapServer::GetDatabase() { return *db_; }
 NetworkLayer& MapServer::GetNetworkLayer() { return *network_; }
+
+void MapServer::SendEntitySpawn(uint32_t entity_id, int8_t entity_type,
+                                const std::string& model_id, const std::string& name,
+                                uint16_t level, float x, float y, float z, float hp_pct) {
+    using namespace luna::protocol;
+    flatbuffers::FlatBufferBuilder fbb;
+    Vec3 pos{x, y, z};
+    auto spawn = CreateEntitySpawnDirect(fbb, entity_id, static_cast<EntityType>(entity_type),
+        model_id.c_str(), &pos, 0.0f, 1.0f, name.c_str(), level, hp_pct);
+    fbb.Finish(spawn);
+    network_->SendPacket(PacketType_MP_ENTITY_SPAWN, fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void MapServer::SendEntityTransform(uint32_t entity_id, float x, float y, float z) {
+    using namespace luna::protocol;
+    flatbuffers::FlatBufferBuilder fbb;
+    Vec3 pos{x, y, z};
+    auto trans = CreateEntityTransformDirect(fbb, entity_id, &pos, 0.0f, "walk", 1.0f, 0);
+    fbb.Finish(trans);
+    network_->SendPacket(PacketType_MP_ENTITY_TRANSFORM, fbb.GetBufferPointer(), fbb.GetSize());
+}
+
+void MapServer::SendWorldSnapshot() {
+    if (!player_joined_) return;
+    auto monsters = registry_->view<TagMonster, Transform, SpawnInfo, CharacterStats>();
+    for (auto entity : monsters) {
+        auto& xform = monsters.get<Transform>(entity);
+        auto& spawn = monsters.get<SpawnInfo>(entity);
+        auto& stats = monsters.get<CharacterStats>(entity);
+        uint32_t eid = static_cast<uint32_t>(entt::to_entity(entity));
+        std::string model = "m224.chx";
+        std::string name = "Monster_" + std::to_string(spawn.monster_id);
+        SendEntitySpawn(eid, static_cast<int8_t>(luna::protocol::EntityType_Monster),
+            model, name, stats.level,
+            xform.position.x, xform.position.y, xform.position.z, 1.0f);
+    }
+    spdlog::info("MapServer: sent world snapshot to player {}", connected_player_.name);
+}
+
+void MapServer::HandlePacket(uint16_t type, const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+
+    if (type == PacketType_MP_USERCONN_GAMEIN_SYN) {
+        auto req = flatbuffers::GetRoot<EnterWorldRequest>(payload);
+        connected_player_.id = static_cast<int>(req->character_id());
+        connected_player_.name = "Player";
+        connected_player_.level = 1;
+        connected_player_.class_id = 0;
+        connected_player_.pos_x = 0;
+        connected_player_.pos_y = 0;
+        connected_player_.pos_z = 0;
+        connected_player_.hp = 500;
+        connected_player_.max_hp = 500;
+        player_joined_ = true;
+        SpawnPlayer(connected_player_.id, connected_player_);
+        SendWorldSnapshot();
+        Vec3 pos{connected_player_.pos_x, connected_player_.pos_y, connected_player_.pos_z};
+        flatbuffers::FlatBufferBuilder fbb;
+        auto ack = CreateEnterWorldResponse(fbb, 0,
+            static_cast<uint16_t>(map_id_), &pos,
+            static_cast<uint32_t>(connected_player_.id));
+        fbb.Finish(ack);
+        network_->SendPacket(PacketType_MP_USERCONN_GAMEIN_ACK, fbb.GetBufferPointer(), fbb.GetSize());
+        return;
+    }
+
+    if (!player_joined_) return;
+
+    if (type == PacketType_MP_MOVE_WALK || type == PacketType_MP_MOVE_RUN) {
+        auto req = flatbuffers::GetRoot<MoveRequest>(payload);
+        if (req->target_position()) {
+            connected_player_.pos_x = req->target_position()->x();
+            connected_player_.pos_y = req->target_position()->y();
+            connected_player_.pos_z = req->target_position()->z();
+            SavePlayerPosition(connected_player_.id,
+                connected_player_.pos_x, connected_player_.pos_y, connected_player_.pos_z);
+            SendEntityTransform(static_cast<uint32_t>(connected_player_.id),
+                connected_player_.pos_x, connected_player_.pos_y, connected_player_.pos_z);
+        }
+        return;
+    }
+
+    if (type == PacketType_MP_COMBAT_ATTACK_SYN) {
+        spdlog::debug("MapServer: combat attack from player {}", connected_player_.id);
+        return;
+    }
+}

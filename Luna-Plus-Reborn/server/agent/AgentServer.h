@@ -43,6 +43,7 @@ public:
     bool HandleCreateCharacter(const std::string& session_token, const std::string& name,
                                int class_id, const std::string& appearance);
     bool HandleDeleteCharacter(const std::string& session_token, int char_id);
+    bool HandleEnterWorld(const std::string& session_token, int char_id, CharData& out);
 
     std::string CreateSession(int account_id);
     int ValidateSession(const std::string& token);

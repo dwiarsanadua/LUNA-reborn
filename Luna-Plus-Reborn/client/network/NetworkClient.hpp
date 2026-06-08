@@ -1,4 +1,5 @@
 #pragma once
+#include <engine/network/LunaPacket.hpp>
 #include <string>
 #include <vector>
 #include <cstdint>
@@ -7,16 +8,6 @@
 #include <thread>
 #include <mutex>
 #include <queue>
-
-#pragma pack(push, 1)
-struct PacketHeader {
-    uint32_t magic;     // 0x4C4E50
-    uint16_t length;    // payload length
-    uint16_t type;      // PacketType enum
-    uint16_t sequence;
-    uint32_t checksum;
-};
-#pragma pack(pop)
 
 class NetworkClient {
 public:

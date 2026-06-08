@@ -1,5 +1,10 @@
 #include "NetworkLayer.h"
+#include "LunaPacket.hpp"
 #include <asio.hpp>
+
+#ifndef LUNA_NETWORK_ENCRYPT
+#define LUNA_NETWORK_PLAINTEXT 1
+#endif
 #include <asio/steady_timer.hpp>
 #include <spdlog/spdlog.h>
 #include <cstring>
@@ -292,7 +297,6 @@ public:
     uint32_t seq_send_ = 0;
     uint32_t seq_recv_ = 0;
     std::chrono::steady_clock::time_point connect_time_;
-    static constexpr uint32_t MAGIC = 0x4C4E50;
     static constexpr int CONNECT_TIMEOUT_SEC = 30;
 
     Impl() : socket_(io_context_) {
@@ -381,11 +385,10 @@ public:
             buf->resize(len);
             read_buf_.insert(read_buf_.end(), buf->begin(), buf->end());
 
-            // Process framed packets
-            while (read_buf_.size() >= sizeof(PacketHeader)) {
-                PacketHeader hdr;
-                std::memcpy(&hdr, read_buf_.data(), sizeof(PacketHeader));
-                if (hdr.magic != MAGIC) {
+            while (read_buf_.size() >= LUNA_PACKET_HEADER_SIZE) {
+                LunaPacketHeader hdr;
+                std::memcpy(&hdr, read_buf_.data(), LUNA_PACKET_HEADER_SIZE);
+                if (hdr.magic != LUNA_PACKET_MAGIC) {
                     spdlog::error("NetworkLayer: bad magic 0x{:08X}", hdr.magic);
                     read_buf_.clear();
                     return;
@@ -395,31 +398,28 @@ public:
                     read_buf_.clear();
                     return;
                 }
-                size_t total = sizeof(PacketHeader) + hdr.length;
+                size_t total = LUNA_PACKET_HEADER_SIZE + hdr.length;
                 if (read_buf_.size() < total) break;
 
-                // Verify CRC32
-                uint32_t actual_crc = CalculateCRC32(read_buf_.data() + sizeof(PacketHeader), hdr.length);
-                if (actual_crc != hdr.crc32) {
-                    spdlog::warn("NetworkLayer: CRC mismatch, dropping packet");
+                const uint8_t* body = read_buf_.data() + LUNA_PACKET_HEADER_SIZE;
+#if defined(LUNA_NETWORK_PLAINTEXT)
+                uint32_t actual_crc = CalculateCRC32(body, hdr.length);
+                if (actual_crc != hdr.checksum) {
+                    spdlog::warn("NetworkLayer: CRC mismatch, dropping packet type=0x{:04X}", hdr.type);
                     read_buf_.erase(read_buf_.begin(), read_buf_.begin() + total);
                     continue;
                 }
-
-                // Decrypt payload (AES-256-GCM)
-                std::vector<uint8_t> raw(read_buf_.begin() + sizeof(PacketHeader),
-                                         read_buf_.begin() + total);
+                if (recv_cb_) recv_cb_(hdr.type, body, hdr.length);
+#else
+                std::vector<uint8_t> raw(body, body + hdr.length);
                 auto payload = GcmDecrypt(raw.data(), raw.size());
                 if (payload.empty()) {
                     spdlog::warn("NetworkLayer: GCM auth tag mismatch, dropping packet");
                     read_buf_.erase(read_buf_.begin(), read_buf_.begin() + total);
                     continue;
                 }
-
-                if (recv_cb_) {
-                    recv_cb_(payload.data(), payload.size());
-                }
-
+                if (recv_cb_) recv_cb_(hdr.type, payload.data(), payload.size());
+#endif
                 read_buf_.erase(read_buf_.begin(), read_buf_.begin() + total);
             }
 
@@ -441,24 +441,27 @@ public:
         });
     }
 
-    void SendData(const uint8_t* data, size_t size) {
+    void SendPacketData(uint16_t type, const uint8_t* data, size_t size) {
         if (!connected_) return;
 
-        // Build packet
-        PacketHeader hdr;
-        hdr.magic = MAGIC;
-        hdr.length = static_cast<uint32_t>(size);
-        hdr.type = 0;
-        hdr.sequence = ++seq_send_;
-        // Encrypt payload with AES-256-GCM (size becomes payload + 24: 8 IV + ciphertext + 16 tag)
+        LunaPacketHeader hdr{};
+        hdr.magic = LUNA_PACKET_MAGIC;
+        hdr.type = type;
+        hdr.sequence = static_cast<uint16_t>(++seq_send_);
+#if defined(LUNA_NETWORK_PLAINTEXT)
+        hdr.length = static_cast<uint16_t>(size);
+        hdr.checksum = CalculateCRC32(data, size);
+        auto packet = std::make_shared<std::vector<uint8_t>>(LUNA_PACKET_HEADER_SIZE + size);
+        std::memcpy(packet->data(), &hdr, LUNA_PACKET_HEADER_SIZE);
+        if (size > 0) std::memcpy(packet->data() + LUNA_PACKET_HEADER_SIZE, data, size);
+#else
         auto encrypted = GcmEncrypt(data, size);
-        hdr.crc32 = CalculateCRC32(encrypted.data(), encrypted.size());
-        hdr.length = static_cast<uint32_t>(encrypted.size());
-
-        auto packet = std::make_shared<std::vector<uint8_t>>(sizeof(PacketHeader) + encrypted.size());
-        std::memcpy(packet->data(), &hdr, sizeof(PacketHeader));
-        std::memcpy(packet->data() + sizeof(PacketHeader), encrypted.data(), encrypted.size());
-
+        hdr.length = static_cast<uint16_t>(encrypted.size());
+        hdr.checksum = CalculateCRC32(encrypted.data(), encrypted.size());
+        auto packet = std::make_shared<std::vector<uint8_t>>(LUNA_PACKET_HEADER_SIZE + encrypted.size());
+        std::memcpy(packet->data(), &hdr, LUNA_PACKET_HEADER_SIZE);
+        std::memcpy(packet->data() + LUNA_PACKET_HEADER_SIZE, encrypted.data(), encrypted.size());
+#endif
         asio::post(io_context_, [this, packet]() {
             write_queue_.push_back(*packet);
             if (write_queue_.size() == 1) DoWrite();
@@ -497,7 +500,11 @@ void NetworkLayer::Disconnect() {
 }
 
 void NetworkLayer::Send(const uint8_t* data, size_t size) {
-    impl_->SendData(data, size);
+    impl_->SendPacketData(0, data, size);
+}
+
+void NetworkLayer::SendPacket(uint16_t type, const uint8_t* payload, size_t len) {
+    impl_->SendPacketData(type, payload, len);
 }
 
 void NetworkLayer::SetReceiveCallback(ReceiveCallback cb) {

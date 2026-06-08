@@ -153,6 +153,8 @@ void Monster::UpdateAI(float dt, float px, float pz) {
         break;
         
     case MonsterState::Aggro:
+        chase_path_ = {};
+        path_replan_timer_ = 0.0f;
         state_ = MonsterState::Chase;
         break;
         
@@ -217,7 +219,24 @@ void Monster::UpdateAI(float dt, float px, float pz) {
 }
 
 void Monster::ChaseTarget(float dt, float px, float pz) {
-    float dx = px - x_, dz = pz - z_;
+    float tx = px, tz = pz;
+    if (navmesh_) {
+        path_replan_timer_ -= dt;
+        if (!chase_path_.valid || chase_path_.IsFinished() || path_replan_timer_ <= 0.0f) {
+            chase_path_ = navmesh_->FindPath(x_, z_, px, pz);
+            chase_path_.current = 1;
+            path_replan_timer_ = 0.75f;
+        }
+        if (chase_path_.valid && !chase_path_.IsFinished()) {
+            NavPoint wp = chase_path_.GetTarget();
+            tx = wp.x;
+            tz = wp.z;
+            float wdx = tx - x_, wdz = tz - z_;
+            if (sqrtf(wdx * wdx + wdz * wdz) < 1.0f)
+                chase_path_.Advance();
+        }
+    }
+    float dx = tx - x_, dz = tz - z_;
     float dist = sqrtf(dx * dx + dz * dz);
     if (dist < 0.1f) return;
     float speed = is_enraged_ ? move_speed_ * 1.5f : move_speed_;
