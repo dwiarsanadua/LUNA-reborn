@@ -1,0 +1,2198 @@
+{
+  "header": {
+    "version": 1,
+    "ticks_per_frame": 160,
+    "first_frame": 0,
+    "last_frame": 1,
+    "frame_speed": 30,
+    "obj_num": 72,
+    "step": 1,
+    "name": "Unnamed M"
+  },
+  "objects": [
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 TailNub",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 2,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 Tail2",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            35.13616943359375,
+            -0.0014363692607730627,
+            -0.021343674510717392
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "pos": [
+            35.10942459106445,
+            -0.005426499061286449,
+            -0.03294852003455162
+          ]
+        }
+      ],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.05691302940249443,
+            0.42125988006591797,
+            -0.0709451213479042,
+            0.902367889881134
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.07540258020162582,
+            -0.03449224680662155,
+            -0.23503676056861877,
+            0.9684433341026306
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 2,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 Tail1",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            20.97920799255371,
+            -0.0009395316010341048,
+            -0.023373473435640335
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "pos": [
+            20.963638305664062,
+            -0.004982509650290012,
+            -0.027508128434419632
+          ]
+        }
+      ],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            4.9205769755644724e-05,
+            0.2863514721393585,
+            0.05857358127832413,
+            0.9563325643539429
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.08800856024026871,
+            -0.01687835343182087,
+            -0.13419747352600098,
+            0.9868944883346558
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 2,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 Tail",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            -20.456253051757812,
+            7.143063157855067e-06,
+            0.6546017527580261
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "pos": [
+            -16.778474807739258,
+            2.6577229499816895,
+            -11.372095108032227
+          ]
+        }
+      ],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            4.910406188108653e-14,
+            0.9997742176055908,
+            -2.772973857645411e-06,
+            -0.021248171105980873
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.01364936213940382,
+            0.9796807169914246,
+            0.07836183160543442,
+            0.1841161549091339
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Toe0Nub",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Toe0",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -5.353456344892038e-09,
+            0.7071067690849304,
+            -2.4280863542003317e-08,
+            0.7071067690849304
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            -1.3978357360500127e-09,
+            0.6684888005256653,
+            -2.4099545470335215e-08,
+            0.7437222003936768
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Foot",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.03986175358295441,
+            -0.6585843563079834,
+            0.062078215181827545,
+            0.7488817572593689
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            -0.02156749926507473,
+            -0.7192417979240417,
+            0.015574098564684391,
+            0.6942502856254578
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R HorseLink",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -1.6188931084570868e-08,
+            0.6613003015518188,
+            4.666796282748464e-09,
+            0.7501212954521179
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            2.0281416546197306e-09,
+            0.46626728773117065,
+            1.0309873843539208e-08,
+            0.8846439123153687
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Calf",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            5.2244670811774085e-09,
+            -0.6695601940155029,
+            1.1413893830081179e-08,
+            0.7427577376365662
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            -2.8210804803308065e-09,
+            -0.4914759695529938,
+            -1.1138596711646187e-09,
+            0.8708910346031189
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 2,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Thigh",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            -10.995895385742188,
+            -14.696593284606934,
+            11.028708457946777
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "pos": [
+            -16.18413543701172,
+            -14.007784843444824,
+            0.2424984723329544
+          ]
+        }
+      ],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.5303553938865662,
+            -0.021090630441904068,
+            0.8413784503936768,
+            0.10178719460964203
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.25944364070892334,
+            -0.2565076947212219,
+            0.9286462664604187,
+            0.0671486109495163
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Toe0Nub",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Toe0",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            1.665336490930258e-08,
+            0.6755902171134949,
+            1.526234250093239e-08,
+            0.7372773289680481
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            2.127951681529794e-08,
+            0.6981349587440491,
+            1.8086819153495526e-08,
+            0.7159662246704102
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Foot",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.06740593910217285,
+            -0.4696020185947418,
+            -0.04961520805954933,
+            0.878902018070221
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.03560028225183487,
+            -0.5805268883705139,
+            -0.04836441949009895,
+            0.8120234608650208
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L HorseLink",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -1.702042595752573e-08,
+            0.6126799583435059,
+            5.289311655332085e-09,
+            0.7903311252593994
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            5.159821903077955e-09,
+            0.2700006365776062,
+            6.311670741609987e-09,
+            0.9628601670265198
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Calf",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -1.1504031505182866e-08,
+            -0.7291311025619507,
+            1.5830536881367152e-08,
+            0.6843740344047546
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            -1.2110866753900495e-09,
+            -0.4305665194988251,
+            -3.79004871930988e-09,
+            0.9025588035583496
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 2,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Thigh",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            -10.995895385742188,
+            14.696654319763184,
+            11.028627395629883
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "pos": [
+            -14.549857139587402,
+            15.013513565063477,
+            4.607852458953857
+          ]
+        }
+      ],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.3550795614719391,
+            0.13018769025802612,
+            0.9185923337936401,
+            -0.11470698565244675
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.2875514328479767,
+            -0.15747776627540588,
+            0.9443383812904358,
+            0.027201544493436813
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone26",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone25",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.016084980219602585,
+            -0.3684072494506836,
+            -0.04054533317685127,
+            0.9286406636238098
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            -0.016084980219602585,
+            -0.3684072494506836,
+            -0.04054533317685127,
+            0.9286406636238098
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone24",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.025617778301239014,
+            -0.5867433547973633,
+            0.035304125398397446,
+            0.8085972666740417
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.36327797174453735,
+            -0.6140924096107483,
+            -0.005028549116104841,
+            0.700638473033905
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone20",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone19",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.06549623608589172,
+            -0.2590877413749695,
+            0.0717473104596138,
+            0.9609558582305908
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            -0.11740689724683762,
+            0.13164377212524414,
+            0.18871155381202698,
+            0.9660608172416687
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone18",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.04404928535223007,
+            -0.30506405234336853,
+            -0.12286879122257233,
+            0.9433444738388062
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.46170127391815186,
+            -0.4094732403755188,
+            -0.3457585573196411,
+            0.7068341374397278
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone14",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone13",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            1.3656359598712697e-08,
+            -0.24305416643619537,
+            -8.135105922235653e-09,
+            0.9700127243995667
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.18933457136154175,
+            -0.09999211877584457,
+            0.12104229629039764,
+            0.9692795276641846
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone12",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.004688996821641922,
+            0.0007340502925217152,
+            -0.12500974535942078,
+            0.9921441674232483
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.36297541856765747,
+            -0.10135570168495178,
+            -0.5885770320892334,
+            0.715229332447052
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone08",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone07",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.029854724183678627,
+            0.30053195357322693,
+            -0.21437053382396698,
+            0.9288888573646545
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.08065542578697205,
+            -0.045750319957733154,
+            -0.2814786434173584,
+            0.9550766348838806
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone06",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -7.311362182349512e-09,
+            0.3839556574821472,
+            4.109043061362172e-08,
+            0.923351526260376
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.286141574382782,
+            0.24304966628551483,
+            -0.7309290170669556,
+            0.5699057579040527
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone05",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.30436185002326965,
+            -0.6792121529579163,
+            -0.2736465334892273,
+            0.6092227101325989
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.7007145285606384,
+            0.6838535070419312,
+            -0.12647570669651031,
+            -0.1592085361480713
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone23",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone22",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.01667267642915249,
+            0.3818671703338623,
+            -0.04030723497271538,
+            0.9231873154640198
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.04875633865594864,
+            0.21656033396720886,
+            0.010734403505921364,
+            0.9749919176101685
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone21",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            4.935355235602401e-08,
+            0.5882185697555542,
+            8.164488463080488e-08,
+            0.8087019920349121
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.23272952437400818,
+            0.5402203798294067,
+            -0.3199639916419983,
+            0.7427125573158264
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone17",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone16",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.035120848566293716,
+            0.21299107372760773,
+            0.006530584767460823,
+            0.9764008522033691
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            -0.03549849987030029,
+            0.22900249063968658,
+            -0.062460627406835556,
+            0.9707709550857544
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone15",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.044987719506025314,
+            0.29595494270324707,
+            -0.12252819538116455,
+            0.9462418556213379
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.1506185233592987,
+            0.28133007884025574,
+            -0.33571797609329224,
+            0.8862622976303101
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone11",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone10",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.006691841408610344,
+            0.25003448128700256,
+            0.04470399022102356,
+            0.9671812653541565
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.0767170786857605,
+            0.2571010887622833,
+            -0.009572621434926987,
+            0.9632870554924011
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone09",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.01912679523229599,
+            -0.020812371745705605,
+            -0.175324946641922,
+            0.9841047525405884
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.01720254123210907,
+            -0.022429605945944786,
+            -0.2620353698730469,
+            0.964644193649292
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone04",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone03",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.025120889768004417,
+            -0.2836398780345917,
+            -0.08334829658269882,
+            0.954971432685852
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            -0.025982990860939026,
+            -0.2832944989204407,
+            -0.08276911079883575,
+            0.9551012516021729
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone02",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            1.1301663604967871e-08,
+            -0.38236063718795776,
+            3.437282813933962e-08,
+            0.9240131974220276
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            -0.31495141983032227,
+            -0.4224688708782196,
+            -0.20937441289424896,
+            0.8237038850784302
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone01",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.613467276096344,
+            0.2688092291355133,
+            0.6734312772750854,
+            0.3128735423088074
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.6169102191925049,
+            -0.4929550588130951,
+            -0.5919307470321655,
+            -0.16135399043560028
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Finger1Nub",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Finger11",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -5.456350482546668e-09,
+            0.09712307900190353,
+            9.000660661229176e-09,
+            0.9952723979949951
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            -9.739719031287564e-10,
+            0.14907947182655334,
+            -1.5370591466279393e-09,
+            0.988825261592865
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Finger1",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.00029763331986032426,
+            0.6642627120018005,
+            -0.0002644839114509523,
+            0.7474990487098694
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.0003910092927981168,
+            0.18869753181934357,
+            -7.51279221731238e-05,
+            0.9820351004600525
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Finger0Nub",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Finger01",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -6.6838534706903374e-09,
+            0.33830755949020386,
+            -4.4899093332162465e-09,
+            0.9410356283187866
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            2.988185476837657e-09,
+            0.2635730803012848,
+            -8.197859280301145e-09,
+            0.9646394848823547
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Finger0",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.5891928672790527,
+            0.1230177953839302,
+            -0.40503957867622375,
+            0.688230574131012
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            -0.6302878260612488,
+            0.02736266329884529,
+            -0.28902891278266907,
+            0.7200353145599365
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Hand",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.6087552309036255,
+            0.2577594220638275,
+            -0.25240421295166016,
+            0.7065898180007935
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.622067928314209,
+            -0.08122360706329346,
+            -0.060769934207201004,
+            0.7763640284538269
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R ForeArm",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            6.463301893688822e-09,
+            -0.6707326769828796,
+            -2.025972722918823e-09,
+            0.7416991591453552
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            1.3757954775428516e-09,
+            -0.5966982841491699,
+            -2.654582997863031e-09,
+            0.8024656772613525
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R UpperArm",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.44413816928863525,
+            0.07952645421028137,
+            -0.5197707414627075,
+            0.7254345417022705
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.379265695810318,
+            -0.6796237230300903,
+            -0.04778013005852699,
+            0.6260880827903748
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 2,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Clavicle",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            -2.1746561527252197,
+            -5.190940856933594,
+            -6.052193641662598
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "pos": [
+            -3.021489381790161,
+            -7.6118597984313965,
+            -1.146148920059204
+          ]
+        }
+      ],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.8232612013816833,
+            -0.56601482629776,
+            0.035616740584373474,
+            0.024485835805535316
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            -0.3035733997821808,
+            0.9350894093513489,
+            0.12063384801149368,
+            -0.13747136294841766
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Finger1Nub",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Finger11",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            9.827012981133976e-09,
+            0.4606100618839264,
+            1.0076361967037428e-09,
+            0.8876025676727295
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            3.4423073280720473e-09,
+            0.1745680272579193,
+            1.975026586720219e-09,
+            0.9846450686454773
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Finger1",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.00031416473211720586,
+            0.614301323890686,
+            0.00024460876011289656,
+            0.7890713810920715
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            -0.03198119252920151,
+            0.0628664568066597,
+            -0.03005966730415821,
+            0.9970563054084778
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Finger0Nub",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Finger01",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Finger0",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.4886329770088196,
+            0.1851869523525238,
+            0.12876617908477783,
+            0.8428303003311157
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.46907827258110046,
+            -0.1216747835278511,
+            0.18542428314685822,
+            0.8548559546470642
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Hand",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.702966570854187,
+            0.10266918689012527,
+            0.2414717972278595,
+            0.6610509753227234
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            -0.5192709565162659,
+            0.19551649689674377,
+            0.05349564552307129,
+            0.8302223682403564
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L ForeArm",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -1.626555068412472e-08,
+            -0.6465879082679749,
+            -2.7348058040388423e-08,
+            0.7628394961357117
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            -1.0246701265259617e-09,
+            -0.5456535816192627,
+            1.3232566153931202e-08,
+            0.838010847568512
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L UpperArm",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.35833656787872314,
+            0.19649775326251984,
+            0.4347853362560272,
+            0.8024619817733765
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            -0.5201111435890198,
+            -0.18225747346878052,
+            0.5390926599502563,
+            0.6369031667709351
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 2,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Clavicle",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            -2.174657106399536,
+            5.190907001495361,
+            -6.052223205566406
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "pos": [
+            -1.3106513023376465,
+            -0.14799092710018158,
+            -8.15661334991455
+          ]
+        }
+      ],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.6421868801116943,
+            0.7653287053108215,
+            0.027781270444393158,
+            -0.03311055153608322
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.5141435861587524,
+            0.6397001147270203,
+            -0.4449840486049652,
+            -0.3583705723285675
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 HeadNub",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 Head",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            1.7235017579775302e-10,
+            -0.3423948884010315,
+            9.495267363490711e-07,
+            0.9395561218261719
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            -0.16960175335407257,
+            0.05106736719608307,
+            0.16315554082393646,
+            0.9705707430839539
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 2,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 Neck",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            26.839725494384766,
+            -2.2339351701816668e-08,
+            -0.008048471994698048
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "pos": [
+            26.83902931213379,
+            0.005463859997689724,
+            -0.0057935770601034164
+          ]
+        }
+      ],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -1.06846857750309e-10,
+            -0.04361938312649727,
+            1.2117659764498967e-07,
+            0.9990482330322266
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            -0.3698056638240814,
+            -0.06919160485267639,
+            -0.06144673749804497,
+            0.9244893789291382
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 2,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 Spine1",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            19.15113067626953,
+            -5.728404062210757e-08,
+            -0.02065793052315712
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "pos": [
+            19.14392852783203,
+            -0.0025684330612421036,
+            -0.021152663975954056
+          ]
+        }
+      ],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            4.961021150091602e-15,
+            0.13052617013454437,
+            -3.62027464007042e-07,
+            0.9914448857307434
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.06071404367685318,
+            -0.03794471547007561,
+            0.014128564856946468,
+            0.9973336458206177
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 2,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 Spine",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            15.573728561401367,
+            2.1612573618767783e-05,
+            -0.010766495950520039
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "pos": [
+            15.565306663513184,
+            -0.0022489994298666716,
+            -0.014912544749677181
+          ]
+        }
+      ],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -2.187145355492248e-06,
+            0.38305121660232544,
+            -9.061204764293507e-07,
+            0.9237270951271057
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.07640694826841354,
+            0.07619944959878922,
+            -0.022113174200057983,
+            0.993914783000946
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 Pelvis",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 2,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 Footsteps",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            13.745719909667969,
+            -157.11431884765625,
+            -3.148024916299619e-07
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "pos": [
+            -77.87154388427734,
+            1.4670413732528687,
+            -1.1584049463272095
+          ]
+        }
+      ],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.030843539163470268,
+            0.7064332962036133,
+            -0.0308435820043087,
+            0.7064342498779297
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            -0.5554924011230469,
+            0.5724586844444275,
+            -0.42662766575813293,
+            0.4262721836566925
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 2,
+      "pos_keys_num": 2,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            9.069956831808668e-06,
+            155.6699981689453,
+            -21.20551300048828
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "pos": [
+            5.513429641723633e-07,
+            10.045726776123047,
+            499.5326232910156
+          ]
+        }
+      ],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.030843539163470268,
+            -0.7064332962036133,
+            0.0308435820043087,
+            0.7064342498779297
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            -0.5554924607276917,
+            0.5724586844444275,
+            -0.4266277253627777,
+            -0.4262721538543701
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "m291_1",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "m291_2",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    }
+  ]
+}

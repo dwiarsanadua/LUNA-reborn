@@ -1,0 +1,166 @@
+{
+  "header": {
+    "version": 1,
+    "ticks_per_frame": 160,
+    "first_frame": 0,
+    "last_frame": 0,
+    "frame_speed": 30,
+    "obj_num": 9,
+    "step": 1,
+    "name": "Unnamed M"
+  },
+  "objects": [
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone05",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone04",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.013181953690946102,
+            -0.022411487996578217,
+            -0.09899118542671204,
+            0.994748592376709
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone03",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.4120995104312897,
+            0.4936070740222931,
+            0.6479767560958862,
+            0.4082305431365967
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone08",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone07",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.07216913998126984,
+            0.0033704089000821114,
+            -0.2522267997264862,
+            0.9649673104286194
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone06",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.6190215945243835,
+            0.346215158700943,
+            0.596267580986023,
+            -0.37604841589927673
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone02",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone01",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "e_m_wing_05",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    }
+  ]
+}

@@ -1,0 +1,1516 @@
+{
+  "header": {
+    "version": 1,
+    "ticks_per_frame": 160,
+    "first_frame": 0,
+    "last_frame": 0,
+    "frame_speed": 30,
+    "obj_num": 82,
+    "step": 1,
+    "name": "Unnamed M"
+  },
+  "objects": [
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 01",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 04",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 03",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 02",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 01",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone05",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone03",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -1.1069595018398104e-08,
+            4.162032335122039e-15,
+            0.14234592020511627,
+            0.9898169636726379
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone01",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.19254285097122192,
+            0.6803863048553467,
+            0.6803886890411377,
+            0.1925433874130249
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone15",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone14",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -3.9252464034689183e-07,
+            -0.4255019426345825,
+            2.8341807478682313e-07,
+            0.9049575924873352
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone13",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.3909389078617096,
+            -0.31681954860687256,
+            0.7332198619842529,
+            0.4573628902435303
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone18",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone17",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.08434994518756866,
+            -0.44321414828300476,
+            -0.02248467691242695,
+            0.892155110836029
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone16",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.4364567697048187,
+            0.4063738286495209,
+            0.6755033731460571,
+            -0.43366000056266785
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone24",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone23",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -7.042387784039761e-10,
+            0.17544633150100708,
+            -6.09402572848694e-09,
+            0.9844890236854553
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone22",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.7098358869552612,
+            0.07380726933479309,
+            -0.6959221959114075,
+            0.0798613578081131
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone21",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone20",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            4.08013678399044e-10,
+            0.1505591720342636,
+            3.1717171111722564e-09,
+            0.98860102891922
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone19",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.7011120319366455,
+            -0.10629553347826004,
+            -0.7000409960746765,
+            -0.08417659997940063
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Toe0Nub",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Toe0",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Foot",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.0916576236486435,
+            0.03958670794963837,
+            -0.0062597147189080715,
+            0.9949836730957031
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Calf",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            1.993866582949977e-08,
+            -0.6672874093055725,
+            6.8403740449696215e-09,
+            0.7448003888130188
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 1,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Thigh",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            -8.707386016845703,
+            -8.30825138092041,
+            0.7473697662353516
+          ]
+        }
+      ],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.43591219186782837,
+            -0.16448700428009033,
+            0.8255991339683533,
+            0.31829333305358887
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Toe0Nub",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Toe0",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Foot",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.09165757149457932,
+            0.03958674520254135,
+            0.00625976687297225,
+            0.9949836730957031
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Calf",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -9.40574107488601e-09,
+            -0.6672873497009277,
+            -1.0248073500918053e-08,
+            0.7448004484176636
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 1,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Thigh",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            -8.66340446472168,
+            8.356828689575195,
+            0.7158075571060181
+          ]
+        }
+      ],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.4357410967350006,
+            0.16489923000335693,
+            0.8244433403015137,
+            -0.32129597663879395
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone02",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone_Rhand",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Finger1Nub",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Finger11",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -6.538120711496731e-09,
+            0.2101111114025116,
+            7.4370825053904355e-09,
+            0.9776774644851685
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Finger1",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.0003822148428298533,
+            0.28007423877716064,
+            -0.00011150772479595616,
+            0.9599782228469849
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Finger0Nub",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Finger01",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -9.207955287138248e-09,
+            -0.08208256214857101,
+            1.7024525122977252e-09,
+            0.996625542640686
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Finger0",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.43600574135780334,
+            -0.2660934329032898,
+            -0.3854353129863739,
+            0.7684614062309265
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Rhand",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.7066145539283752,
+            -0.333016961812973,
+            0.16676859557628632,
+            0.6016508936882019
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R ForeArm",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            2.0228400288146986e-08,
+            -0.4175465703010559,
+            6.513132699836888e-09,
+            0.9086555242538452
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R UpperArm",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.03203563019633293,
+            -0.4882473945617676,
+            -0.3807181715965271,
+            0.7846285104751587
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 1,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 R Clavicle",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            -1.8465200662612915,
+            -3.1108391284942627,
+            0.4652065336704254
+          ]
+        }
+      ],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.6204715967178345,
+            0.7816222906112671,
+            0.05012679100036621,
+            0.03960977867245674
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone04",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone_Lhand",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Finger1Nub",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Finger11",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            5.692144089408657e-09,
+            0.2101111114025116,
+            -3.2572191610569234e-09,
+            0.9776774644851685
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Finger1",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.000382212019758299,
+            0.28007423877716064,
+            0.00011151044600410387,
+            0.9599782228469849
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Finger0Nub",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Finger01",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -1.8590160522080623e-09,
+            -0.08208256214857101,
+            -3.322301100894265e-09,
+            0.996625542640686
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Finger0",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.4360056519508362,
+            -0.2660934031009674,
+            0.3854353129863739,
+            0.7684614062309265
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Lhand",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.7066144943237305,
+            -0.3330170214176178,
+            -0.1667686253786087,
+            0.6016508936882019
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L ForeArm",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            9.499852460237435e-09,
+            -0.4175465404987335,
+            7.440754679066686e-10,
+            0.9086555242538452
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L UpperArm",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.03225906193256378,
+            -0.48478081822395325,
+            0.37545013427734375,
+            0.7892934679985046
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 1,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 L Clavicle",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            -1.8298977613449097,
+            3.114203929901123,
+            0.5071299076080322
+          ]
+        }
+      ],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.6222761273384094,
+            0.7802821397781372,
+            -0.04475615173578262,
+            0.04392088204622269
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone08",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone_head",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "elf_m_face",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 Ponytail1Nub",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 1,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 Ponytail11",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            15.200545310974121,
+            -3.5842411705289123e-08,
+            -0.011560868471860886
+          ]
+        }
+      ],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            3.4122132896996504e-10,
+            -0.25507140159606934,
+            7.06483490375831e-07,
+            0.9669222235679626
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 1,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 Ponytail1",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            0.21792376041412354,
+            -2.221148861281108e-05,
+            -13.688566207885742
+          ]
+        }
+      ],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            3.339922227674208e-10,
+            0.9770457744598389,
+            -2.7094356482848525e-06,
+            -0.2130296230316162
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 HeadNub",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 Head",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.002937810495495796,
+            -0.07638265937566757,
+            0.0018239959608763456,
+            0.9970725774765015
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 Neck",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.0034445940982550383,
+            0.06183454021811485,
+            -0.0011247465154156089,
+            0.9980798363685608
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 1,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 Spine1",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            13.038993835449219,
+            3.653610838227905e-05,
+            -0.013679353520274162
+          ]
+        }
+      ],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.0011780081549659371,
+            0.07385563850402832,
+            -0.001990410266444087,
+            0.9972662329673767
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 1,
+      "pos_keys_num": 1,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 Spine",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            8.715011596679688,
+            3.0915660317987204e-05,
+            0.143402099609375
+          ]
+        }
+      ],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            -0.0008801573421806097,
+            0.05022304132580757,
+            -0.0013661100529134274,
+            0.9987367391586304
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 Pelvis",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 1,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01 Footsteps",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            1.971756091734278e-12,
+            -148.2520751953125,
+            -6.751483053180074e-13
+          ]
+        }
+      ],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 1,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bip01",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            1.323339915870747e-06,
+            148.21453857421875,
+            15.53066635131836
+          ]
+        }
+      ],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "E_M_boots006",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "E_M_glove006",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "E_M_armer006",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "elf_m_hair",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 01",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 08",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 07",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 06",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 05",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 01",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 04",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 03",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 02",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 01",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    }
+  ]
+}

@@ -1,0 +1,211 @@
+{
+  "header": {
+    "version": 1,
+    "ticks_per_frame": 160,
+    "first_frame": 0,
+    "last_frame": 9,
+    "frame_speed": 30,
+    "obj_num": 8,
+    "step": 1,
+    "name": "Unnamed M"
+  },
+  "objects": [
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Object05",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Object04",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Object03",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Object02",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Object01",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Box01",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Box02",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 10,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone01",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.5049741268157959,
+            0.4949755370616913,
+            -0.49497589468955994,
+            0.5049744844436646
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.032208412885665894,
+            0.01807718724012375,
+            -0.706372857093811,
+            0.7068756818771362
+          ]
+        },
+        {
+          "ticks": 480,
+          "frame": 2,
+          "quat": [
+            -0.4057862162590027,
+            -0.4172845482826233,
+            -0.5790833830833435,
+            0.5708533525466919
+          ]
+        },
+        {
+          "ticks": 640,
+          "frame": 3,
+          "quat": [
+            0.6476090550422668,
+            0.6531565189361572,
+            0.28390589356422424,
+            -0.27089938521385193
+          ]
+        },
+        {
+          "ticks": 800,
+          "frame": 4,
+          "quat": [
+            0.7070958614349365,
+            0.7068760395050049,
+            -0.003922995645552874,
+            0.018061453476548195
+          ]
+        },
+        {
+          "ticks": 960,
+          "frame": 5,
+          "quat": [
+            0.6736146211624146,
+            0.6691799163818359,
+            -0.21504256129264832,
+            0.22846923768520355
+          ]
+        },
+        {
+          "ticks": 1120,
+          "frame": 6,
+          "quat": [
+            0.6108621954917908,
+            0.603618323802948,
+            -0.3561563193798065,
+            0.3682999908924103
+          ]
+        },
+        {
+          "ticks": 1280,
+          "frame": 7,
+          "quat": [
+            0.5533857345581055,
+            0.5444729924201965,
+            -0.4401865005493164,
+            0.4511641263961792
+          ]
+        },
+        {
+          "ticks": 1440,
+          "frame": 8,
+          "quat": [
+            0.5168117880821228,
+            0.5070582032203674,
+            -0.4826028048992157,
+            0.49284061789512634
+          ]
+        },
+        {
+          "ticks": 1600,
+          "frame": 9,
+          "quat": [
+            0.5049740076065063,
+            0.49497538805007935,
+            -0.49497586488723755,
+            0.5049744844436646
+          ]
+        }
+      ],
+      "scale_keys": []
+    }
+  ]
+}

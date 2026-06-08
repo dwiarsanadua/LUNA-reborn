@@ -1,0 +1,391 @@
+{
+  "header": {
+    "version": 1,
+    "ticks_per_frame": 160,
+    "first_frame": 0,
+    "last_frame": 21,
+    "frame_speed": 30,
+    "obj_num": 13,
+    "step": 1,
+    "name": "Unnamed M"
+  },
+  "objects": [
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 22,
+      "name": "U_light 10",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 22,
+      "name": "U_light 09",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 22,
+      "name": "U_light 08",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 22,
+      "name": "U_light03",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 22,
+      "name": "U_light 07",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 22,
+      "name": "U_light 06",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 22,
+      "name": "U_light 05",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 22,
+      "name": "U_light02",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 22,
+      "name": "U_light 04",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 22,
+      "name": "U_light 03",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 22,
+      "name": "U_light01",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 22,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "front 01",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "quat": [
+            0.14231479167938232,
+            0.0,
+            0.0,
+            0.9898214340209961
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "quat": [
+            0.2817322015762329,
+            0.0,
+            0.0,
+            0.9594930410385132
+          ]
+        },
+        {
+          "ticks": 480,
+          "frame": 2,
+          "quat": [
+            0.41541507840156555,
+            0.0,
+            0.0,
+            0.9096319079399109
+          ]
+        },
+        {
+          "ticks": 640,
+          "frame": 3,
+          "quat": [
+            0.5406408309936523,
+            0.0,
+            0.0,
+            0.8412534594535828
+          ]
+        },
+        {
+          "ticks": 800,
+          "frame": 4,
+          "quat": [
+            0.6548605561256409,
+            0.0,
+            0.0,
+            0.7557497024536133
+          ]
+        },
+        {
+          "ticks": 960,
+          "frame": 5,
+          "quat": [
+            0.7557496428489685,
+            0.0,
+            0.0,
+            0.6548605561256409
+          ]
+        },
+        {
+          "ticks": 1120,
+          "frame": 6,
+          "quat": [
+            0.8412534594535828,
+            0.0,
+            0.0,
+            0.5406408309936523
+          ]
+        },
+        {
+          "ticks": 1280,
+          "frame": 7,
+          "quat": [
+            0.9096319675445557,
+            0.0,
+            0.0,
+            0.4154149293899536
+          ]
+        },
+        {
+          "ticks": 1440,
+          "frame": 8,
+          "quat": [
+            0.9594930410385132,
+            0.0,
+            0.0,
+            0.2817322611808777
+          ]
+        },
+        {
+          "ticks": 1600,
+          "frame": 9,
+          "quat": [
+            0.9898213744163513,
+            0.0,
+            0.0,
+            0.1423153132200241
+          ]
+        },
+        {
+          "ticks": 1760,
+          "frame": 10,
+          "quat": [
+            1.0,
+            0.0,
+            0.0,
+            -1.7699385068681295e-07
+          ]
+        },
+        {
+          "ticks": 1920,
+          "frame": 11,
+          "quat": [
+            0.9898214936256409,
+            0.0,
+            0.0,
+            -0.14231473207473755
+          ]
+        },
+        {
+          "ticks": 2080,
+          "frame": 12,
+          "quat": [
+            0.9594931602478027,
+            0.0,
+            0.0,
+            -0.2817321717739105
+          ]
+        },
+        {
+          "ticks": 2240,
+          "frame": 13,
+          "quat": [
+            0.90963214635849,
+            0.0,
+            0.0,
+            -0.41541483998298645
+          ]
+        },
+        {
+          "ticks": 2400,
+          "frame": 14,
+          "quat": [
+            -0.8412536382675171,
+            0.0,
+            0.0,
+            0.5406407713890076
+          ]
+        },
+        {
+          "ticks": 2560,
+          "frame": 15,
+          "quat": [
+            -0.7557495832443237,
+            0.0,
+            0.0,
+            0.6548608541488647
+          ]
+        },
+        {
+          "ticks": 2720,
+          "frame": 16,
+          "quat": [
+            -0.6548609137535095,
+            0.0,
+            0.0,
+            0.755749523639679
+          ]
+        },
+        {
+          "ticks": 2880,
+          "frame": 17,
+          "quat": [
+            -0.5406408905982971,
+            0.0,
+            0.0,
+            0.8412535786628723
+          ]
+        },
+        {
+          "ticks": 3040,
+          "frame": 18,
+          "quat": [
+            -0.41541534662246704,
+            0.0,
+            0.0,
+            0.9096319675445557
+          ]
+        },
+        {
+          "ticks": 3200,
+          "frame": 19,
+          "quat": [
+            -0.2817327380180359,
+            0.0,
+            0.0,
+            0.9594930410385132
+          ]
+        },
+        {
+          "ticks": 3360,
+          "frame": 20,
+          "quat": [
+            -0.1423148363828659,
+            0.0,
+            0.0,
+            0.9898215532302856
+          ]
+        },
+        {
+          "ticks": 3520,
+          "frame": 21,
+          "quat": [
+            -2.717576990107773e-07,
+            0.0,
+            0.0,
+            1.0000001192092896
+          ]
+        }
+      ],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 22,
+      "name": "U_light 02",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    }
+  ]
+}

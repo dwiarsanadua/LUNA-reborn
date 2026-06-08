@@ -1,0 +1,15 @@
+{
+  "map": "01_loginpage_01",
+  "heightfield": {"width": 128, "height": 291, "hmin": 0, "hmax": 100000},
+  "box_min": [0,0,-1197.54],
+  "box_max": [49212.6,8802.07,49212.6],
+  "static_model": "01_Loginpage_01.stm",
+  "lights": [
+  ],
+  "objects": [
+    {"model": "Login_alpha.MOD", "pos": [0,0,0], "scale": [1,1,1], "rot": [0,1,0,0]},
+    {"model": "Login_ani01.chr", "pos": [0,0,0], "scale": [1,1,1], "rot": [0,1,0,0]},
+    {"model": "Login_ani03.chr", "pos": [0,0,0], "scale": [1,1,1], "rot": [0,1,0,0]},
+    {"model": "Login_ani02.chr", "pos": [0,0,0], "scale": [1,1,1], "rot": [0,1,0,0]}
+  ]
+}

@@ -1,0 +1,916 @@
+{
+  "header": {
+    "version": 1,
+    "ticks_per_frame": 160,
+    "first_frame": 0,
+    "last_frame": 31,
+    "frame_speed": 30,
+    "obj_num": 27,
+    "step": 1,
+    "name": "Unnamed M"
+  },
+  "objects": [
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 20",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 19",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 18",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 17",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 16",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 15",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 14",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 13",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 12",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 11",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 32,
+      "scale_keys_num": 32,
+      "morph_keys_num": 32,
+      "name": "BUV_Plane02",
+      "flag": 0,
+      "pos_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "pos": [
+            9.98747730255127,
+            0.03737560287117958,
+            0.05921309441328049
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "pos": [
+            12.72560977935791,
+            0.037374917417764664,
+            0.0638931393623352
+          ]
+        },
+        {
+          "ticks": 480,
+          "frame": 2,
+          "pos": [
+            15.463740348815918,
+            0.03737667575478554,
+            0.07144982367753983
+          ]
+        },
+        {
+          "ticks": 640,
+          "frame": 3,
+          "pos": [
+            18.20186996459961,
+            0.03737364709377289,
+            0.08166198432445526
+          ]
+        },
+        {
+          "ticks": 800,
+          "frame": 4,
+          "pos": [
+            20.940004348754883,
+            0.03737444803118706,
+            0.09434637427330017
+          ]
+        },
+        {
+          "ticks": 960,
+          "frame": 5,
+          "pos": [
+            23.678138732910156,
+            0.037375543266534805,
+            0.10927413403987885
+          ]
+        },
+        {
+          "ticks": 1120,
+          "frame": 6,
+          "pos": [
+            26.41626739501953,
+            0.0373741090297699,
+            0.1262621283531189
+          ]
+        },
+        {
+          "ticks": 1280,
+          "frame": 7,
+          "pos": [
+            29.15439796447754,
+            0.037374354898929596,
+            0.1450890153646469
+          ]
+        },
+        {
+          "ticks": 1440,
+          "frame": 8,
+          "pos": [
+            31.89253044128418,
+            0.03737715631723404,
+            0.16556409001350403
+          ]
+        },
+        {
+          "ticks": 1600,
+          "frame": 9,
+          "pos": [
+            34.63066482543945,
+            0.03737528249621391,
+            0.18746614456176758
+          ]
+        },
+        {
+          "ticks": 1760,
+          "frame": 10,
+          "pos": [
+            37.36879348754883,
+            0.037373416125774384,
+            0.21060428023338318
+          ]
+        },
+        {
+          "ticks": 1920,
+          "frame": 11,
+          "pos": [
+            40.10692596435547,
+            0.037375885993242264,
+            0.23476488888263702
+          ]
+        },
+        {
+          "ticks": 2080,
+          "frame": 12,
+          "pos": [
+            42.84505844116211,
+            0.03737581893801689,
+            0.2597495913505554
+          ]
+        },
+        {
+          "ticks": 2240,
+          "frame": 13,
+          "pos": [
+            45.583194732666016,
+            0.037373729050159454,
+            0.28534480929374695
+          ]
+        },
+        {
+          "ticks": 2400,
+          "frame": 14,
+          "pos": [
+            48.32132339477539,
+            0.037374187260866165,
+            0.3113519847393036
+          ]
+        },
+        {
+          "ticks": 2560,
+          "frame": 15,
+          "pos": [
+            51.059452056884766,
+            0.03737400844693184,
+            0.33756518363952637
+          ]
+        },
+        {
+          "ticks": 2720,
+          "frame": 16,
+          "pos": [
+            53.797584533691406,
+            0.03737371414899826,
+            0.3637707829475403
+          ]
+        },
+        {
+          "ticks": 2880,
+          "frame": 17,
+          "pos": [
+            56.53571701049805,
+            0.03737417235970497,
+            0.3897779881954193
+          ]
+        },
+        {
+          "ticks": 3040,
+          "frame": 18,
+          "pos": [
+            59.27384948730469,
+            0.03737589716911316,
+            0.4153731167316437
+          ]
+        },
+        {
+          "ticks": 3200,
+          "frame": 19,
+          "pos": [
+            62.01198959350586,
+            0.03737583011388779,
+            0.44035786390304565
+          ]
+        },
+        {
+          "ticks": 3360,
+          "frame": 20,
+          "pos": [
+            64.75011444091797,
+            0.03737448528409004,
+            0.4645184874534607
+          ]
+        },
+        {
+          "ticks": 3520,
+          "frame": 21,
+          "pos": [
+            67.48825073242188,
+            0.03737643361091614,
+            0.4876566231250763
+          ]
+        },
+        {
+          "ticks": 3680,
+          "frame": 22,
+          "pos": [
+            70.22637939453125,
+            0.03737455606460571,
+            0.5095586180686951
+          ]
+        },
+        {
+          "ticks": 3840,
+          "frame": 23,
+          "pos": [
+            72.96451568603516,
+            0.03737354278564453,
+            0.5300337672233582
+          ]
+        },
+        {
+          "ticks": 4000,
+          "frame": 24,
+          "pos": [
+            75.70264434814453,
+            0.03737379238009453,
+            0.5488606691360474
+          ]
+        },
+        {
+          "ticks": 4160,
+          "frame": 25,
+          "pos": [
+            78.44078063964844,
+            0.037376172840595245,
+            0.5658486485481262
+          ]
+        },
+        {
+          "ticks": 4320,
+          "frame": 26,
+          "pos": [
+            81.17890930175781,
+            0.03737345337867737,
+            0.5807764530181885
+          ]
+        },
+        {
+          "ticks": 4480,
+          "frame": 27,
+          "pos": [
+            83.91703796386719,
+            0.03737425431609154,
+            0.5934607982635498
+          ]
+        },
+        {
+          "ticks": 4640,
+          "frame": 28,
+          "pos": [
+            86.65516662597656,
+            0.037375155836343765,
+            0.6036804914474487
+          ]
+        },
+        {
+          "ticks": 4800,
+          "frame": 29,
+          "pos": [
+            89.39330291748047,
+            0.03737679868936539,
+            0.6112295985221863
+          ]
+        },
+        {
+          "ticks": 4960,
+          "frame": 30,
+          "pos": [
+            92.13143157958984,
+            0.03737611323595047,
+            0.6159096360206604
+          ]
+        },
+        {
+          "ticks": 5120,
+          "frame": 31,
+          "pos": [
+            94.86957550048828,
+            0.03737373650074005,
+            0.6175146698951721
+          ]
+        }
+      ],
+      "rot_keys": [],
+      "scale_keys": [
+        {
+          "ticks": 160,
+          "frame": 0,
+          "scale": [
+            1.6624046564102173,
+            1.6624048948287964,
+            1.662405252456665
+          ]
+        },
+        {
+          "ticks": 320,
+          "frame": 1,
+          "scale": [
+            1.6541773080825806,
+            1.6541775465011597,
+            1.6541776657104492
+          ]
+        },
+        {
+          "ticks": 480,
+          "frame": 2,
+          "scale": [
+            1.6473525762557983,
+            1.6473528146743774,
+            1.6473530530929565
+          ]
+        },
+        {
+          "ticks": 640,
+          "frame": 3,
+          "scale": [
+            1.6416503190994263,
+            1.6416504383087158,
+            1.641650676727295
+          ]
+        },
+        {
+          "ticks": 800,
+          "frame": 4,
+          "scale": [
+            1.6367897987365723,
+            1.636790156364441,
+            1.6367902755737305
+          ]
+        },
+        {
+          "ticks": 960,
+          "frame": 5,
+          "scale": [
+            1.6324905157089233,
+            1.632490634918213,
+            1.632490873336792
+          ]
+        },
+        {
+          "ticks": 1120,
+          "frame": 6,
+          "scale": [
+            1.6284717321395874,
+            1.628471851348877,
+            1.6284719705581665
+          ]
+        },
+        {
+          "ticks": 1280,
+          "frame": 7,
+          "scale": [
+            1.624452829360962,
+            1.624453067779541,
+            1.6244533061981201
+          ]
+        },
+        {
+          "ticks": 1440,
+          "frame": 8,
+          "scale": [
+            1.6201533079147339,
+            1.620153546333313,
+            1.6201541423797607
+          ]
+        },
+        {
+          "ticks": 1600,
+          "frame": 9,
+          "scale": [
+            1.6152929067611694,
+            1.615293025970459,
+            1.615293264389038
+          ]
+        },
+        {
+          "ticks": 1760,
+          "frame": 10,
+          "scale": [
+            1.609590768814087,
+            1.609591007232666,
+            1.6095913648605347
+          ]
+        },
+        {
+          "ticks": 1920,
+          "frame": 11,
+          "scale": [
+            1.6027661561965942,
+            1.6027660369873047,
+            1.6027666330337524
+          ]
+        },
+        {
+          "ticks": 2080,
+          "frame": 12,
+          "scale": [
+            1.5945384502410889,
+            1.594538688659668,
+            1.5945390462875366
+          ]
+        },
+        {
+          "ticks": 2240,
+          "frame": 13,
+          "scale": [
+            1.5846275091171265,
+            1.5846275091171265,
+            1.5846278667449951
+          ]
+        },
+        {
+          "ticks": 2400,
+          "frame": 14,
+          "scale": [
+            1.5727522373199463,
+            1.572752833366394,
+            1.5727527141571045
+          ]
+        },
+        {
+          "ticks": 2560,
+          "frame": 15,
+          "scale": [
+            1.558632731437683,
+            1.5586329698562622,
+            1.5586330890655518
+          ]
+        },
+        {
+          "ticks": 2720,
+          "frame": 16,
+          "scale": [
+            1.541987657546997,
+            1.5419880151748657,
+            1.5419880151748657
+          ]
+        },
+        {
+          "ticks": 2880,
+          "frame": 17,
+          "scale": [
+            1.5225368738174438,
+            1.5225372314453125,
+            1.5225369930267334
+          ]
+        },
+        {
+          "ticks": 3040,
+          "frame": 18,
+          "scale": [
+            1.4999996423721313,
+            1.5000001192092896,
+            1.4999998807907104
+          ]
+        },
+        {
+          "ticks": 3200,
+          "frame": 19,
+          "scale": [
+            1.46881902217865,
+            1.4688196182250977,
+            1.4688191413879395
+          ]
+        },
+        {
+          "ticks": 3360,
+          "frame": 20,
+          "scale": [
+            1.4243803024291992,
+            1.424380898475647,
+            1.4243807792663574
+          ]
+        },
+        {
+          "ticks": 3520,
+          "frame": 21,
+          "scale": [
+            1.3678165674209595,
+            1.3678171634674072,
+            1.3678169250488281
+          ]
+        },
+        {
+          "ticks": 3680,
+          "frame": 22,
+          "scale": [
+            1.300260305404663,
+            1.3002605438232422,
+            1.3002604246139526
+          ]
+        },
+        {
+          "ticks": 3840,
+          "frame": 23,
+          "scale": [
+            1.2228440046310425,
+            1.222844123840332,
+            1.222843885421753
+          ]
+        },
+        {
+          "ticks": 4000,
+          "frame": 24,
+          "scale": [
+            1.1367006301879883,
+            1.1367003917694092,
+            1.1367005109786987
+          ]
+        },
+        {
+          "ticks": 4160,
+          "frame": 25,
+          "scale": [
+            1.0429624319076538,
+            1.0429625511169434,
+            1.0429623126983643
+          ]
+        },
+        {
+          "ticks": 4320,
+          "frame": 26,
+          "scale": [
+            0.9427626132965088,
+            0.9427627921104431,
+            0.9427626729011536
+          ]
+        },
+        {
+          "ticks": 4480,
+          "frame": 27,
+          "scale": [
+            0.8372337818145752,
+            0.8372340202331543,
+            0.8372339010238647
+          ]
+        },
+        {
+          "ticks": 4640,
+          "frame": 28,
+          "scale": [
+            0.7275086045265198,
+            0.7275087833404541,
+            0.7275086641311646
+          ]
+        },
+        {
+          "ticks": 4800,
+          "frame": 29,
+          "scale": [
+            0.6147197484970093,
+            0.6147198677062988,
+            0.6147197484970093
+          ]
+        },
+        {
+          "ticks": 4960,
+          "frame": 30,
+          "scale": [
+            0.5,
+            0.5000000596046448,
+            0.5
+          ]
+        },
+        {
+          "ticks": 5120,
+          "frame": 31,
+          "scale": [
+            0.0010000001639127731,
+            0.0010000000474974513,
+            0.0010000000474974513
+          ]
+        }
+      ]
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 32,
+      "name": "Plane02",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 32,
+      "name": "BUV_Plane01",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone03",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone02",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Bone01",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "DAGGERS021",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 10",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 09",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 08",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 07",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 06",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 05",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 04",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 03",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 02",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    },
+    {
+      "index": 0,
+      "rot_keys_num": 0,
+      "pos_keys_num": 0,
+      "scale_keys_num": 0,
+      "morph_keys_num": 0,
+      "name": "Particle View 01",
+      "flag": 0,
+      "pos_keys": [],
+      "rot_keys": [],
+      "scale_keys": []
+    }
+  ]
+}
