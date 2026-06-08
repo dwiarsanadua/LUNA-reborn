@@ -2,9 +2,10 @@
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <ecs/systems/GameDataDB.hpp>
+#include <ecs/components/Inventory.hpp>
 
 QuestSystem::QuestSystem() {
-    LoadQuestTemplates(GAME_DATA_PATH);
+    LoadQuestTemplates("assets/data/game_data.db");
 }
 
 void QuestSystem::LoadQuestTemplates(const std::string& db_path) {
@@ -192,7 +193,8 @@ void QuestSystem::UpdateCondition(entt::registry& registry, entt::entity entity,
         if (entry.is_completed) continue;
         for (auto& obj : entry.objectives) {
             if (obj.type == type && obj.target_id == target_id) {
-                obj.current_count = std::min(obj.current_count + amount, obj.required_count);
+                uint16_t new_count = obj.current_count + amount;
+                obj.current_count = (new_count < obj.required_count) ? new_count : obj.required_count;
                 spdlog::debug("QuestSystem: condition updated for quest {}: {}/{}",
                               entry.quest_id, obj.current_count, obj.required_count);
             }
