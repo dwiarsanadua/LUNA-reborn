@@ -21,8 +21,8 @@ import json
 import os
 from pathlib import Path
 
-BASE = Path("/Users/macbookair/PRIBADI/luna-plus-master")
-REBORN = BASE / "Luna-Plus-Reborn"
+BASE = Path(__file__).resolve().parents[2]
+REBORN = BASE
 ASSETS = REBORN / "assets" / "data"
 INPUT = ASSETS / "quests_full.json"
 FSM_DIR = ASSETS / "quest_fsms"

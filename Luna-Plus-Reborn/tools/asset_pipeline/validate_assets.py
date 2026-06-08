@@ -101,13 +101,42 @@ def check_phase5_server() -> dict:
         reborn / "server/map/systems/MapScriptRuntime.hpp",
         reborn / "game/network/protocol/Quest.fbs",
         reborn / "game/network/protocol/Dungeon.fbs",
+        reborn / "engine/scripting/stdlib/fsm_engine.lua",
+        reborn / "database/schema_game_sqlite.sql",
+        reborn / "database/schema_map_server.sql",
         reborn / "assets/data/quest_templates_seed.json",
         reborn / "assets/data/map_triggers_seed.json",
         reborn / "tools/asset_pipeline/bootstrap_phase5.py",
+        reborn / "tools/asset_pipeline/migrate_schema_sqlite.py",
+        reborn / "tools/asset_pipeline/build_quest_scripts.py",
+        reborn / "tools/data_parser/generate_quest_runtime_lua.py",
     ]
     for path in required:
         if not path.is_file():
             issues.append(f"Phase5: missing {path.relative_to(reborn)}")
+
+    old_quest = reborn.parent / "Luna-Plus-Old" / "NEW_LUNA" / "data" / "QuestScript.bin.txt"
+    quests_full = reborn / "assets" / "data" / "quests_full.json"
+    if old_quest.is_file() and not quests_full.is_file():
+        issues.append("Phase5: run tools/asset_pipeline/build_quest_scripts.py to generate quests_full.json")
+
+    map_db = reborn / "assets" / "data" / "luna_map.db"
+    if map_db.is_file():
+        import sqlite3
+        conn = sqlite3.connect(map_db)
+        tables = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()
+        names = {row[0] for row in tables}
+        for needed in ("quest_templates", "map_triggers", "player_quests", "TB_CHARACTER"):
+            if needed not in names:
+                issues.append(f"Phase5: luna_map.db missing table {needed} (run bootstrap_phase5.py)")
+        quest_count = conn.execute("SELECT COUNT(*) FROM quest_templates").fetchone()[0]
+        if quest_count < 3:
+            issues.append(f"Phase5: quest_templates has only {quest_count} rows")
+        conn.close()
+    else:
+        issues.append("Phase5: missing assets/data/luna_map.db (run bootstrap_phase5.py)")
 
     quest_fbs = (reborn / "game/network/protocol/PacketType.fbs").read_text()
     for token in ("MP_QUEST_START_SYN", "MP_DUNGEON_ENTRANCE_SYN", "MP_TRIGGER_NOTIFY"):

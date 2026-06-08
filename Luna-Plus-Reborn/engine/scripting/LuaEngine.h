@@ -3,6 +3,7 @@
 #include <string>
 #include <memory>
 #include <functional>
+#include <vector>
 
 class LuaEngine {
 public:
@@ -30,6 +31,9 @@ public:
     void CallFunction(const std::string& name);
     int GetGlobalInt(const std::string& name);
     void SetGlobalInt(const std::string& name, int value);
+    void SetScriptRoots(const std::vector<std::string>& roots);
+    bool PreloadModule(const std::string& module_name, const std::string& file_path);
+    bool UsesLuaJit() const;
 
 private:
     void RegisterFunctionImpl(const std::string& name, std::function<int()> func);

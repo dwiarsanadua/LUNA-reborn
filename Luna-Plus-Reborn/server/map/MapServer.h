@@ -12,6 +12,7 @@
 #include "systems/TriggerSystem.hpp"
 #include "systems/MapScriptRuntime.hpp"
 #include <ecs/systems/SkillSystem.hpp>
+#include <ecs/components/QuestLog.hpp>
 
 // entt::entity used for connected player tracking
 
@@ -201,6 +202,7 @@ private:
     void SendQuestList(uint8_t result);
     void SendQuestUpdate(uint32_t quest_id, uint8_t obj_index, uint16_t current, uint16_t required);
     void OnMonsterKilled(uint32_t monster_template_id);
+    void ApplyQuestProgress(QuestObjective::Type type, uint32_t target_id, uint16_t amount = 1);
     void LoadPlayerQuests(int character_id);
     void SavePlayerQuests(int character_id);
     void UpdatePlayerVisibility();

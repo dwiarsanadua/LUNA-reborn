@@ -39,15 +39,6 @@ void TriggerSystem::LoadForMap(Database& db, int map_id) {
     triggers_.clear();
     fired_once_.clear();
 
-    db.Execute(
-        "CREATE TABLE IF NOT EXISTS map_triggers ("
-        " trigger_id INTEGER PRIMARY KEY,"
-        " map_id INTEGER NOT NULL,"
-        " trigger_type INTEGER DEFAULT 0,"
-        " pos_x REAL, pos_z REAL, radius REAL DEFAULT 8,"
-        " param0 INTEGER DEFAULT 0, param1 INTEGER DEFAULT 0,"
-        " script_path TEXT, repeatable INTEGER DEFAULT 0)");
-
     auto rows = db.Query("SELECT trigger_id,map_id,trigger_type,pos_x,pos_z,radius,param0,param1,script_path,repeatable "
                          "FROM map_triggers WHERE map_id=" + std::to_string(map_id));
     for (const auto& row : rows) {

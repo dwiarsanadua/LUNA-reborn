@@ -217,6 +217,7 @@ bool MapServer::Initialize(int map_id, uint16_t port) {
     script_runtime_.Initialize();
     triggers_.LoadForMap(*db_, map_id_);
     quest_->LoadQuestTemplates("assets/data/game_data.db");
+    quest_->LoadQuestTemplatesFromDatabase(*db_);
 
     running_ = true;
     SeedMarketData();
@@ -686,6 +687,7 @@ void MapServer::GrantLootToPlayer(uint32_t item_id, uint16_t count) {
     auto upd = CreateInventoryUpdate(fbb, next_loot_slot_ - 1, item_id, count);
     fbb.Finish(upd);
     network_->SendPacket(PacketType_MP_INVENTORY_UPDATE, fbb.GetBufferPointer(), fbb.GetSize());
+    ApplyQuestProgress(QuestObjective::CollectItem, item_id, count);
     spdlog::info("MapServer: loot item {} x{} -> player {}", item_id, count, connected_player_.id);
 }
 
@@ -2139,27 +2141,38 @@ void MapServer::RunMapScript(const std::string& path, entt::entity player) {
 }
 
 void MapServer::OnMonsterKilled(uint32_t monster_template_id) {
+    ApplyQuestProgress(QuestObjective::KillMonster, monster_template_id, 1);
+}
+
+void MapServer::ApplyQuestProgress(QuestObjective::Type type, uint32_t target_id, uint16_t amount) {
     if (!registry_->valid(player_entity_)) return;
     auto* log = registry_->try_get<QuestLog>(player_entity_);
-    if (log) {
-        for (auto& entry : log->active_quests) {
-            if (entry.is_completed) continue;
-            for (size_t oi = 0; oi < entry.objectives.size(); ++oi) {
-                auto& obj = entry.objectives[oi];
-                if (obj.type != QuestObjective::KillMonster || obj.target_id != monster_template_id)
-                    continue;
-                if (obj.current_count >= obj.required_count) continue;
-                uint16_t before = obj.current_count;
-                obj.current_count = std::min<uint16_t>(
-                    static_cast<uint16_t>(before + 1), obj.required_count);
-                if (obj.current_count != before)
-                    SendQuestUpdate(entry.quest_id, static_cast<uint8_t>(oi),
-                        obj.current_count, obj.required_count);
+    if (!log) return;
+
+    const char* fsm_event = (type == QuestObjective::CollectItem) ? "collect"
+        : (type == QuestObjective::TalkToNPC) ? "npc_talk" : "kill";
+
+    for (auto& entry : log->active_quests) {
+        if (entry.is_completed) continue;
+        for (size_t oi = 0; oi < entry.objectives.size(); ++oi) {
+            auto& obj = entry.objectives[oi];
+            if (obj.type != type || obj.target_id != target_id) continue;
+            if (obj.current_count >= obj.required_count) continue;
+            uint16_t before = obj.current_count;
+            obj.current_count = std::min<uint16_t>(
+                static_cast<uint16_t>(before + amount), obj.required_count);
+            if (obj.current_count != before) {
+                SendQuestUpdate(entry.quest_id, static_cast<uint8_t>(oi),
+                    obj.current_count, obj.required_count);
+                script_runtime_.RunQuestFsm(entry.quest_id,
+                    static_cast<uint32_t>(connected_player_.id), fsm_event,
+                    type == QuestObjective::CollectItem ? 0 : target_id,
+                    type == QuestObjective::CollectItem ? target_id : 0);
             }
         }
-        quest_->Update(*registry_, 0.0f);
-        SavePlayerQuests(connected_player_.id);
     }
+    quest_->Update(*registry_, 0.0f);
+    SavePlayerQuests(connected_player_.id);
 }
 
 void MapServer::SendQuestList(uint8_t result) {
@@ -2215,6 +2228,13 @@ void MapServer::HandleQuestStart(const uint8_t* payload, size_t len) {
     network_->SendPacket(ok ? PacketType_MP_QUEST_START_ACK : PacketType_MP_QUEST_START_NACK,
         fbb.GetBufferPointer(), fbb.GetSize());
     if (ok) {
+        char script_path[128];
+        snprintf(script_path, sizeof(script_path), "assets/scripts/quests/quest_%04u.lua", qid);
+        RunMapScript(script_path, player_entity_);
+        script_runtime_.RunQuestFsm(qid, static_cast<uint32_t>(connected_player_.id), "accept");
+        if (req->npc_id())
+            script_runtime_.RunQuestFsm(qid, static_cast<uint32_t>(connected_player_.id),
+                "npc_talk", req->npc_id(), 0);
         SendQuestList(0);
         SavePlayerQuests(connected_player_.id);
     }
@@ -2298,7 +2318,7 @@ std::string SerializeQuestProgress(const QuestEntry& entry) {
     return s;
 }
 
-void ApplyQuestProgress(QuestEntry& entry, const std::string& progress) {
+void ParseStoredQuestProgress(QuestEntry& entry, const std::string& progress) {
     size_t p = 0;
     while (p < progress.size()) {
         size_t semi = progress.find(';', p);
@@ -2353,7 +2373,7 @@ void MapServer::LoadPlayerQuests(int character_id) {
         entry.completer_npc_id = it->second.completer_npc_id;
         for (const auto& obj : it->second.objectives)
             entry.objectives.push_back(obj);
-        ApplyQuestProgress(entry, row[2]);
+        ParseStoredQuestProgress(entry, row[2]);
         if (state == 1) entry.is_completed = true;
         log.active_quests.push_back(std::move(entry));
     }

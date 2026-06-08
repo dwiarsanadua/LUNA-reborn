@@ -19,9 +19,10 @@ import json
 import re
 from pathlib import Path
 
-BASE = Path("/Users/macbookair/PRIBADI/luna-plus-master")
-OLD_DATA = BASE / "Luna-Plus-Old" / "NEW_LUNA" / "data"
-REBORN = BASE / "Luna-Plus-Reborn"
+BASE = Path(__file__).resolve().parents[2]
+REPO_ROOT = BASE.parent
+OLD_DATA = REPO_ROOT / "Luna-Plus-Old" / "NEW_LUNA" / "data"
+REBORN = BASE
 ASSETS = REBORN / "assets" / "data"
 OUTPUT = ASSETS / "quests_full.json"
 
