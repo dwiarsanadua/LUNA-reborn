@@ -16,7 +16,7 @@ bool EngineMap::Load(const std::string& map_id) {
     InitBGMMap();
     
     std::string hgt_path = "assets/maps/" + map_id + ".hgt";
-    if (!terrain_->LoadFromHGT(hgt_path.c_str(), 0.16f)) {  // 51200 world / (10000 * 32 cols) = 0.16
+    if (!terrain_->LoadFromHGT(hgt_path.c_str(), 0.04f)) {  // tile=400, object_factor=0.0001, 400*0.0001=0.04
         terrain_->Init(100, 12.0f);
         spdlog::info("EngineMap: procedural terrain for map {}", map_id);
     }
