@@ -304,13 +304,15 @@ def create_legacy_db(src_path: Path, dst_path: Path):
     dst.execute("""
         CREATE TABLE npc_templates (
             id INTEGER PRIMARY KEY, name TEXT,
-            npc_type INTEGER DEFAULT 0, shop_type INTEGER DEFAULT 0
+            npc_type INTEGER DEFAULT 0, shop_type INTEGER DEFAULT 0,
+            dialog_text TEXT DEFAULT ''
         )
     """)
     npc_rows = src.execute("SELECT * FROM game_npclist").fetchall()
     for r in npc_rows:
-        dst.execute("INSERT INTO npc_templates (id,name,npc_type,shop_type) VALUES (?,?,?,?)",
-                    (col(r, 0), col(r, 1), col(r, 2), col(r, 6, 1)))
+        dialog = str(col(r, 5, "") if len(r) > 5 else "")
+        dst.execute("INSERT INTO npc_templates (id,name,npc_type,shop_type,dialog_text) VALUES (?,?,?,?,?)",
+                    (col(r, 0), col(r, 1), col(r, 2), col(r, 6, 1), dialog))
     print(f"  [LEGACY] npc_templates: {len(npc_rows)} rows")
 
     # npc_positions
