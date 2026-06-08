@@ -829,11 +829,11 @@ void GameScreen::Render(UIRenderer& ui) {
 }
 
 void GameScreen::Render(UIRenderer& ui, const glm::mat4& view, const glm::mat4& proj) {
-    // Build environment data from day/night cycle
+    // Build environment data from day/night cycle + map data
     EnvData env;
     env.light_dir = glm::vec4(sky_.GetLightDirection(), 0.0f);
     env.fog_color = glm::vec4(sky_.GetFogColor(), 1.0f);
-    env.fog_data  = glm::vec4(30.0f, 150.0f, 0.8f, 0.0f);
+    env.fog_data  = glm::vec4(50.0f, 500.0f, 0.4f, 0.0f);  // further fog = better atmosphere
 
     // Sky dome (background, view 0)
     sky_.Render(ui, view, proj);

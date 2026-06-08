@@ -6,9 +6,9 @@
 #include <string>
 
 struct EnvData {
-    glm::vec4 light_dir{0.5f, -0.8f, 0.3f, 0.0f};
-    glm::vec4 fog_data{50.0f, 200.0f, 0.8f, 0.0f};
-    glm::vec4 fog_color{0.1f, 0.1f, 0.18f, 1.0f};
+    glm::vec4 light_dir{0.5f, -0.6f, -0.4f, 0.0f};
+    glm::vec4 fog_data{80.0f, 600.0f, 0.3f, 0.0f};
+    glm::vec4 fog_color{0.6f, 0.7f, 0.8f, 1.0f};
 };
 
 struct RenderDeviceConfig {
