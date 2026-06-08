@@ -169,7 +169,7 @@ void EngineMap::LoadSceneObjects(const std::string& json_path) {
         size_t dot = modLower.find_last_of('.');
         if (dot != std::string::npos) modLower = modLower.substr(0, dot);
 
-        // Try .glb first, then .obj, then .MOD with fresh ifstream each time
+        // Try .glb first, then .obj, then .mod
         auto tryLoad = [&](const std::string& ext) -> bool {
             std::string fname = "assets/models/" + modLower + ext;
             std::ifstream test(fname);
@@ -185,7 +185,48 @@ void EngineMap::LoadSceneObjects(const std::string& json_path) {
             return false;
         };
 
+        // Try .chr — character definition files
+        auto tryLoadChr = [&](const std::string& orig_name, const std::string& base_name, glm::vec3 pos, float scale) -> bool {
+            std::string lower = orig_name;
+            std::transform(lower.begin(), lower.end(), lower.begin(),
+                [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            if (lower.find(".chr") == std::string::npos) return false;
+            std::string chr_name = base_name;
+            auto us = chr_name.find_last_of('_');
+            if (us != std::string::npos && us > 2) {
+                std::string suffix = chr_name.substr(us + 1);
+                if (suffix.size() == 1 && suffix[0] >= '0' && suffix[0] <= '9')
+                    chr_name = chr_name.substr(0, us);
+            }
+            std::string chr_path = "assets/characters/" + chr_name + ".json";
+            std::ifstream cf(chr_path);
+            if (!cf.good()) return false;
+            std::string json((std::istreambuf_iterator<char>(cf)), {});
+            cf.close();
+            auto mpos = json.find("\"file\":");
+            if (mpos == std::string::npos) return false;
+            auto q1 = json.find('"', mpos + 7);
+            auto q2 = json.find('"', q1 + 1);
+            if (q1 == std::string::npos || q2 == std::string::npos) return false;
+            std::string model_path = json.substr(q1 + 1, q2 - q1 - 1);
+            auto slash = model_path.find_last_of('/');
+            std::string model_file = (slash != std::string::npos) ? model_path.substr(slash + 1) : model_path;
+            auto dot2 = model_file.find_last_of('.');
+            if (dot2 != std::string::npos) model_file = model_file.substr(0, dot2);
+            std::string fname = "assets/models/" + model_file + ".glb";
+            std::ifstream mtest(fname);
+            if (!mtest.good()) { fname = "assets/models/" + model_file + ".obj"; mtest.open(fname); }
+            if (!mtest.good()) return false;
+            mtest.close();
+            int mesh_idx = props_->LoadObj(fname);
+            if (mesh_idx < 0) return false;
+            props_->AddInstance(mesh_idx, pos, scale);
+            return true;
+        };
+
         if (tryLoad(".glb") || tryLoad(".obj") || tryLoad(".mod")) {
+            loaded++;
+        } else if (tryLoadChr(modelName, modLower, {px * 0.0001f, py * 0.0001f, pz * 0.0001f}, (sx + sy + sz) / 3.0f * 0.005f)) {
             loaded++;
         } else {
             skipped_no_obj++;
