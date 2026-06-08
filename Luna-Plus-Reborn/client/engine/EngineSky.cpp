@@ -31,11 +31,13 @@ void EngineSky::Init() {
         program_ = bgfx::createProgram(bgfx::createShader(vs), bgfx::createShader(fs), true);
     }
 
-    // Load sky texture
-    sky_tex_ = LoadSkyTexture("assets/textures/01_human_sky.png");
-    if (!bgfx::isValid(sky_tex_)) {
-        sky_tex_ = LoadSkyTexture("assets/textures/60_sky.png");
-    }
+    // Load sky texture — try multiple possible paths
+    sky_tex_ = LoadSkyTexture("assets/textures/unpacked/map/01_human_sky.png");
+    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture("assets/textures/unpacked/map/60_sky.png"); }
+    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture("assets_converted/mod_objs/01_human_sky.png"); }
+    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture("assets_converted/mod_objs/60_sky.png"); }
+    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture("assets/textures/01_human_sky.png"); }
+    if (!bgfx::isValid(sky_tex_)) { sky_tex_ = LoadSkyTexture("assets/textures/60_sky.png"); }
 
     BuildDomeMesh();
 }

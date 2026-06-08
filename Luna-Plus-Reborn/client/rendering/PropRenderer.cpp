@@ -45,7 +45,7 @@ bgfx::TextureHandle PropRenderer::LoadTextureForMesh(const std::string& base_nam
     if (it != tex_cache_.end()) return it->second;
 
     std::string variations[] = { base_name, base_name + ".png", base_name + ".dds" };
-    std::string base_paths[] = { "assets/textures/", "assets_converted/mod_objs/", "assets/unpacked/image/" };
+    std::string base_paths[] = { "assets/textures/", "assets/textures/unpacked/map/", "assets/textures/unpacked/farm/", "assets/textures/unpacked/", "assets_converted/mod_objs/", "assets/unpacked/image/" };
 
     for (auto& base_path : base_paths) {
         for (auto& v : variations) {
