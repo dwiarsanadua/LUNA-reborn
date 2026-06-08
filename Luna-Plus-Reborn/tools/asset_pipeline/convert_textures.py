@@ -11,9 +11,6 @@ import argparse
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-SRC = Path("/Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/textures")
-DST = Path("/Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/assets/textures")
-
 TOOLS = {
     'ffmpeg': '/opt/homebrew/bin/ffmpeg',
     'sips': '/usr/bin/sips',
@@ -31,7 +28,7 @@ def convert_tif_tga(src: Path, dst: Path) -> bool:
     result = subprocess.run(cmd, capture_output=True, text=True)
     return result.returncode == 0
 
-def convert_file(src_path: str) -> tuple:
+def convert_file(src_path: str, src_base: Path, dst_base: Path) -> tuple:
     src = Path(src_path)
     ext = src.suffix.lower()
     converters = {
@@ -43,10 +40,10 @@ def convert_file(src_path: str) -> tuple:
         return (src_path, 'skip', None)
     new_ext, converter = converters[ext]
     try:
-        rel = src.relative_to(SRC)
+        rel = src.relative_to(src_base)
     except ValueError:
-        return (src_path, 'fail', 'outside SRC')
-    dst = DST / rel.with_suffix(f'.{new_ext}')
+        return (src_path, 'fail', 'outside src_base')
+    dst = dst_base / rel.with_suffix(f'.{new_ext}')
     if dst.exists():
         return (src_path, 'skip', 'exists')
     try:
@@ -60,22 +57,27 @@ def convert_file(src_path: str) -> tuple:
 def main():
     parser = argparse.ArgumentParser(description='Convert textures to PNG')
     parser.add_argument('--all', action='store_true', help='Process all textures')
+    parser.add_argument('--input', type=str, help='Input directory')
+    parser.add_argument('--output', type=str, help='Output directory')
     parser.add_argument('--workers', type=int, default=4, help='Parallel workers')
     parser.add_argument('--file', type=str, help='Single file to convert')
     args = parser.parse_args()
 
+    src_base = Path(args.input) if args.input else Path("/Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/textures")
+    dst_base = Path(args.output) if args.output else Path("/Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/assets/textures")
+
     if args.file:
-        path, status, err = convert_file(args.file)
+        path, status, err = convert_file(args.file, src_base, dst_base)
         print(f"{status}: {path}" + (f" ({err})" if err else ""))
         return 0 if status == 'ok' else 1
 
-    if not SRC.exists():
-        print(f"Source directory not found: {SRC}")
+    if not src_base.exists():
+        print(f"Source directory not found: {src_base}")
         return 1
 
     files = []
     for ext in ['.dds', '.tif', '.TIF', '.tga', '.TGA']:
-        files.extend(SRC.rglob(f'*{ext}'))
+        files.extend(src_base.rglob(f'*{ext}'))
     files = sorted(set(files))
 
     if not files:
@@ -89,15 +91,15 @@ def main():
     failed_list = []
 
     print(f"Found {total} texture files to convert")
-    print(f"Output: {DST}")
+    print(f"Output: {dst_base}")
     print()
 
     if args.workers > 1 and not args.file:
         with ProcessPoolExecutor(max_workers=args.workers) as executor:
-            futures = {executor.submit(convert_file, str(f)): f for f in files}
+            futures = {executor.submit(convert_file, str(f), src_base, dst_base): f for f in files}
             for future in as_completed(futures):
                 path, status, err = future.result()
-                rel = os.path.relpath(path, str(SRC))
+                rel = os.path.relpath(path, str(src_base))
                 if status == 'ok':
                     success += 1
                     print(f"  OK  {rel}")
@@ -109,8 +111,8 @@ def main():
                     print(f"  FAIL {rel}" + (f" ({err})" if err else ""))
     else:
         for f in files:
-            path, status, err = convert_file(str(f))
-            rel = os.path.relpath(path, str(SRC))
+            path, status, err = convert_file(str(f), src_base, dst_base)
+            rel = os.path.relpath(path, str(src_base))
             if status == 'ok':
                 success += 1
                 print(f"  OK  {rel}")

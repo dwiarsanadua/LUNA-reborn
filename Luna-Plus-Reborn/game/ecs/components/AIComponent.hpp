@@ -21,6 +21,7 @@ struct AIComponent {
     int current_patrol_index = 0;
     float patrol_wait_time = 0.0f;
     float patrol_wait_timer = 0.0f;
+    float enrage_timer = 0.0f;
     float state_timer = 0.0f;
     float skill_timer = 0.0f;
     float last_attack_time = 0.0f;

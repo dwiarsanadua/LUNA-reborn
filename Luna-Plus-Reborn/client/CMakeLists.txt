@@ -131,7 +131,7 @@ target_link_libraries(LunaPlusClient PRIVATE
 )
 
 if(APPLE)
-    target_link_libraries(LunaPlusClient PRIVATE ${APPLE_FRAMEWORKS})
+    # Frameworks are linked via bgfx::bgfx and Jolt::Jolt INTERFACE_LINK_OPTIONS
 endif()
 
 target_compile_definitions(LunaPlusClient PRIVATE

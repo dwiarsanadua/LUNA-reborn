@@ -51,11 +51,9 @@ void SkillSystem::UseSkill(entt::registry& reg, entt::entity caster,
     }
 
     auto& book = reg.get<SkillBook>(caster);
-    for (auto& sk : book.skills) {
-        if (sk.skill_id == skill_id) {
-            sk.cooldown_until = sd.cooldown_ms;
-            break;
-        }
+    auto it = book.skills.find(skill_id);
+    if (it != book.skills.end()) {
+        it->second.cooldown_until = sd.cooldown_ms;
     }
 }
 
@@ -69,10 +67,10 @@ void SkillSystem::UpdateCooldowns(entt::registry& reg, float dt) {
     auto view = reg.view<SkillBook>();
     for (auto entity : view) {
         auto& book = view.get<SkillBook>(entity);
-        for (auto& skill : book.skills) {
-            if (skill.cooldown_until > 0) {
+        for (auto& [id, entry] : book.skills) {
+            if (entry.cooldown_until > 0) {
                 uint32_t dec = static_cast<uint32_t>(dt * 1000);
-                skill.cooldown_until = (skill.cooldown_until > dec) ? skill.cooldown_until - dec : 0;
+                entry.cooldown_until = (entry.cooldown_until > dec) ? entry.cooldown_until - dec : 0;
             }
         }
     }

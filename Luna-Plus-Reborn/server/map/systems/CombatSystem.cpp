@@ -206,7 +206,7 @@ void CombatSystem::HandleDeath(entt::registry& registry, entt::entity target, en
 
 uint64_t CombatSystem::CalculateExpGain(const CharacterStats& killer, const CharacterStats& victim) {
     uint64_t base = static_cast<uint64_t>(victim.level * 50);
-    float level_ratio = static_cast<float>(victim.level) / std::max(1, killer.level);
+    float level_ratio = static_cast<float>(victim.level) / static_cast<float>(std::max<int>(1, killer.level));
 
     // Bonus for higher-level mobs (up to 2x)
     float bonus = (level_ratio > 1.0f) ? std::min(level_ratio, 2.0f) : 0.5f;

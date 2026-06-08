@@ -195,7 +195,7 @@ void AISystem::Attack(entt::registry& registry, entt::entity entity,
     ai.skill_timer += dt;
     if (ai.skill_timer >= 2.0f) {
         ai.skill_timer = 0.0f;
-        target_stats->hp = std::max(0, target_stats->hp - stats.physic_attack);
+        target_stats->hp = std::max(0.0f, target_stats->hp - stats.physic_attack);
         ai.AddThreat(ai.aggro_target, static_cast<int32_t>(stats.physic_attack));
         spdlog::debug("AI: entity {} attacks target {} for {} damage",
                       static_cast<uint32_t>(entity), ai.aggro_target, static_cast<int>(stats.physic_attack));

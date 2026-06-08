@@ -4,10 +4,10 @@
 #include <string>
 #include <memory>
 #include <glm/glm.hpp>
+#include <entt/entt.hpp>
 
 class NetworkLayer;
 class Database;
-class entt::registry;
 
 struct PlayerData {
     int id;

@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <random>
 #include <entt/entt.hpp>
 #include <ecs/components/Inventory.hpp>
 #include <ecs/components/Equipment.hpp>

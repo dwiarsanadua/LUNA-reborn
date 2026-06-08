@@ -32,3 +32,9 @@ assets/
 # Python cache
 __pycache__/
 *.pyc
+
+# External dependencies (cloned/build from source)
+external/
+
+# Runtime data
+*.db

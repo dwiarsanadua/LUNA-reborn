@@ -108,7 +108,7 @@ if(bgfx_FOUND AND NOT TARGET bgfx::bgfx)
     endif()
     if(APPLE)
         set_property(TARGET bgfx::bgfx APPEND PROPERTY
-            INTERFACE_LINK_OPTIONS "-framework Cocoa;-framework Metal;-framework MetalKit;-framework QuartzCore;-framework IOKit;-framework CoreGraphics"
+            INTERFACE_LINK_OPTIONS "SHELL:-Xlinker -framework -Xlinker Cocoa -Xlinker -framework -Xlinker Metal -Xlinker -framework -Xlinker MetalKit -Xlinker -framework -Xlinker QuartzCore -Xlinker -framework -Xlinker IOKit -Xlinker -framework -Xlinker CoreGraphics"
         )
     endif()
 endif()

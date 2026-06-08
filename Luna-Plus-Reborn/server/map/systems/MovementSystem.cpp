@@ -23,8 +23,8 @@ void MovementSystem::Update(entt::registry& registry, float dt) {
         glm::vec3 prev = xform.position;
 
         // Apply velocity
-        if (glm::length(move.direction) > 0.1f) {
-            glm::vec3 dir = glm::normalize(move.direction);
+        if (glm::length(move.velocity) > 0.1f) {
+            glm::vec3 dir = glm::normalize(move.velocity);
             float speed = move.current_speed * dt;
             xform.position += dir * speed;
         }

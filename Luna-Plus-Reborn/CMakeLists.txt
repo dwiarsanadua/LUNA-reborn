@@ -1,4 +1,14 @@
 cmake_minimum_required(VERSION 3.30)
+
+if(APPLE)
+    execute_process(COMMAND xcrun --show-sdk-path
+        OUTPUT_VARIABLE CMAKE_OSX_SYSROOT
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+    message(STATUS "macOS SDK: ${CMAKE_OSX_SYSROOT}")
+    set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "macOS arch")
+    set(CMAKE_MACOSX_BUNDLE OFF)
+endif()
+
 project(LunaPlusReborn
     VERSION 1.0.0
     LANGUAGES CXX
@@ -8,11 +18,6 @@ project(LunaPlusReborn
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
-if(APPLE)
-    set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "macOS arch")
-    set(CMAKE_MACOSX_BUNDLE OFF)
-endif()
 
 set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type")
 
@@ -74,22 +79,6 @@ if(UV_LIBRARY AND UV_INCLUDE_DIR)
 else()
     message(WARNING "libuv not found. Legacy network code disabled.")
     add_library(libuv::uv INTERFACE IMPORTED)
-endif()
-
-if(APPLE)
-    find_library(COCOA_LIBRARY Cocoa)
-    find_library(METAL_LIBRARY Metal)
-    find_library(METALKIT_LIBRARY MetalKit)
-    find_library(QUARTZCORE_LIBRARY QuartzCore)
-    find_library(IOKIT_LIBRARY IOKit)
-    find_library(COREGRAPHICS_LIBRARY CoreGraphics)
-    find_library(CORESERVICES_LIBRARY CoreServices)
-    find_library(APPKIT_LIBRARY AppKit)
-    set(APPLE_FRAMEWORKS
-        ${COCOA_LIBRARY} ${METAL_LIBRARY} ${METALKIT_LIBRARY}
-        ${QUARTZCORE_LIBRARY} ${IOKIT_LIBRARY} ${COREGRAPHICS_LIBRARY}
-        ${CORESERVICES_LIBRARY} ${APPKIT_LIBRARY}
-    )
 endif()
 
 include(cmake/CompileOptions.cmake)

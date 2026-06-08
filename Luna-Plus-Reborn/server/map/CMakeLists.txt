@@ -11,12 +11,15 @@ add_executable(MapServer
 target_include_directories(MapServer PRIVATE
     ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/game
+    ${CMAKE_BINARY_DIR}/game/fbs
 )
 
 target_link_libraries(MapServer PRIVATE
     gx_network
     gx_physics
+    gx_geom
     Database
+    game_core
     EnTT::EnTT
     spdlog::spdlog
     fmt::fmt
@@ -24,5 +27,5 @@ target_link_libraries(MapServer PRIVATE
 )
 
 if(APPLE)
-    target_link_libraries(MapServer PRIVATE ${APPLE_FRAMEWORKS})
+    # Frameworks are linked via bgfx::bgfx and Jolt::Jolt INTERFACE_LINK_OPTIONS
 endif()

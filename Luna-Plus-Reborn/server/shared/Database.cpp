@@ -150,7 +150,7 @@ public:
         }
 
         auto handle = new StmtHandle{stmt, db, false};
-        return reinterpret_cast<int>(handle);
+        return static_cast<int>(reinterpret_cast<intptr_t>(handle));
     }
 
     void Bind(const std::string& sql, int stmt_handle, int index, int value) {

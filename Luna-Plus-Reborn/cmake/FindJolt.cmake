@@ -33,7 +33,7 @@ if(Jolt_FOUND AND NOT TARGET Jolt::Jolt)
     )
     if(APPLE)
         set_property(TARGET Jolt::Jolt APPEND PROPERTY
-            INTERFACE_LINK_OPTIONS "-framework Foundation"
+            INTERFACE_LINK_OPTIONS "SHELL:-Xlinker -framework -Xlinker Foundation"
         )
     endif()
 endif()

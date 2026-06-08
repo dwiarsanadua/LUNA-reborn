@@ -2,6 +2,7 @@
 #include <spdlog/spdlog.h>
 #include <random>
 #include <algorithm>
+#include <game/ecs/components/Tag.hpp>
 
 ItemSystem::ItemSystem() : rng_(std::random_device{}()) {}
 
@@ -107,11 +108,11 @@ bool ItemSystem::EquipItem(entt::registry& registry, entt::entity entity, size_t
     if (slot.item_id == 0) return false;
 
     // Determine equipment slot from item subtype (simplified)
-    Equipment::Slot eSlot = Equipment::Slot::WEAPON;
-    if (slot.item_id >= 2000 && slot.item_id < 3000) eSlot = Equipment::Slot::ARMOR;
-    else if (slot.item_id >= 3000 && slot.item_id < 4000) eSlot = Equipment::Slot::HELMET;
-    else if (slot.item_id >= 4000 && slot.item_id < 5000) eSlot = Equipment::Slot::GLOVES;
-    else if (slot.item_id >= 5000 && slot.item_id < 6000) eSlot = Equipment::Slot::BOOTS;
+    Equipment::Slot eSlot = Equipment::Slot::Weapon;
+    if (slot.item_id >= 2000 && slot.item_id < 3000) eSlot = Equipment::Slot::Body;
+    else if (slot.item_id >= 3000 && slot.item_id < 4000) eSlot = Equipment::Slot::Helmet;
+    else if (slot.item_id >= 4000 && slot.item_id < 5000) eSlot = Equipment::Slot::Gloves;
+    else if (slot.item_id >= 5000 && slot.item_id < 6000) eSlot = Equipment::Slot::Boots;
 
     if (static_cast<size_t>(eSlot) >= Equipment::COUNT) return false;
 

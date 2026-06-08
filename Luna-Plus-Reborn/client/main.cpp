@@ -107,7 +107,7 @@ int main() {
     } else {
         map.Load("51"); // Default to Alker Plains
     }
-    map.LoadFarmProps("assets/unpacked/farm");
+    map.LoadFarmProps("assets/models/farm");
 
     CharRenderer_Init();
     CharRenderer_SetFBSize((uint16_t)device.GetWidth(), (uint16_t)device.GetHeight());

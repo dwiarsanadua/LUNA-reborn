@@ -87,8 +87,12 @@ void EngineMap::LoadSceneObjects(const std::string& json_path) {
         std::transform(modLower.begin(), modLower.end(), modLower.begin(), ::tolower);
         size_t dot = modLower.find_last_of('.');
         if (dot != std::string::npos) modLower = modLower.substr(0, dot);
-        std::string fname = "assets/unpacked/map/" + modLower + ".obj";
+        std::string fname = "assets/models/" + modLower + ".glb";
         std::ifstream test(fname);
+        if (!test.good()) {
+            fname = "assets/models/" + modLower + ".obj";
+            test.open(fname);
+        }
         if (test.good()) {
             test.close();
             float avgScale = (sx + sy + sz) / 3.0f * 0.005f;
@@ -115,7 +119,10 @@ void EngineMap::LoadFarmProps(const std::string& farm_dir) {
         {"01_farm_stable_lv1", -35, -30, 0.6f},
     };
     for (auto& p : props) {
-        props_->LoadObj(farm_dir + "/" + std::string(p.file) + ".obj", {p.x, 0, p.z}, p.scale);
+        std::string path = farm_dir + "/" + std::string(p.file);
+        std::ifstream test(path + ".glb");
+        if (test.good()) { test.close(); props_->LoadObj(path + ".glb", {p.x, 0, p.z}, p.scale); }
+        else { props_->LoadObj(path + ".obj", {p.x, 0, p.z}, p.scale); }
     }
     spdlog::info("EngineMap: loaded {} farm props", (int)(sizeof(props)/sizeof(props[0])));
 }

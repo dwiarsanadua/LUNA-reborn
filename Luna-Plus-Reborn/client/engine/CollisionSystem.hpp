@@ -1,8 +1,7 @@
 #pragma once
 #include <glm/glm.hpp>
 #include <rendering/TerrainRenderer.hpp>
-
-class PhysicsWorld;
+#include <engine/physics/PhysicsWorld.h>
 
 struct AABB {
     glm::vec3 min{0}, max{0};
