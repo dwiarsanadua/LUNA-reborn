@@ -61,7 +61,7 @@ private:
     int correction_count_ = 0;
     float estimated_latency_ = 50.0f; // ms
     
-    static constexpr int MAX_HISTORY = 60;
+    static constexpr int MAX_HISTORY = 120;
     static constexpr float MAX_SPEED = 8.0f;
     static constexpr float MAX_TELEPORT_DIST = 20.0f;
 };

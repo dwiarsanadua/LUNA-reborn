@@ -54,6 +54,8 @@ MovementState ServerAuthMovement::ComputeNewState(const MovementCommand& cmd, co
 
 void ServerAuthMovement::ApplyCorrection(const MovementState& server_state, uint32_t server_time) {
     (void)server_time;
+    state_history_.push_back(current_state_);
+    if (state_history_.size() > MAX_HISTORY) state_history_.pop_front();
     current_state_ = server_state;
     render_state_ = server_state;
     correction_count_++;
@@ -65,7 +67,15 @@ void ServerAuthMovement::ApplyCorrection(const MovementState& server_state, uint
 }
 
 glm::vec3 ServerAuthMovement::GetRenderPosition() const {
-    return render_state_.position;
+    if (state_history_.size() < 2) return current_state_.position;
+
+    auto& prev = state_history_[state_history_.size() - 2];
+    auto& curr = state_history_.back();
+
+    float t = (estimated_latency_ / 1000.0f) * 60.0f;
+    t = std::clamp(t, 0.0f, 1.0f);
+
+    return glm::mix(prev.position, curr.position, t);
 }
 
 bool ServerAuthMovement::CheckSpeedHack(const MovementCommand& cmd, float max_speed) const {

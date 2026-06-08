@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 
 void Hero::UpdateEquipment() {
     if (!game_state_) return;
@@ -56,6 +57,10 @@ void Hero::Init(GameState* state, AudioManager* audio, PhysicsWorld* physics) {
     prev_state_ = HeroState::Idle;
     state_timer_ = 0;
     state_duration_ = 0;
+    target_entity_ = 0;
+    attack_cooldown_ = 0;
+    skill_cooldown_ = 0;
+    dash_cooldown_ = 0;
     pk_flagged_ = false;
 
     // Create physics character
@@ -226,7 +231,32 @@ void Hero::ProcessStateTransitions(float dt) {
     }
 }
 
+void Hero::ExecuteAutoAttack() {
+    if (!game_state_) return;
+    float atk = static_cast<float>(attack_);
+    float def = static_cast<float>(defense_);
+    float rnd = 0.9f + static_cast<float>(std::rand()) / RAND_MAX * 0.2f;
+    float base_dmg = atk * rnd - def * 0.5f;
+    int dmg = std::max(1, static_cast<int>(base_dmg));
+    SetState(HeroState::Attack, 0.3f);
+    if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_Monster, "hit.wav");
+}
+
+bool Hero::IsInAttackRange() const {
+    if (!game_state_ || target_entity_ == 0) return false;
+    return true;
+}
+
 void Hero::Update(float dt) {
+    // Auto-attack
+    if (target_entity_ != 0 && IsAlive()) {
+        attack_cooldown_ -= dt;
+        if (attack_cooldown_ <= 0 && IsInAttackRange()) {
+            ExecuteAutoAttack();
+            attack_cooldown_ = 1.2f;
+        }
+    }
+
     ProcessStateTransitions(dt);
     
     moving_ = (fabs(x_ - prev_x_) > 0.01f || fabs(z_ - prev_z_) > 0.01f) 

@@ -43,6 +43,7 @@ void AISystem::Update(entt::registry& registry, float dt) {
             default: break;
         }
         ai.state_timer += dt;
+        ai.aggro_scan_timer += dt;
 
         if (ai.is_boss) {
             auto& stats = registry.get<CharacterStats>(entity);
@@ -52,7 +53,10 @@ void AISystem::Update(entt::registry& registry, float dt) {
 }
 
 void AISystem::UpdateIdle(entt::registry& reg, entt::entity e, AIComponent& ai, float dt) {
-    ScanForTargets(reg, e, ai, reg.get<Transform>(e));
+    if (ai.aggro_scan_timer >= 5.0f) {
+        ScanForTargets(reg, e, ai, reg.get<Transform>(e));
+        ai.aggro_scan_timer = 0;
+    }
     if (!ai.patrol_points.empty() && ai.state_timer > 3.0f) {
         TransitionState(ai, AIComponent::Patrol);
     }
@@ -60,7 +64,10 @@ void AISystem::UpdateIdle(entt::registry& reg, entt::entity e, AIComponent& ai, 
 
 void AISystem::UpdatePatrol(entt::registry& reg, entt::entity e,
                              AIComponent& ai, Transform& xform, Movement& mv, float dt) {
-    ScanForTargets(reg, e, ai, xform);
+    if (ai.aggro_scan_timer >= 5.0f) {
+        ScanForTargets(reg, e, ai, xform);
+        ai.aggro_scan_timer = 0;
+    }
     if (ai.patrol_points.empty()) { TransitionState(ai, AIComponent::Idle); return; }
     size_t idx = ai.current_patrol_index % ai.patrol_points.size();
     glm::vec3 target = ai.patrol_points[idx];
@@ -120,6 +127,12 @@ void AISystem::UpdateAttack(entt::registry& reg, entt::entity e,
         combat = &reg.emplace<CombatState>(e);
     }
 
+    // Battle delay: 10 detik sebelum state change
+    if (ai.state_timer >= 10.0f) {
+        TransitionState(ai, AIComponent::Chase);
+        return;
+    }
+
     if (!combat->is_casting && !combat->is_animation_locked) {
         // Basic attack (id 0) with 0.5s cast time
         combat->StartCast(0, 0.5f, static_cast<entt::entity>(ai.aggro_target));
@@ -162,6 +175,26 @@ void AISystem::TransitionState(AIComponent& ai, AIComponent::State new_state) {
         spdlog::debug("Monster AI state transition: {} -> {}", static_cast<int>(ai.state), static_cast<int>(new_state));
         ai.state = new_state;
         ai.state_timer = 0.0f;
+    }
+}
+
+void AISystem::RequestHelp(entt::registry& reg, entt::entity e, AIComponent& ai, uint32_t target_id) {
+    auto& xform = reg.get<Transform>(e);
+    auto view = reg.view<AIComponent, Transform>();
+    for (auto other : view) {
+        if (other == e) continue;
+        auto& other_ai = view.get<AIComponent>(other);
+        auto& other_xform = view.get<Transform>(other);
+        float dist = glm::distance(xform.position, other_xform.position);
+        if (dist < 15.0f && other_ai.aggro_target == 0) {
+            other_ai.aggro_target = target_id;
+            other_ai.AddThreat(target_id, 80);
+            if (other_ai.state == AIComponent::Idle || other_ai.state == AIComponent::Patrol) {
+                TransitionState(other_ai, AIComponent::Chase);
+            }
+            spdlog::info("Monster {} calls help: monster {} now chasing target {}",
+                         static_cast<uint32_t>(e), static_cast<uint32_t>(other), target_id);
+        }
     }
 }
 

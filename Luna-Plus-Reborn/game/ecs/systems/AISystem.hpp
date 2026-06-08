@@ -30,4 +30,5 @@ private:
     void HandleBossAI(entt::registry& reg, entt::entity e,
                       AIComponent& ai, CharacterStats& stats, float dt);
     void TransitionState(AIComponent& ai, AIComponent::State new_state);
+    void RequestHelp(entt::registry& reg, entt::entity e, AIComponent& ai, uint32_t target_id);
 };

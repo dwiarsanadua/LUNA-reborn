@@ -17,7 +17,7 @@ struct AIComponent {
     std::vector<uint32_t> aggro_list;
     float aggro_range = 10.0f;
     float attack_range = 3.0f;
-    float chase_range = 30.0f;
+    float chase_range = 50.0f;
     glm::vec3 spawn_position{0.0f};
     std::vector<glm::vec3> patrol_points;
     int current_patrol_index = 0;
@@ -31,6 +31,7 @@ struct AIComponent {
     float special_attack_timer = 0.0f;
     float special_attack_cooldown = 8.0f;
     float state_timer = 0.0f;
+    float aggro_scan_timer = 0.0f;
     float skill_timer = 0.0f;
     float last_attack_time = 0.0f;
     int32_t threat = 0;

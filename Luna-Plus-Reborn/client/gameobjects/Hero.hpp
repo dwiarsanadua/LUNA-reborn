@@ -59,6 +59,12 @@ public:
     void AddEXP(int e) { exp_ += e; }
     const std::string& GetName() const { return name_; }
 
+    // Auto-attack
+    void SetTarget(uint32_t entity_id) { target_entity_ = entity_id; }
+    uint32_t GetTarget() const { return target_entity_; }
+    void ExecuteAutoAttack();
+    bool IsInAttackRange() const;
+
     // PK Integration
     void SetPKManager(PKManagerDlg* mgr) { pk_mgr_ = mgr; }
     bool IsPKFlagged() const { return pk_flagged_; }
@@ -81,6 +87,12 @@ private:
     // Skill casting
     int current_skill_id_ = 0;
     float cast_time_ = 0;
+
+    // Auto-attack & cooldowns
+    uint32_t target_entity_ = 0;
+    float attack_cooldown_ = 0;
+    float skill_cooldown_ = 0;
+    float dash_cooldown_ = 0;
     
     int hp_ = 500, max_hp_ = 500;
     int mp_ = 100, max_mp_ = 100;
