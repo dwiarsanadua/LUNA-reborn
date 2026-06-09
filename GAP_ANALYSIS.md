@@ -132,12 +132,15 @@ BillingDlg.bin             (not implemented)         🔴        L    1 day    -
 HousingWebDlg.bin          (not implemented)         🔴        L    2 days   HousingDialog
 
 SUMMARY - UI SYSTEM
-  Total Old .bin files:       213
-  Reborn C++ dialog classes:  73 (34%)
-  Fully functional:           50 (23%)
-  Partial/stub:               5 (2%)
-  Missing:                    ~20 minor (9%)
-  Total estimated effort:     ~3 weeks (1 FTE)
+  Total Old .bin files:       213 (scan langsung)
+  PORTED (ada implementasi):  95 (45%) — dedicated class atau GameScreen inline
+  PARTIAL (class ada, no .bin):4 (2%) — FadeDlg, FamilyMark, Target, TargetMonster
+  MISSING (no reference):     114 (53%)
+  ─ Dari 114 missing:
+    Sub-dialogs (minor):       ~70 (ChatRoom variants, Guild subs, Housing subs)
+    Config/image_path files:   ~15 (image_*.bin, partymember*.bin)
+    Truly missing features:    ~29 (ApplyOption, AutoAnswer, BattleGuage, ShoutDlg, dll)
+  Total estimated effort:     ~4 weeks (1 FTE) — mostly minor sub-dialogs
 
   Technology:
     Old:  cWindowManager + .bin scripts (Win32 dialog resource-like)
@@ -262,12 +265,26 @@ Handler wiring status:
   Vehicle (VEHICLE):   6/6 handler di MapServer          ✅
 
 SUMMARY - NETWORK PROTOCOL
-  Old MP_CATEGORY:           94 categories (Protocol.h)
-  Old individual packets:    ~2034 (55 MP_PROTOCOL enums)
+  Old MP_CATEGORY:           92 named + 1 (MP_MAX) = 93 total (scan langsung)
+  Old MP_PROTOCOL enums:     55 (dari Protocol.h)
+  Old individual packets:    ~2034 (sum of all enum values)
+  ────────────────
   Reborn .fbs schemas:       30 files
-  Reborn PacketType enum:    ~246 entries
-  10 key categories:         100% field-mapped
-  Handler wiring:            100% (all categories wired)
+  Reborn PacketType enum:    ~262 entries (termasuk 20 VEHICLE)
+  ────────────────
+  MP_PROTOCOL dengan .fbs:   23 dari 55 (42%)
+  MP_PROTOCOL di PacketType: 32 dari 55 (58%)
+  MP_PROTOCOL dgn handler:   28 dari 55 (51%)
+  ─ Yang TIDAK di-port (27/55):
+    Anti-cheat:       NPROTECT, HACKSHIELD, HACKCHECK (3)
+    Admin/monitoring: MORNITORTOOL, MORNITORSERVER, MORNITORMAPSERVER (3)
+    Cheat/GM:         CHEAT (1)
+    Minor features:   SKILLTREE, POWERUP, SIGNAL, PACKEDDATA, CHAR_REVIVE,
+                      BOSSMONSTER, PK, GUILD_UNION, GUILD_FIELDWAR,
+                      FACIAL, EMOTION, RESIDENTREGIST, TUTORIAL, DATE,
+                      AUTONOTE, CHATROOM, COOK, PCROOM, NOTE, QUICK (20)
+  10 key categories:         100% field-mapped ✅
+  Handler wiring:            100% (all 10 categories wired) ✅
   Total estimated effort:    ~1 week (optimization)
 ```
 
@@ -354,11 +371,22 @@ DISTRIBUTE SERVER     [Server]Distribute/    server/distribute/    🟡     M   
 
 SUMMARY - SERVER SYSTEMS
   3 Old server types → 3 Reborn server types
-  Old file count: ~243 .cpp files
-  Reborn file count: ~40 .cpp files
-  Agent: ~85% ported
-  Map: ~70% ported (16 of ~25 subsystems)
-  Distribute: ~70% ported
+  ────────────────
+  MAP SERVER (terbesar):
+    Old: 116 .cpp files, 95.440 lines, 1.938 methods
+    Reborn: 18 .cpp files, 9.316 lines, 902 methods
+    Coverage: 902/1.938 = 47% methods ported
+    Lines reduced: 95.440 → 9.316 (-90%) — ECS refactor
+  ────────────────
+  AGENT SERVER:
+    Old: 21 .cpp files
+    Reborn: 7 .cpp files
+    Coverage: ~85%
+  ────────────────
+  DISTRIBUTE SERVER:
+    Old: 12 .cpp files
+    Reborn: 5 .cpp files
+    Coverage: ~70%
   Total estimated effort: ~4 weeks (2 FTE)
 
   Technology:
@@ -481,33 +509,53 @@ SUMMARY - BUILD SYSTEM
 ## B9. Error Handling & Edge Cases
 
 ```
-LAYER: ERROR HANDLING
+LAYER: ERROR HANDLING (dari scan Old AttackManager.cpp, ItemManager.h, MoveManager.cpp)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Error Case              Old Handling               Reborn Handling        Status Sev Effort Deps
+Error Case                Old Handling                  Reborn Handling       Status Sev Effort Deps
 ────────────────────────────────────────────────────────────────────────────────────────────────────
-Network disconnect       Dialog "reconnect" 10s    ReconnectHandler       🟡     M   3 days  Network
-                          countdown → retry          (agent #020)
-Packet corruption        MSGROOT.CheckSum           FlatBuffers verifier  🟡     L   1 day   -
-                          (1 byte XOR all bytes)
-Asset load failure       Fallback texture + log    Texture fallback       🟡     M   1 day   Texture
-                                                    (agent #021)
-Null pointer / crash     MINIDUMP handler + log    Basic crash handler    🟡     M   2 days  -
-DB query failure         Return error code + retry Basic error return     🟡     M   2 days  DB
-Login failure            MP_USERCONN_LOGIN_NACK    LoginResult enum       ✅     -   -      -
-                          dgn dwData (error code)
-Character load failure   Retry + error dialog      Basic                   🟡     M   1 day   DB
-Map change failure       Rollback previous map     Basic                   🟡     M   1 day   -
-File not found (asset)   Fallback asset + dialog   VFS fallback            🟡     M   2 days  VFS
-                                                    (agent #023)
-Cheat detection          HackShield + NProtect     Server validation       🔴     H   2 wks  -
-                          + ScriptCheckValue        (partial)
-Overlapped login         MP_USERCONN_              SessionManager check    🟡     M   1 day   -
-                          NOTIFY_OVERLAPPEDLOGIN
+Network disconnect        Reconnect dialog 10s          ReconnectHandler      🟡     M   3 days  Network
+                           countdown → retry             (agent #020)
+Packet corruption         MSGROOT.CheckSum               FlatBuffers verifier 🟡     L   1 day   -
+                           (XOR all bytes)
+Asset load failure        Fallback texture + log         Texture fallback      🟡     M   1 day   Texture
+Null pointer / crash      MINIDUMP handler + log         Basic                 🟡     M   2 days  -
+DB query failure          Error code + retry             Basic error return    🟡     M   2 days  DB
+Login failure             MP_USERCONN_LOGIN_NACK         LoginResult enum     ✅     -   -      -
+                           (dwData error code)
+
+Character load failure    Retry + error dialog           Basic                 🟡     M   1 day   DB
+Map change failure        Rollback previous map          Basic                 🟡     M   1 day   -
+File not found (asset)    Fallback asset + dialog        VFS fallback           🟡     M   2 days  VFS
+Cheat detection           HackShield + NProtect          Server validation     🔴     H   2 wks  -
+                           + ScriptCheckValue             (partial)
+Overlapped login          MP_USERCONN_                   SessionManager check  🟡     M   1 day   -
+                           NOTIFY_OVERLAPPEDLOGIN
+
+DARI OLD SOURCE (error code spesifik per subsystem):
+Item use failed           MP_ITEM_ERROR_NACK            Basic NACK            🔴     M   2 days  ItemSystem
+                           (ECode int — berbagai kode)
+Item enchant failed       MP_ITEM_ENCHANT_FAILED_ACK    Basic fail            🔴     M   2 days  Upgrade
+Item mix failed           MP_ITEM_MIX_BIGFAILED_ACK     Basic fail            🔴     M   2 days  Mix
+Item reinforce failed     MP_ITEM_REINFORCE_FAILED_ACK  Basic fail            🔴     M   2 days  Reinforce
+Skill cannot use          MP_SKILL_START_NACK            Basic NACK            🔴     M   2 days  SkillSystem
+                           (dwData error code)
+Skill cancel failed       MP_SKILL_CANCEL_NACK          Basic NACK            🔴     L   1 day   SkillSystem
+Party operation fail      MP_PARTY_ADD_NACK             Basic NACK            🔴     M   2 days  Party
+Guild operation fail      MP_GUILD_CREATE_NACK          Basic NACK            🔴     M   2 days  Guild
+Quest error               MP_QUEST_ERROR_EXT            Basic NACK            🔴     M   2 days  Quest
+                           (dwData1-3 + Name)
+Trade/Exchange error      ExchangeManager error codes   Basic fail            🔴     M   2 days  Trading
+Move out of bounds        1000 unit threshold check     ValidationSystem      🟡     M   2 days  Movement
+                           di MoveManager::NetworkMsg
+Vehicle error             MP_VEHICLE_ERROR_ACK          VehicleErrorResponse   🟡     M   2 days  Vehicle
+                           (32 error types enum)         (enum ada, handler ada)
+NPC interaction fail      MP_NPC_SPEECH_NACK            NPCResponse(result)   🟡     M   1 day   NPC
+Battle aggro penalty      aggroNum≥3: avoid penalty     ThreatTable           🟡     M   3 days  Combat
 
 SUMMARY - ERROR HANDLING
-  Old punya error codes detail di setiap layer
-  Reborn: basic return true/false — perlu NACK codes
-  Total estimated effort: ~2 weeks
+  Old punya NACK code spesifik untuk SETIAP operasi (item, skill, party, guild, quest, trade)
+  Reborn: basic return true/false — NACK codes belum diimplementasi detail
+  Total: ~20+ error cases identified — ~3 weeks
 ```
 
 ---
@@ -517,18 +565,29 @@ SUMMARY - ERROR HANDLING
 ```
 LAYER: PERFORMANCE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Benchmark              Old (DX9, .mod)            Reborn (bgfx Metal)    Status Sev Effort
+Benchmark              Old (DX9, .mod)            Reborn (bgfx Metal)       Status Sev Effort
 ────────────────────────────────────────────────────────────────────────────────────────────
-Map load (map 51)      ~1.2s (PAK file load)      ~0.3s (GLB file)       ✅ 4x  -   -
-                                                      faster
-Login screen FPS       60 FPS (capped)             1800 FPS (no cap)      🟡   L   2 hrs
-Character render       60 FPS @ 20 chars           ~120 FPS @ 20 chars    ✅ 2x  -   -
-Memory usage (idle)    ~300 MB                      ~150 MB               ✅ 50% -   -
-Texture memory         ~200 MB (DDS)                ~100 MB (PNG/BCn)     ✅ 50% -   -
+Code size (MapServer)  95.440 lines               9.316 lines               ✅ 10x -   -
+                                                    (-90% LOC)
+Method count (Map)     1.938 methods              902 methods               ✅ 53%  -   -
+Compiler speed          MSVC 7.1 (2003)            AppleClang 16 (C++20)    ✅     -   -
+Target platform         Windows only               macOS (cross-platform)   ✅     -   -
+Map load (map 51)      ~1.2s (estimasi DX9 PAK)   ~0.3s (estimasi GLB)     🟡     -   -  Perlu benchmark
+Login screen FPS       ~60 (capped DX9)            ~1800 (no cap)           🟡     L   2 hrs
+Memory usage (idle)    ~300 MB (est.)              ~150 MB (est.)           🟡     -   -  Perlu ukur
+Binary size (client)   ~? (DX9, MFC)               4.6 MB (arm64 Metal)    🟢     -   -  Sangat kecil
+
+CATATAN: Angka performance di atas adalah ESTIMASI. Belum ada benchmark aktual.
+         Untuk data presisi, perlu:
+         1. Run client dengan assets → FPS counter
+         2. Parse log untuk map load time
+         3. measure memory with `vmmap` atau `Activity Monitor`
 
 SUMMARY - PERFORMANCE
-  Reborn 2-4x faster across all benchmarks.
-  Rekomendasi: tambah frame cap (glfwSwapInterval(1)).
+  Binary size: ✅ 4.6 MB sangat kecil untuk MMORPG client
+  Code size:   ✅ 90% lebih sedikit dari Old (refactor ECS)
+  FPS cap:     🟡 perlu glfwSwapInterval(1)
+  Benchmark:   ❌ belum ada data aktual
 ```
 
 ---
@@ -683,27 +742,38 @@ SUMMARY - PHYSICS & COLLISION
 ## Overall Summary
 
 ```
-GRAND SUMMARY — ALL LAYERS
+GRAND SUMMARY — ALL LAYERS (dengan data presisi)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Layer               Coverage    Critical Gaps              Total Effort
+Layer               Coverage    Data Presisi                                Total Effort
 ────────────────────────────────────────────────────────────────────────────────────────────
-B1. Player Flow     95%         1 minor feature            1 week
-B2. UI System       90%         ~20 minor dialogs          3 weeks
-B3. Gameplay        100%        None (after agent A-D)     1 week (tuning)
-B4. Network         100%        None (all wired)           1 week (opt)
-B5. Asset Pipeline  90%         Spr/UI parser polish       1 week
-B6. Server Systems  70%         ~9 subsystems partial      4 weeks
-B7. Database        100%        None                       ✅
-B8. Build System    90%         4 missing tools            1 week
-B9. Error Handling  50%         Detailed NACK codes        2 weeks
-B10. Performance    90%         Frame cap                  <1 day
-B11. Security       60%         Client anti-cheat          3 weeks
-B12. Concurrency    70%         Job system, DB pool        1 week
-B13. Localization   80%         CJK font, ~400 strings     1 week
-B14. Audio          100%        None                       ✅
-B15. Physics        60%         Ragdoll, vehicle phy       2 weeks
+B1. Player Flow     95%         5 screens, 1 minor: Save ID checkbox        1 week
+B2. UI System       45%         95/213 .bin ported, 114 missing (mostly     4 weeks
+                                 minor sub-dialogs)
+B3. Gameplay        100%        12/12 formulas Old-accurate ✅               1 week (tuning)
+B4. Network         51%         28/55 MP_PROTOCOL have handlers.            1 week (opt)
+                                 27 not ported (anti-cheat/admin/minor)
+B5. Asset Pipeline  90%         Spr/UI parser polish                        1 week
+B6. Server Systems  47%         Map: 902/1.938 methods ported (ECS refactor)4 weeks
+                                 116 file → 18 file (-90% LOC)
+B7. Database        100%        75 tables ✅                                 ✅
+B8. Build System    90%         18 binaries, 4 tools missing                 1 week
+B9. Error Handling  50%         Perlu NACK codes per error case              2 weeks
+B10. Performance    90%         Frame cap                                    <1 day
+B11. Security       60%         27/55 protocol tidak di-port (anti-cheat)    3 weeks
+B12. Concurrency    70%         Job system, DB pool                          1 week
+B13. Localization   80%         CJK font, ~400 strings                       1 week
+B14. Audio          100%        ✅                                           ✅
+B15. Physics        60%         Ragdoll, vehicle physics                     2 weeks
 ────────────────────────────────────────────────────────────────────────────────────────────
-TOTAL:              ~82%       ~20 weeks (1 FTE ~5 months)
+TOTAL:              ~65%       ~20 weeks (1 FTE ~5 months)
+────────────────────────────────────────────────────────────────────────────────────────────
+
+CATATAN KOREKSI DATA:
+  - B2 UI:  95/213 (45%) ported, bukan 73/213 (34%)
+  - B4 Net: 28/55 (51%) protocol punya handler, bukan "100%"
+  - B6 Svr: 47% methods ported (902/1.938), bukan "70%"
+  - MP_CATEGORY: 93 total (92 named + sentinel), bukan 94
+  - Overall real: ~65%, bukan ~82%
 ────────────────────────────────────────────────────────────────────────────────────────────
 ```
 
