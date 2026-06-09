@@ -19,6 +19,12 @@ void Init(ScreenManager* screens, EngineMap* map) {
     g_map = map;
 }
 
+void StartLogin() {
+    if (g_screens) {
+        g_screens->SwitchTo("login");
+    }
+}
+
 void StartOffline(GameState& state) {
     state.offline_mode = true;
     state.login_ok = true;

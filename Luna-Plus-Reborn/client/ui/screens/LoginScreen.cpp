@@ -1,6 +1,7 @@
 #include "LoginScreen.hpp"
 #include <ui/ClientFlow.hpp>
 #include <ui/GameState.hpp>
+#include <ui/ScreenManager.hpp>
 #include <Character_generated.h>
 #include <network/NetworkClient.hpp>
 #include <flatbuffers/flatbuffers.h>
@@ -9,6 +10,9 @@
 #include <spdlog/spdlog.h>
 #include <bgfx/bgfx.h>
 #include <stb_image.h>
+#include <cstring>
+
+extern ScreenManager* g_screen_mgr;
 
 void LoginScreen::Init(GameState* state, NetworkClient* network) {
     state_ = state;
@@ -46,17 +50,15 @@ void LoginScreen::LoadTexture(bgfx::TextureHandle& cache, const std::string& nam
 }
 
 void LoginScreen::Enter() {
-    spdlog::info("Entering Login Screen");
-    if (!textures_loaded_) {
-        LoadTexture(tex_bg_, "Launcher_01_01.png");
-        if (!bgfx::isValid(tex_bg_)) LoadTexture(tex_bg_, "login.png");
-        LoadTexture(tex_bar_, "login_bar00.png");
-        LoadTexture(tex_btn_, "login_bar01.png");
-        bg_ok_ = bgfx::isValid(tex_bg_);
-        textures_loaded_ = true;
-        // Set clear color to match Luna Plus login theme
-        if (scene_renderer_) scene_renderer_->SetClearColor(0x887766FF);
-    }
+    TexturesLoadOnce();
+    id_field_.label = "Account";
+    id_field_.active = true;
+    id_field_.masked = false;
+    pw_field_.label = "Password";
+    pw_field_.active = false;
+    pw_field_.masked = true;
+    error_message_.clear();
+    error_timer_ = 0;
 }
 
 void LoginScreen::Exit() {
@@ -78,48 +80,114 @@ bool LoginScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payloa
 }
 
 void LoginScreen::Update(float dt) {
-    (void)dt;
+    if (error_timer_ > 0) error_timer_ -= dt;
+}
+
+bool LoginScreen::DoLogin() {
+    if (strlen(id_field_.buffer) == 0) {
+        error_message_ = "Please enter account ID";
+        error_timer_ = 3.0f;
+        return true;
+    }
+    if (strlen(pw_field_.buffer) == 0) {
+        error_message_ = "Please enter password";
+        error_timer_ = 3.0f;
+        return true;
+    }
+
+    if (!sent_) {
+        if (!network_->IsConnected()) {
+            if (!network_->Connect("127.0.0.1", 8100)) {
+                error_message_ = "Server unavailable";
+                error_timer_ = 3.0f;
+                return true;
+            }
+            state_->current_state = ClientState::Connect;
+        }
+        flatbuffers::FlatBufferBuilder fbb;
+        auto req = luna::protocol::CreateLoginRequestDirect(fbb, id_field_.buffer, {});
+        fbb.Finish(req);
+        network_->SendPacket(luna::protocol::PacketType_MP_USERCONN_LOGIN_SYN,
+                             fbb.GetBufferPointer(), fbb.GetSize());
+        sent_ = true;
+        state_->current_state = ClientState::Title;
+    }
+    return true;
+}
+
+bool LoginScreen::HandleChar(unsigned int codepoint) {
+    if (codepoint < 32 || codepoint > 126) return false;
+    InputField* f = id_field_.active ? &id_field_ : &pw_field_;
+    if (f->cursor_pos < 63) {
+        f->buffer[f->cursor_pos++] = (char)codepoint;
+        f->buffer[f->cursor_pos] = '\0';
+    }
+    return true;
+}
+
+void LoginScreen::DrawField(UIRenderer& ui, const InputField& field, bool focus) {
+    (void)ui;
+    (void)field;
+    (void)focus;
 }
 
 void LoginScreen::Render(UIRenderer& ui) {
     float lw = ui.logicalWidth;
     float lh = ui.logicalHeight;
 
-    // Ensure textures are loaded (safety check if Enter() was not called)
     if (!textures_loaded_) {
         TexturesLoadOnce();
     }
 
-    // Draw background (triangular fade pattern like Luna Plus Old)
-    if (bg_ok_ && bgfx::isValid(tex_bg_)) {
+    if (bgfx::isValid(tex_bg_))
         ui.DrawImage(0, 0, lw, lh, tex_bg_);
-    } else {
-        // Fallback: gradient background instead of magenta
-        ui.DrawRect(0, 0, lw, lh, UIColor{80, 50, 30, 255});
-    }
-    
-    // Bottom bar
-    if (bgfx::isValid(tex_bar_)) ui.DrawImage(0, lh - 120.0f, lw, 120, tex_bar_);
+    else
+        ui.DrawRect(0, 0, lw, lh, UIColor{20, 20, 40, 255});
 
-    // Title
-    ui.DrawTextCentered(lh * 0.2f, 0xffffcc88, "LUNA Plus Reborn");
-    ui.DrawTextCentered(lh * 0.2f + 25.0f, 0xff888888, "v1.1.0 (GitHub Build)");
-    
-    // Account buttons
-    const char* names[3] = {"admin", "test", "demo"};
-    for (int i = 0; i < 3; i++) {
-        float by = lh * 0.45f + i * 50;
-        bool sel = (i == state_->selected_account);
-        if (bgfx::isValid(tex_btn_)) {
-            ui.DrawImage(lw * 0.5f - 200, by, 400, 40, tex_btn_, sel ? UIColor{255,255,200,255} : UIColor{200,200,200,255});
-        }
-        ui.DrawTextCentered(by + 10, sel ? 0xffffffff : 0xffaaaaaa, names[i]);
+    float wx = lw * 0.5f - 200;
+    float wy = lh * 0.3f;
+
+    ui.DrawRect(wx, wy, 400, 280, UIColor{30, 30, 50, 220});
+    ui.DrawBorder(wx, wy, 400, 280, UIColor{100, 120, 180, 200});
+    ui.DrawText(wx + 10, wy + 8, 0xFFFFCC88, "Account Login");
+
+    float fy = wy + 50;
+    ui.DrawText(wx + 20, fy, 0xFFCCCCCC, "%s", id_field_.label.c_str());
+    ui.DrawRect(wx + 120, fy - 2, id_field_.w, id_field_.h,
+                id_field_.active ? UIColor{60, 60, 100, 255} : UIColor{40, 40, 70, 255});
+    ui.DrawBorder(wx + 120, fy - 2, id_field_.w, id_field_.h,
+                  id_field_.active ? UIColor{150, 150, 255, 255} : UIColor{80, 80, 120, 255});
+    if (strlen(id_field_.buffer) > 0)
+        ui.DrawText(wx + 125, fy + 2, 0xFFFFFFFF, "%s", id_field_.buffer);
+    else
+        ui.DrawText(wx + 125, fy + 2, 0xFF666666, "Enter account ID");
+
+    fy = wy + 100;
+    ui.DrawText(wx + 20, fy, 0xFFCCCCCC, "%s", pw_field_.label.c_str());
+    ui.DrawRect(wx + 120, fy - 2, pw_field_.w, pw_field_.h,
+                pw_field_.active ? UIColor{60, 60, 100, 255} : UIColor{40, 40, 70, 255});
+    ui.DrawBorder(wx + 120, fy - 2, pw_field_.w, pw_field_.h,
+                  pw_field_.active ? UIColor{150, 150, 255, 255} : UIColor{80, 80, 120, 255});
+    if (strlen(pw_field_.buffer) > 0) {
+        char masked[64]; int len = (int)strlen(pw_field_.buffer);
+        for (int i = 0; i < len && i < 63; i++) masked[i] = '*';
+        masked[len] = '\0';
+        ui.DrawText(wx + 125, fy + 2, 0xFFFFFFFF, "%s", masked);
+    } else {
+        ui.DrawText(wx + 125, fy + 2, 0xFF666666, "Enter password");
     }
-    
-    ui.DrawTextCentered(lh * 0.75f, 0xffffffff, "Press ENTER to Login");
-    ui.DrawTextCentered(lh * 0.80f, 0xffaaaaaa, "F2 = Offline Demo (no server)");
-    if (!state_->login_error.empty())
-        ui.DrawTextCentered(lh * 0.8f, 0xffff4444, "%s", state_->login_error.c_str());
+
+    ui.DrawButton(wx + 50, wy + 170, 130, 35, "OK", false);
+    ui.DrawButton(wx + 220, wy + 170, 130, 35, "Cancel", false);
+
+    if (error_timer_ > 0 && !error_message_.empty()) {
+        ui.DrawText(wx + 20, wy + 230, 0xFFFF4444, "%s", error_message_.c_str());
+    }
+
+    if (bgfx::isValid(tex_bar_))
+        ui.DrawImage(0, lh - 120, lw, 120, tex_bar_);
+
+    ui.DrawTextCentered(lh * 0.82f, 0xFF888888, "Tab=Switch Field  Enter=Login  Esc=Back");
 }
 
 void LoginScreen::TexturesLoadOnce() {
@@ -134,38 +202,24 @@ void LoginScreen::TexturesLoadOnce() {
 bool LoginScreen::HandleKey(int key, int scancode, int action, int mods) {
     if (action != 1) return false;
 
-    if (key == 290) { // F2 offline demo
-        ClientFlow::StartOffline(*state_);
+    if (key == 258) {
+        id_field_.active = !id_field_.active;
+        pw_field_.active = !pw_field_.active;
         return true;
     }
 
-    if (key == 257) { // Enter
-        if (!sent_) {
-            if (!network_->IsConnected()) {
-                if (!network_->Connect("127.0.0.1", 8100)) {
-                    state_->login_error = "Agent server unavailable (try F2)";
-                    return true;
-                }
-                state_->current_state = ClientState::Connect;
-            }
-            flatbuffers::FlatBufferBuilder fbb;
-            const char* unames[] = {"admin", "test", "demo"};
-            std::vector<uint8_t> pass_hash = {0,0,0,0};
-            auto req = luna::protocol::CreateLoginRequestDirect(fbb, unames[state_->selected_account], &pass_hash);
-            fbb.Finish(req);
-            network_->SendPacket(luna::protocol::PacketType_MP_USERCONN_LOGIN_SYN, fbb.GetBufferPointer(), fbb.GetSize());
-            sent_ = true;
-            state_->current_state = ClientState::Title;
-        }
+    if (key == 256) {
+        if (g_screen_mgr) g_screen_mgr->SwitchTo("launcher");
         return true;
     }
-    
-    if (key == 264) { // Down
-        state_->selected_account = (state_->selected_account + 1) % 3;
-        return true;
+
+    if (key == 257) {
+        return DoLogin();
     }
-    if (key == 265) { // Up
-        state_->selected_account = (state_->selected_account + 2) % 3;
+
+    if (key == 259) {
+        InputField* f = id_field_.active ? &id_field_ : &pw_field_;
+        if (f->cursor_pos > 0) f->buffer[--f->cursor_pos] = '\0';
         return true;
     }
 

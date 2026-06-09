@@ -445,9 +445,90 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
     }
 }
 
+void GameScreen::ToggleDialog(const std::string& name) {
+    dialog_visibility_[name] = !dialog_visibility_[name];
+    bool open = dialog_visibility_[name];
+
+    if (name == "inventory") {
+        state_->inv_open = open;
+        if (open) inv_dlg_.Open(state_, &wm_);
+    } else if (name == "skill") {
+        state_->skill_open = open;
+        if (open) skill_dlg_.Open(state_, &wm_);
+    } else if (name == "quest") {
+        state_->quest_open = open;
+        if (open) {
+            SetupQuestNetworkCallbacks();
+            quest_dlg_.Open(state_, &wm_);
+            if (!state_->offline_mode && network_ && network_->IsConnected())
+                RequestQuestList();
+        }
+    } else if (name == "character") {
+        state_->charinfo_open = open;
+        if (open) char_dlg_.Open(state_, &wm_);
+    } else if (name == "minimap") {
+        if (open) minimap_dlg_.Open(&wm_);
+        else minimap_dlg_.Close();
+    } else if (name == "party") {
+        state_->party_open = open;
+        if (open) {
+            party_dlg_.Open(&wm_);
+            if (!state_->offline_mode && network_ && network_->IsConnected() && state_->party_id == 0)
+                SendPartyCreate();
+        }
+    } else if (name == "guild") {
+        state_->guild_open = open;
+        if (open) {
+            guild_dlg_.Open(&wm_, &siege_);
+            if (!state_->offline_mode && network_ && network_->IsConnected()) {
+                RequestGuildInfo();
+                RequestSiegeInfo();
+            }
+        } else {
+            siege_poll_timer_ = 0.0f;
+        }
+    } else if (name == "pet") {
+        state_->pet_open = open;
+        if (open) {
+            if (state_->offline_mode)
+                pet_.Init("Fluffy", 1);
+            pet_dlg_.Open(state_, &wm_, &pet_);
+            if (!state_->offline_mode && network_ && network_->IsConnected())
+                RequestPetInfo();
+        } else {
+            pet_poll_timer_ = 0.0f;
+        }
+    } else if (name == "mount") {
+        state_->mount_open = open;
+        if (open) mount_dlg_.Open(state_, &wm_);
+    }
+
+    if (open && audio_)
+        audio_->PlaySFXByCategory(AudioManager::SFX_UI, "window_open1.wav");
+}
+
+bool GameScreen::IsDialogOpen(const std::string& name) const {
+    auto it = dialog_visibility_.find(name);
+    return it != dialog_visibility_.end() && it->second;
+}
+
 bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
     (void)scancode; (void)mods;
     if (action != 1) return true;
+
+    // Dialog hotkeys (Old-style mapping: I K Q C M P G T R)
+    switch (key) {
+        case 73:  ToggleDialog("inventory"); return true;
+        case 75:  ToggleDialog("skill"); return true;
+        case 81:  ToggleDialog("quest"); return true;
+        case 67:  ToggleDialog("character"); return true;
+        case 77:  ToggleDialog("minimap"); return true;
+        case 80:  ToggleDialog("party"); return true;
+        case 71:  ToggleDialog("guild"); return true;
+        case 84:  ToggleDialog("pet"); return true;
+        case 82:  ToggleDialog("mount"); return true;
+        default: break;
+    }
 
     float speed = 0.5f;
     if (key == 87 || key == 265) { hero_.ClearWaypoint(); state_->player_z -= speed; hero_.Move(0, -speed); }

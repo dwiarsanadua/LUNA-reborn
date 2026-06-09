@@ -8,6 +8,9 @@
 
 struct GameState;
 class NetworkClient;
+class ScreenManager;
+
+extern ScreenManager* g_screen_mgr;
 
 class ScreenManager {
 public:

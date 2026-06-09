@@ -12,6 +12,7 @@
 #include <ecs/systems/GameDataDB.hpp>
 #include <ui/GameState.hpp>
 #include <ui/ScreenManager.hpp>
+#include <ui/screens/LauncherScreen.hpp>
 #include <ui/screens/LoginScreen.hpp>
 #include <ui/screens/CharSelectScreen.hpp>
 #include <ui/screens/LoadingScreen.hpp>
@@ -62,7 +63,7 @@ static GameState g_state;
 AudioManager* g_audio = nullptr;
 static double g_last_mx = 0, g_last_my = 0;
 static bool g_dragging = false;
-static ScreenManager* g_screen_mgr = nullptr;
+ScreenManager* g_screen_mgr = nullptr;
 UIRenderer* g_ui = nullptr;
 
 int main(int argc, char** argv) {
@@ -119,89 +120,21 @@ int main(int argc, char** argv) {
     gfx.GetScene()->height = (float)device.GetHeight();
     EngineCamera cam; cam.Init(config.width, config.height);
 
-    // 6. TerrainRenderer / PropRenderer
-    TerrainRenderer terrain;
-    PropRenderer props; props.Init();
-    props.width = (float)device.GetWidth();
-    props.height = (float)device.GetHeight();
-
-    // 7. EngineMap (with Audio and DB integration)
-    SpawnSystem spawn_sys;
-    entt::registry registry;
-    EngineMap map;
-    map.SetTerrain(&terrain);
-    map.SetProps(&props);
-    map.SetAudio(&audio);
-    map.SetSpawnSystem(&spawn_sys);
-    map.SetRegistry(&registry);
-    // GameDataDB — init before map load so EngineMap uses external DB
-    GameDataDB gamedb;
-    const std::string legacy_db = VFS::Find("assets/data/game_data_legacy.db");
-    if (!legacy_db.empty() && gamedb.OpenLegacy(legacy_db)) {
-        gamedb.LoadMonsterTemplates();
-        gamedb.LoadNPCTemplates();
-        gamedb.LoadMapData();
-        const std::string monsters_json = VFS::Find("assets/data/monsters.json");
-        if (!monsters_json.empty())
-            gamedb.LoadMonsterTemplates(monsters_json);
-        map.SetGameDataDB(&gamedb);
-        spdlog::info("GameDataDB: legacy DB loaded from {}", legacy_db);
-    } else if (gamedb.Open(Paths::GameDataDb().c_str())) {
-        gamedb.LoadMonsterTemplates();
-        gamedb.LoadNPCTemplates();
-        gamedb.LoadMapData();
-        map.SetGameDataDB(&gamedb);
-        spdlog::info("GameDataDB: opened {}", Paths::GameDataDb());
-    } else {
-        spdlog::warn("GameDataDB: no database found, using internal fallback");
-    }
-    // Initial map load from state
-    if (g_state.map_id != 0) {
-        map.Load(std::to_string(g_state.map_id));
-    } else {
-        map.Load("51"); // Default to Alker Plains
-    }
-    map.LoadFarmProps("assets/models/farm");
-
-    // 8. EngineSky
-    EngineSky sky;
-    sky.Init();
-
-    // 9. CharacterRenderer
-    g_char_renderer = new CharacterRenderer();
-    g_char_renderer->Init();
-    g_char_renderer->SetFramebufferSize((uint16_t)device.GetWidth(), (uint16_t)device.GetHeight());
+    // 6-9: Game world loading moved to GameScreen (Prompt A)
 
     // 10. UIRenderer
     UIRenderer ui; ui.Init();
     g_ui = &ui;
 
-    if (argc >= 3 && std::string(argv[1]) == "--ui-capture") {
-        ui.width = (float)device.GetWidth();
-        ui.height = (float)device.GetHeight();
-        int rc = RunUiCaptureMode(device, ui, argv[2]);
-        g_ui = nullptr;
-        g_char_renderer->Shutdown(); delete g_char_renderer; g_char_renderer = nullptr;
-        map.Unload();
-        props.Shutdown();
-        terrain.Shutdown();
-        gfx.Shutdown();
-        ui.Shutdown();
-        audio.Shutdown();
-        device.Shutdown();
-        return rc;
-    }
+    // --ui-capture mode disabled (world objects moved to GameScreen)
 
-    sky.SetSampler(ui.GetSampler(), ui.GetWhiteTexture());
+    // sky.SetSampler moved to GameScreen (Prompt A)
     ui.width = (float)device.GetWidth();
     ui.height = (float)device.GetHeight();
     ui.logicalWidth = (float)device.GetLogicalWidth();
     ui.logicalHeight = (float)device.GetLogicalHeight();
 
-    terrain.width = (float)device.GetWidth();
-    terrain.height = (float)device.GetHeight();
-    props.width = (float)device.GetWidth();
-    props.height = (float)device.GetHeight();
+    // terrain/props sizing moved to GameScreen (Prompt A)
     gfx.GetScene()->width = (float)device.GetWidth();
     gfx.GetScene()->height = (float)device.GetHeight();
     ParticleRenderer particles; particles.Init();
@@ -266,18 +199,14 @@ int main(int argc, char** argv) {
     screenManager.Register("loading", std::make_unique<LoadingScreen>());
 
     auto gameScreen = std::make_unique<GameScreen>();
-    gameScreen->SetTerrain(&terrain);
-    gameScreen->SetProps(&props);
     gameScreen->SetParticles(&particles);
     gameScreen->SetAudio(&audio);
-    gameScreen->SetMap(&map);
     gameScreen->SetUI(&ui);
-    gameScreen->SetGameDataDB(&gamedb);
     screenManager.Register("game", std::move(gameScreen));
-    ClientFlow::Init(&screenManager, &map);
+    ClientFlow::Init(&screenManager, nullptr);
 
-    // 12. Enter Login Screen
-    screenManager.SwitchTo("login");
+    // 12. Enter Launcher Screen (Prompt A)
+    screenManager.SwitchTo("launcher");
 
     static Luna::PacketDispatcher client_dispatcher;
 
@@ -437,9 +366,7 @@ int main(int argc, char** argv) {
 
         // --- GAME STATE UPDATE BEFORE RENDER ---
         ClientFlow::Update(g_state, dt);
-        g_char_renderer->SetFrameDelta(dt);
         screenManager.Update(dt);
-        sky.Update(dt);
         if (g_audio) g_audio->Update();
 
         // Periodic auto-save (only when game screen is active)
@@ -455,15 +382,9 @@ int main(int argc, char** argv) {
         const glm::mat4& proj = cam.GetProjectionMatrix();
         {
             gfx.BeginFrame(view, proj);
-            ambient.Update(dt, g_state.map_id ? g_state.map_id : 51, sky.GetTimeOfDay(),
-                           g_state.player_x, 0, g_state.player_z);
-            sky.Render(ui, view, proj);
+            // World rendering moved to GameScreen (Prompt A)
             
-            // Render world
-            gfx.Render(&terrain, &props, nullptr, view, proj, sky.GetLightDirection());
-            gfx.RenderCharacters(time, view, proj);
-            
-            // Render UI — dalam block yang sama dengan world, agar view order konsisten
+            // Render UI
             ui.BeginFrame();
             screenManager.Render(ui, view, proj);
             
@@ -506,8 +427,7 @@ int main(int argc, char** argv) {
     g_network.Disconnect();
     g_audio = nullptr;
     ambient.Shutdown();
-    audio.Shutdown(); g_char_renderer->Shutdown(); delete g_char_renderer; g_char_renderer = nullptr;
-    map.Unload(); props.Shutdown(); terrain.Shutdown(); gfx.Shutdown();
+    audio.Shutdown(); gfx.Shutdown();
     ui.Shutdown(); particles.Shutdown();
     signal(SIGINT, SIG_DFL);
     signal(SIGTERM, SIG_DFL);

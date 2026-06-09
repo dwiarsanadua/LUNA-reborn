@@ -11,6 +11,7 @@ namespace ClientFlow {
 
 void Init(ScreenManager* screens, EngineMap* map);
 
+void StartLogin();
 void StartOffline(GameState& state);
 void OnLoginSuccess(GameState& state);
 void BeginEnterGame(GameState& state);

@@ -272,6 +272,10 @@ private:
     ParticleSystem particleSys_;
     float prev_x_ = 0, prev_z_ = 0;
 
+    std::unordered_map<std::string, bool> dialog_visibility_;
+    void ToggleDialog(const std::string& name);
+    bool IsDialogOpen(const std::string& name) const;
+
     // Sky & Environment
     EngineSky sky_;
     WeatherSystem weather_;
