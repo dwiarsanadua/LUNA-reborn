@@ -30,6 +30,9 @@ add_executable(test_runner
     content.cpp          # BARU
     performance.cpp      # BARU
     security.cpp         # BARU
+    visual.cpp           # BARU
+    ui_widgets.cpp       # BARU
+    screens_audio.cpp    # BARU
 )
 ```
 
