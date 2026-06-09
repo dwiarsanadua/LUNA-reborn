@@ -1,4 +1,6 @@
 #include "PartySystem.h"
+#include <ecs/components/Inventory.hpp>
+#include <ecs/components/CharacterStats.hpp>
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <random>
@@ -230,6 +232,41 @@ bool PartySystem::DistributeLoot(entt::registry& reg, uint32_t party_id, uint32_
         default:
             return true;
     }
+}
+
+void PartySystem::DistributeGold(entt::registry& reg, uint32_t party_id, uint32_t total_gold, entt::entity killer) {
+    auto it = parties_.find(party_id);
+    if (it == parties_.end()) {
+        if (reg.valid(killer)) {
+            auto* inv = reg.try_get<Inventory>(killer);
+            if (inv) inv->gold += total_gold;
+        }
+        return;
+    }
+
+    auto& party = it->second;
+    std::vector<entt::entity> online_members;
+    for (auto& m : party.members) {
+        if (m.online) online_members.push_back(m.entity);
+    }
+
+    if (online_members.empty()) {
+        if (reg.valid(killer)) {
+            auto* inv = reg.try_get<Inventory>(killer);
+            if (inv) inv->gold += total_gold;
+        }
+        return;
+    }
+
+    uint32_t share = total_gold / static_cast<uint32_t>(online_members.size());
+    for (auto& entity : online_members) {
+        if (reg.valid(entity)) {
+            auto* inv = reg.try_get<Inventory>(entity);
+            if (inv) inv->gold += share;
+        }
+    }
+    spdlog::debug("PartySystem: distributed {} gold across {} members ({} each)",
+                  total_gold, online_members.size(), share);
 }
 
 void PartySystem::SetLootMode(entt::registry& reg, entt::entity leader, LootMode mode) {

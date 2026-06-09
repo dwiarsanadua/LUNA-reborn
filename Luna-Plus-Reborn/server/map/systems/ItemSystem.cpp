@@ -217,7 +217,18 @@ bool ItemSystem::RemoveItem(entt::registry& registry, entt::entity entity, size_
 
 bool ItemSystem::MoveItem(entt::registry& registry, entt::entity entity, size_t from_slot, size_t to_slot) {
     auto* inv = registry.try_get<Inventory>(entity);
-    if (!inv || from_slot >= inv->slots.size() || to_slot >= inv->slots.size()) return false;
+    if (!inv) {
+        spdlog::warn("ItemSystem::MoveItem: null inventory for entity {}", static_cast<uint32_t>(entity));
+        return false;
+    }
+    if (from_slot >= inv->slots.size()) {
+        spdlog::warn("ItemSystem::MoveItem: from_slot {} out of bounds ({})", from_slot, inv->slots.size());
+        return false;
+    }
+    if (to_slot >= inv->slots.size()) {
+        spdlog::warn("ItemSystem::MoveItem: to_slot {} out of bounds ({})", to_slot, inv->slots.size());
+        return false;
+    }
 
     // If target has same item type, try to stack
     auto& src = inv->slots[from_slot];
@@ -484,13 +495,26 @@ int ItemSystem::GetUpgradeSuccessRate(int current_enchant) {
 
 void ItemSystem::UseItem(entt::registry& registry, entt::entity entity, size_t slot) {
     auto* inv = registry.try_get<Inventory>(entity);
-    if (!inv || slot >= inv->slots.size()) return;
+    if (!inv) {
+        spdlog::warn("ItemSystem::UseItem: null inventory for entity {}", static_cast<uint32_t>(entity));
+        return;
+    }
+    if (slot >= inv->slots.size()) {
+        spdlog::warn("ItemSystem::UseItem: slot {} out of bounds ({})", slot, inv->slots.size());
+        return;
+    }
 
     auto& item = inv->slots[slot];
-    if (item.item_id == 0) return;
+    if (item.item_id == 0) {
+        spdlog::warn("ItemSystem::UseItem: empty slot {}", slot);
+        return;
+    }
 
     auto* stats = registry.try_get<CharacterStats>(entity);
-    if (!stats) return;
+    if (!stats) {
+        spdlog::warn("ItemSystem::UseItem: null CharacterStats for entity {}", static_cast<uint32_t>(entity));
+        return;
+    }
 
     auto it = s_item_defs.find(item.item_id);
     uint8_t item_type = (it != s_item_defs.end()) ? it->second.type : 0;
@@ -526,12 +550,13 @@ void ItemSystem::UseItem(entt::registry& registry, entt::entity entity, size_t s
                     break;
                 }
                 default: {
-                    // Generic consumable — apply stat bonuses if defined
                     if (it != s_item_defs.end()) {
                         stats->hp = std::min(stats->max_hp, stats->hp + it->second.bonus_hp);
                         stats->mp = std::min(stats->max_mp, stats->mp + it->second.bonus_mp);
                         RemoveItem(registry, entity, slot, 1);
                         spdlog::info("ItemSystem: used consumable {}", item.item_id);
+                    } else {
+                        spdlog::warn("ItemSystem::UseItem: item {} not found in definitions", item.item_id);
                     }
                     break;
                 }

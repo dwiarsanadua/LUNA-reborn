@@ -81,6 +81,18 @@ public:
     void HandleThreatOnDamage(entt::registry& registry, entt::entity monster, entt::entity attacker, int32_t damage);
     void HandleThreatOnHeal(entt::registry& registry, entt::entity monster, entt::entity healer, int32_t heal_amount);
 
+    // HP/MP stat calculations (Old: CalcMaxLife/CalcMaxMana)
+    static int32_t CalcMaxLife(const CharacterStats& s);
+    static int32_t CalcMaxMana(const CharacterStats& s);
+
+    // Stat point distribution (Old: ArrangeCharLevelPoint)
+    static constexpr uint8_t STAT_STR = 0;
+    static constexpr uint8_t STAT_WIS = 1;
+    static constexpr uint8_t STAT_DEX = 2;
+    static constexpr uint8_t STAT_VIT = 3;
+    static constexpr uint8_t STAT_INT = 4;
+    static void ApplyStatPoint(CharacterStats& s, uint8_t stat_type, int32_t points);
+
     // Old-accurate stat calculations
     static float CalcPhysicAttack(const CharacterStats& s);
     static float CalcPhysicDefense(const CharacterStats& s);

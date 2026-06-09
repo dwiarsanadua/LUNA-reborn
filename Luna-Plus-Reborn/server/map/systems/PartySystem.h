@@ -58,6 +58,7 @@ public:
 
     uint32_t DistributeXP(entt::registry& reg, uint32_t party_id, uint32_t total_xp, entt::entity killer);
     bool DistributeLoot(entt::registry& reg, uint32_t party_id, uint32_t item_id);
+    void DistributeGold(entt::registry& reg, uint32_t party_id, uint32_t total_gold, entt::entity killer);
 
     void SetLootMode(entt::registry& reg, entt::entity leader, LootMode mode);
     bool TransferLeadership(entt::registry& reg, entt::entity new_leader);

@@ -25,6 +25,8 @@ private:
                       AIComponent& ai, Transform& xform, float dt);
     void UpdateReturn(entt::registry& reg, entt::entity e,
                       AIComponent& ai, Transform& xform, Movement& mv, float dt);
+    void UpdateFlee(entt::registry& reg, entt::entity e,
+                    AIComponent& ai, Transform& xform, Movement& mv, float dt);
     void ScanForTargets(entt::registry& reg, entt::entity e,
                         AIComponent& ai, const Transform& xform);
     void HandleBossAI(entt::registry& reg, entt::entity e,

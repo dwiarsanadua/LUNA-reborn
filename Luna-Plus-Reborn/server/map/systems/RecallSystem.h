@@ -24,14 +24,25 @@ struct RecallRequest {
     uint32_t skill_id;
 };
 
+struct BindPoint {
+    uint32_t character_id = 0;
+    int map_id = 0;
+    glm::vec3 position{0.0f};
+};
+
 class RecallSystem {
 public:
     void RequestRecall(uint32_t character_id, const RecallTarget& target, uint32_t skill_id);
     bool AcceptRecall(uint32_t character_id, uint32_t key);
+    void Recall(uint32_t character_id, entt::registry& registry);
+    void RecallParty(uint32_t character_id, entt::registry& registry, uint32_t party_id);
+    void BindLocation(uint32_t character_id, int map_id, const glm::vec3& position);
+    const BindPoint* GetBindPoint(uint32_t character_id) const;
     void Process(entt::registry& registry, float dt);
 
 private:
     std::unordered_map<uint32_t, RecallRequest> requests_;
+    std::unordered_map<uint32_t, BindPoint> bind_points_;
     uint32_t next_request_id_ = 1;
 
     void ExecuteRecall(uint32_t request_id, entt::registry& registry);

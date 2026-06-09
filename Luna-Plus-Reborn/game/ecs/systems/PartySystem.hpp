@@ -30,6 +30,7 @@ public:
     void KickMember(entt::registry& reg, entt::entity leader, uint32_t target_id);
     uint32_t DistributeXP(entt::registry& reg, entt::entity party_entity, uint32_t total_xp);
     bool DistributeLoot(entt::registry& reg, entt::entity party_entity, uint32_t item_id);
+    void DistributeGold(entt::registry& reg, entt::entity party_entity, uint32_t total_gold);
     void Update(entt::registry& reg, float dt);
 
     void SetLootMode(entt::registry& reg, entt::entity leader, LootMode mode);

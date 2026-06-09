@@ -154,6 +154,51 @@ float CombatSystem::CalcBlockRate(const CharacterStats& s) {
     return s.dexterity / 27.0f + GetClassBlockBonus(s.class_id) + s.block_rate_buff;
 }
 
+// ---- HP/MP stat calculations (Old: CalcMaxLife/CalcMaxMana from CharacterCalcManager) ----
+
+int32_t CombatSystem::CalcMaxLife(const CharacterStats& s) {
+    float hp_factor = 1.0f;
+    switch (s.class_id) {
+        case 1: hp_factor = 1.3f; break;
+        case 2: hp_factor = 0.9f; break;
+        case 3: hp_factor = 1.0f; break;
+        case 4: hp_factor = 0.7f; break;
+    }
+    float vita = s.constitution;
+    float base_vita = static_cast<float>(s.base_vitality);
+    float total = (static_cast<float>(s.level - 1) * 10.0f)
+                + ((vita - base_vita + 4.0f) * 10.0f)
+                + (hp_factor * static_cast<float>(s.level) * 7.0f);
+    return std::max(1, static_cast<int32_t>(total));
+}
+
+int32_t CombatSystem::CalcMaxMana(const CharacterStats& s) {
+    float mp_factor = 1.0f;
+    switch (s.class_id) {
+        case 1: mp_factor = 0.6f; break;
+        case 2: mp_factor = 0.9f; break;
+        case 3: mp_factor = 0.8f; break;
+        case 4: mp_factor = 1.4f; break;
+    }
+    float wis = s.wisdom;
+    float base_wis = static_cast<float>(s.base_wisdom);
+    float total = (static_cast<float>(s.level - 1) * 10.0f)
+                + ((wis - base_wis + 4.0f) * 10.0f)
+                + (mp_factor * static_cast<float>(s.level) * 7.0f);
+    return std::max(1, static_cast<int32_t>(total));
+}
+
+void CombatSystem::ApplyStatPoint(CharacterStats& s, uint8_t stat_type, int32_t points) {
+    switch (stat_type) {
+        case STAT_STR: s.strength += static_cast<float>(points); break;
+        case STAT_WIS: s.wisdom += static_cast<float>(points); break;
+        case STAT_DEX: s.dexterity += static_cast<float>(points); break;
+        case STAT_VIT: s.constitution += static_cast<float>(points); break;
+        case STAT_INT: s.intelligence += static_cast<float>(points); break;
+        default: break;
+    }
+}
+
 // ---- Old-accurate stat calculations ----
 
 float CombatSystem::CalcPhysicAttack(const CharacterStats& s) {

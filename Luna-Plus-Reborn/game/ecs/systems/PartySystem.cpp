@@ -192,6 +192,26 @@ bool PartySystem::DistributeLoot(entt::registry& reg, entt::entity party_entity,
     return false;
 }
 
+void PartySystem::DistributeGold(entt::registry& reg, entt::entity party_entity, uint32_t total_gold) {
+    if (!reg.valid(party_entity)) return;
+    auto& party = reg.get<Party>(party_entity);
+    int online = 0;
+    for (auto& m : party.members) {
+        if (m.is_online) online++;
+    }
+    if (online == 0) return;
+    uint32_t share = total_gold / static_cast<uint32_t>(online);
+    for (auto& m : party.members) {
+        if (m.is_online) {
+            entt::entity e = static_cast<entt::entity>(m.entity_id);
+            if (reg.valid(e) && reg.all_of<Inventory>(e)) {
+                reg.get<Inventory>(e).gold += share;
+            }
+        }
+    }
+    spdlog::info("PartySystem: distributed {} gold among {} members", total_gold, online);
+}
+
 void PartySystem::Update(entt::registry& reg, float dt) {
     for (auto it = invite_timers_.begin(); it != invite_timers_.end(); ) {
         it->timer += dt;

@@ -154,6 +154,10 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         ApplyPartyResponse(resp);
         return true;
     }
+    case luna::protocol::PacketType_MP_PARTY_CREATE_NACK:
+    case luna::protocol::PacketType_MP_PARTY_INVITE_NACK:
+        state_->chat_messages.push_back("Party operation failed");
+        return true;
     case luna::protocol::PacketType_MP_STORAGE_LIST_ACK:
     case luna::protocol::PacketType_MP_STORAGE_DEPOSIT_ACK:
     case luna::protocol::PacketType_MP_STORAGE_WITHDRAW_ACK: {
@@ -161,6 +165,9 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         ApplyStorageResponse(resp);
         return true;
     }
+    case luna::protocol::PacketType_MP_STORAGE_LIST_NACK:
+        state_->chat_messages.push_back("Storage operation failed");
+        return true;
     case luna::protocol::PacketType_MP_FRIEND_LIST_ACK:
     case luna::protocol::PacketType_MP_FRIEND_ADD_ACK:
     case luna::protocol::PacketType_MP_FRIEND_DEL_ACK: {
@@ -168,6 +175,10 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         ApplyFriendResponse(resp);
         return true;
     }
+    case luna::protocol::PacketType_MP_FRIEND_LIST_NACK:
+    case luna::protocol::PacketType_MP_FRIEND_ADD_NACK:
+        state_->chat_messages.push_back("Friend operation failed");
+        return true;
     case luna::protocol::PacketType_MP_GUILD_CREATE_ACK:
     case luna::protocol::PacketType_MP_GUILD_INFO:
     case luna::protocol::PacketType_MP_GUILD_ADDMEMBER_ACK:
@@ -176,6 +187,10 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         ApplyGuildResponse(resp);
         return true;
     }
+    case luna::protocol::PacketType_MP_GUILD_CREATE_NACK:
+    case luna::protocol::PacketType_MP_GUILD_ADDMEMBER_NACK:
+        state_->chat_messages.push_back("Guild operation failed");
+        return true;
     case luna::protocol::PacketType_MP_EXCHANGE_APPLY_NACK:
     case luna::protocol::PacketType_MP_EXCHANGE_APPLY_ACK:
     case luna::protocol::PacketType_MP_EXCHANGE_START:
@@ -204,6 +219,12 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         pending_consignment_bids_ = false;
         return true;
     }
+    case luna::protocol::PacketType_MP_CONSIGNMENT_GETLIST_NACK:
+    case luna::protocol::PacketType_MP_CONSIGNMENT_SEARCH_NACK:
+    case luna::protocol::PacketType_MP_CONSIGNMENT_REGIST_NACK:
+    case luna::protocol::PacketType_MP_CONSIGNMENT_UPDATE_NACK:
+        state_->chat_messages.push_back("Consignment operation failed");
+        return true;
     case luna::protocol::PacketType_MP_STREETSTALL_OPEN_ACK:
     case luna::protocol::PacketType_MP_STREETSTALL_ADDITEM_ACK:
     case luna::protocol::PacketType_MP_STREETSTALL_BUY_ACK:

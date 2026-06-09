@@ -6,6 +6,7 @@
 #include <entt/entt.hpp>
 #include <unordered_map>
 #include <vector>
+#include <algorithm>
 
 struct HouseData {
     uint32_t house_id;
@@ -51,6 +52,51 @@ void HousingSystem::PlaceFurniture(entt::registry& reg, uint32_t house_id, uint3
     if (it == g_houses.end()) return;
     it->second.furniture.push_back(furniture_id);
     spdlog::info("Furniture {} placed in house {}", furniture_id, house_id);
+}
+
+void HousingSystem::AddFurniture(entt::registry& reg, uint32_t house_id, uint32_t furniture_id) {
+    PlaceFurniture(reg, house_id, furniture_id);
+}
+
+void HousingSystem::RemoveFurniture(entt::registry& reg, uint32_t house_id, uint32_t furniture_id) {
+    auto it = g_houses.find(house_id);
+    if (it == g_houses.end()) return;
+    auto& hd = it->second;
+    auto& furniture = hd.furniture;
+    auto fit = std::find(furniture.begin(), furniture.end(), furniture_id);
+    if (fit != furniture.end()) {
+        furniture.erase(fit);
+        spdlog::info("Furniture {} removed from house {}", furniture_id, house_id);
+    }
+}
+
+bool HousingSystem::Decorate(entt::registry& reg, entt::entity player, uint32_t house_id, bool on) {
+    auto it = g_houses.find(house_id);
+    if (it == g_houses.end()) return false;
+    auto& hd = it->second;
+    if (hd.owner_id != static_cast<uint32_t>(player)) {
+        spdlog::warn("Player {} is not owner of house {}", static_cast<uint32_t>(player), house_id);
+        return false;
+    }
+    spdlog::info("Player {} {} decoration mode for house {}",
+                  static_cast<uint32_t>(player), on ? "enters" : "exits", house_id);
+    return true;
+}
+
+HouseInfo HousingSystem::GetHouseInfo(uint32_t house_id) const {
+    auto it = g_houses.find(house_id);
+    if (it != g_houses.end()) {
+        HouseInfo info;
+        info.house_id = it->second.house_id;
+        info.owner_id = it->second.owner_id;
+        info.map_instance = it->second.map_instance;
+        info.furniture = it->second.furniture;
+        info.deco_points = static_cast<uint32_t>(it->second.furniture.size() * 10);
+        info.pos_x = it->second.pos_x;
+        info.pos_z = it->second.pos_z;
+        return info;
+    }
+    return HouseInfo{};
 }
 
 bool HousingSystem::HasHouse(uint32_t player_id) const {

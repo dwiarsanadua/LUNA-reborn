@@ -131,6 +131,11 @@ void AISystem::Update(entt::registry& registry, float dt) {
                 UpdateReturn(registry, entity, ai, xform, mv, dt);
                 break;
             }
+            case AIComponent::Flee: {
+                auto& mv = registry.get<Movement>(entity);
+                UpdateFlee(registry, entity, ai, xform, mv, dt);
+                break;
+            }
             default: break;
         }
         ai.state_timer += dt;
@@ -278,6 +283,26 @@ void AISystem::UpdateReturn(entt::registry& reg, entt::entity e,
     } else {
         mv.destination = ai.spawn_position;
         mv.is_moving = true;
+    }
+}
+
+void AISystem::UpdateFlee(entt::registry& reg, entt::entity e,
+                           AIComponent& ai, Transform& xform, Movement& mv, float dt) {
+    if (ai.state_timer < 0.1f) {
+        ai.ClearAggro();
+        glm::vec3 away = xform.position - ai.spawn_position;
+        if (glm::length(away) < 0.1f) away = glm::vec3(1.0f, 0.0f, 0.0f);
+        glm::vec3 flee_dir = glm::normalize(away);
+        mv.destination = xform.position + flee_dir * 15.0f;
+        mv.is_moving = true;
+        spdlog::debug("Monster {} starts fleeing to ({:.1f},{:.1f},{:.1f})",
+                      static_cast<uint32_t>(e), mv.destination.x, mv.destination.y, mv.destination.z);
+    }
+
+    float dist = glm::distance(xform.position, mv.destination);
+    if (dist < 1.0f || ai.state_timer > 5.0f) {
+        mv.is_moving = false;
+        TransitionState(ai, AIComponent::Patrol);
     }
 }
 

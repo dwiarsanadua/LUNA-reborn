@@ -25,6 +25,66 @@ void RecallSystem::RequestRecall(uint32_t character_id, const RecallTarget& targ
                   req.id, character_id, target.target_char_id, req.key);
 }
 
+void RecallSystem::Recall(uint32_t character_id, entt::registry& registry) {
+    auto it = bind_points_.find(character_id);
+    if (it == bind_points_.end()) {
+        spdlog::warn("RecallSystem: no bind point for character {}", character_id);
+        return;
+    }
+
+    auto& bp = it->second;
+    auto view = registry.view<TagPlayer, CharacterStats>();
+    for (auto entity : view) {
+        auto* stats = registry.try_get<CharacterStats>(entity);
+        if (stats && static_cast<uint32_t>(entity) == character_id) {
+            auto* xform = registry.try_get<Transform>(entity);
+            if (xform) {
+                xform->position = bp.position;
+                spdlog::info("RecallSystem: character {} recalled to bind point at ({:.1f},{:.1f},{:.1f})",
+                              character_id, bp.position.x, bp.position.y, bp.position.z);
+            }
+            break;
+        }
+    }
+}
+
+void RecallSystem::RecallParty(uint32_t character_id, entt::registry& registry, uint32_t party_id) {
+    auto view = registry.view<TagPlayer, CharacterStats>();
+    for (auto entity : view) {
+        auto* stats = registry.try_get<CharacterStats>(entity);
+        if (!stats) continue;
+        uint32_t id = static_cast<uint32_t>(entity);
+        if (id == character_id) continue;
+        // In full implementation, check if entity is in party
+        // For now, recall all nearby party members
+        auto* xform = registry.try_get<Transform>(entity);
+        if (xform) {
+            auto caller_it = bind_points_.find(character_id);
+            if (caller_it != bind_points_.end()) {
+                xform->position = caller_it->second.position;
+                spdlog::info("RecallSystem: party member {} recalled to caller's position", id);
+            }
+        }
+    }
+    spdlog::info("RecallSystem: party recall initiated by character {}", character_id);
+}
+
+void RecallSystem::BindLocation(uint32_t character_id, int map_id, const glm::vec3& position) {
+    BindPoint bp;
+    bp.character_id = character_id;
+    bp.map_id = map_id;
+    bp.position = position;
+    bind_points_[character_id] = bp;
+    spdlog::info("RecallSystem: character {} bound to map {} at ({:.1f},{:.1f},{:.1f})",
+                  character_id, map_id, position.x, position.y, position.z);
+}
+
+const BindPoint* RecallSystem::GetBindPoint(uint32_t character_id) const {
+    auto it = bind_points_.find(character_id);
+    if (it != bind_points_.end()) return &it->second;
+    return nullptr;
+}
+
 bool RecallSystem::AcceptRecall(uint32_t character_id, uint32_t key) {
     for (auto& [id, req] : requests_) {
         if (req.target_char_id == character_id && req.key == key && req.timeout > 0) {
