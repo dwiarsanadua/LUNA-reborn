@@ -59,6 +59,7 @@ void LoginScreen::Enter() {
     pw_field_.masked = true;
     error_message_.clear();
     error_timer_ = 0;
+    if (scene_renderer_) scene_renderer_->SetClearColor(0x887766FF);
 }
 
 void LoginScreen::Exit() {

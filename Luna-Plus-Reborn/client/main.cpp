@@ -34,6 +34,7 @@
 #include <config/ConfigManager.hpp>
 #include <config/Paths.hpp>
 #include <engine/gx_render/VFS.h>
+#include <entt/entt.hpp>
 #include <ui/ClientFlow.hpp>
 #include <config/KeyBindings.hpp>
 #include <ui/skin/UiSkinManager.hpp>
@@ -120,23 +121,47 @@ int main(int argc, char** argv) {
     gfx.GetScene()->height = (float)device.GetHeight();
     EngineCamera cam; cam.Init(config.width, config.height);
 
-    // 6-9: Game world loading moved to GameScreen (Prompt A)
+    // 6. TerrainRenderer / PropRenderer — needed for login 3D background
+    TerrainRenderer terrain;
+    PropRenderer props; props.Init();
+    props.width = (float)device.GetWidth();
+    props.height = (float)device.GetHeight();
+
+    // 7. EngineMap
+    SpawnSystem spawn_sys;
+    entt::registry registry;
+    EngineMap map;
+    map.SetTerrain(&terrain);
+    map.SetProps(&props);
+    map.SetSpawnSystem(&spawn_sys);
+    map.SetRegistry(&registry);
+    map.Load("51");
+
+    // 8. EngineSky
+    EngineSky sky;
+    sky.Init();
+
+    // 9. CharacterRenderer
+    g_char_renderer = new CharacterRenderer();
+    g_char_renderer->Init();
+    g_char_renderer->SetFramebufferSize((uint16_t)device.GetWidth(), (uint16_t)device.GetHeight());
 
     // 10. UIRenderer
     UIRenderer ui; ui.Init();
     g_ui = &ui;
 
-    // --ui-capture mode disabled (world objects moved to GameScreen)
-
-    // sky.SetSampler moved to GameScreen (Prompt A)
     ui.width = (float)device.GetWidth();
     ui.height = (float)device.GetHeight();
     ui.logicalWidth = (float)device.GetLogicalWidth();
     ui.logicalHeight = (float)device.GetLogicalHeight();
 
-    // terrain/props sizing moved to GameScreen (Prompt A)
+    terrain.width = (float)device.GetWidth();
+    terrain.height = (float)device.GetHeight();
+    props.width = (float)device.GetWidth();
+    props.height = (float)device.GetHeight();
     gfx.GetScene()->width = (float)device.GetWidth();
     gfx.GetScene()->height = (float)device.GetHeight();
+    sky.SetSampler(ui.GetSampler(), ui.GetWhiteTexture());
     ParticleRenderer particles; particles.Init();
 
     // BGM will be played by screen manager when screen is active
@@ -366,7 +391,9 @@ int main(int argc, char** argv) {
 
         // --- GAME STATE UPDATE BEFORE RENDER ---
         ClientFlow::Update(g_state, dt);
+        g_char_renderer->SetFrameDelta(dt);
         screenManager.Update(dt);
+        sky.Update(dt);
         if (g_audio) g_audio->Update();
 
         // Periodic auto-save (only when game screen is active)
@@ -382,9 +409,14 @@ int main(int argc, char** argv) {
         const glm::mat4& proj = cam.GetProjectionMatrix();
         {
             gfx.BeginFrame(view, proj);
-            // World rendering moved to GameScreen (Prompt A)
+            ambient.Update(dt, 51, sky.GetTimeOfDay(),
+                           g_state.player_x, 0, g_state.player_z);
+            sky.Render(ui, view, proj);
+            gfx.Render(&terrain, &props, nullptr, view, proj, sky.GetLightDirection());
+            gfx.RenderCharacters(time, view, proj);
+            gfx.RenderUI(ui);
             
-            // Render UI
+            // Render UI on top
             ui.BeginFrame();
             screenManager.Render(ui, view, proj);
             
@@ -427,7 +459,8 @@ int main(int argc, char** argv) {
     g_network.Disconnect();
     g_audio = nullptr;
     ambient.Shutdown();
-    audio.Shutdown(); gfx.Shutdown();
+    audio.Shutdown(); g_char_renderer->Shutdown(); delete g_char_renderer; g_char_renderer = nullptr;
+    map.Unload(); props.Shutdown(); terrain.Shutdown(); gfx.Shutdown();
     ui.Shutdown(); particles.Shutdown();
     signal(SIGINT, SIG_DFL);
     signal(SIGTERM, SIG_DFL);
