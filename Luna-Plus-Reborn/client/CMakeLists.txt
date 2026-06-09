@@ -115,8 +115,27 @@ add_executable(LunaPlusClient
     ui/dialogs/GameOutDialog.cpp
     ui/dialogs/PKManagerDlg.cpp
     ui/dialogs/WeatherDialog.cpp
+    ui/dialogs/ApplyOptionDialog.cpp
+    ui/dialogs/AutoAnswerDlg.cpp
+    ui/dialogs/ChallengeZoneClearNo1Dlg.cpp
+    ui/dialogs/ChatRoomCreateDlg.cpp
+    ui/dialogs/ChatRoomJoinDlg.cpp
+    ui/dialogs/ChatRoomOptionDlg.cpp
+    ui/dialogs/FarmAnimalCageDlg.cpp
+    ui/dialogs/GuildLevelUp.cpp
+    ui/dialogs/GuildRank.cpp
+    ui/dialogs/HouseNameDlg.cpp
+    ui/dialogs/ItemPopupDlg.cpp
     ui/dialogs/OptionsDialog.cpp
+    ui/dialogs/PartyMatchingSetting.cpp
+    ui/dialogs/PartySeekMemberDlg.cpp
+    ui/dialogs/ReinforceGuideDialog.cpp
     ui/dialogs/StorageDialog.cpp
+    ui/dialogs/SystemMsgDialog.cpp
+    ui/dialogs/ShoutDialog.cpp
+    ui/dialogs/BillingDialog.cpp
+    ui/dialogs/HousingWebDialog.cpp
+    ui/dialogs/TutorialBtnDlg.cpp
     engine/GraphicEngine.cpp
     engine/EngineCamera.cpp
     engine/EngineMap.cpp

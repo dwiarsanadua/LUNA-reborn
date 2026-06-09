@@ -236,6 +236,22 @@ float CombatSystem::CalcHealAmount(const CharacterStats& healer, float skill_fac
     return std::max(1.0f, heal);
 }
 
+int32_t CombatSystem::CalcRequiredExp(uint16_t level) {
+    return static_cast<int32_t>(level) * level * 100 + level * 50;
+}
+
+float CombatSystem::CalcAttackSpeed(const CharacterStats& s) {
+    return s.physic_skill_speed_rate;
+}
+
+float CombatSystem::CalcCastingSpeed(const CharacterStats& s) {
+    return s.magic_skill_speed_rate;
+}
+
+float CombatSystem::CalcMoveSpeed(const CharacterStats& s) {
+    return s.move_speed;
+}
+
 // ---- CalculateDamage (refactored with Old formulas) ----
 
 DamageResult CombatSystem::CalculateDamage(const CharacterStats& attacker,

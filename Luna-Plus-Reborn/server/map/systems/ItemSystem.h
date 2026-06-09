@@ -53,6 +53,22 @@ public:
     bool UpgradeItem(ItemSlot& item);
     int GetUpgradeSuccessRate(int current_enchant);
 
+    // Shop
+    bool BuyItem(entt::registry& registry, entt::entity entity, uint32_t shop_item_id, uint32_t price, uint16_t count = 1);
+    bool SellItem(entt::registry& registry, entt::entity entity, size_t slot, uint16_t count = 1);
+
+    // Enhancements
+    bool EnchantItem(entt::registry& registry, entt::entity entity, size_t slot);
+    bool MixItem(entt::registry& registry, entt::entity entity, const std::vector<size_t>& slots, uint32_t recipe_id = 0);
+    bool ComposeItem(entt::registry& registry, entt::entity entity, const std::vector<size_t>& slots);
+    bool DissolveItem(entt::registry& registry, entt::entity entity, size_t slot);
+
+    // Durability
+    void DurabilityDegrade(entt::registry& registry, entt::entity entity, size_t slot, uint16_t amount = 1);
+
+    // Drop generation
+    ItemSlot GenerateItemOption(uint32_t item_id, int monster_level);
+
     // Effects
     void UseItem(entt::registry& registry, entt::entity entity, size_t slot);
 

@@ -465,6 +465,173 @@ void ItemSystem::SpawnLoot(entt::registry& registry, glm::vec3 position, const s
     }
 }
 
+bool ItemSystem::BuyItem(entt::registry& registry, entt::entity entity, uint32_t shop_item_id, uint32_t price, uint16_t count) {
+    auto* inv = registry.try_get<Inventory>(entity);
+    if (!inv) return false;
+    uint32_t total_cost = price * count;
+    if (inv->gold < total_cost) {
+        spdlog::warn("ItemSystem: not enough gold to buy item {} (need {}, have {})",
+                      shop_item_id, total_cost, inv->gold);
+        return false;
+    }
+    ItemSlot item;
+    item.item_id = shop_item_id;
+    item.count = count;
+    if (!AddItem(registry, entity, item)) return false;
+    inv->gold -= total_cost;
+    spdlog::info("ItemSystem: bought item {} x{} for {} gold", shop_item_id, count, total_cost);
+    return true;
+}
+
+bool ItemSystem::SellItem(entt::registry& registry, entt::entity entity, size_t slot, uint16_t count) {
+    auto* inv = registry.try_get<Inventory>(entity);
+    if (!inv || slot >= inv->slots.size()) return false;
+    auto& s = inv->slots[slot];
+    if (s.item_id == 0 || s.count < count) return false;
+    auto it = s_item_defs.find(s.item_id);
+    if (it != s_item_defs.end() && !it->second.is_sellable) {
+        spdlog::warn("ItemSystem: item {} is not sellable", s.item_id);
+        return false;
+    }
+    uint32_t sell_price = (it != s_item_defs.end()) ? it->second.sell_price : (s.item_id / 10);
+    uint32_t total_price = sell_price * count;
+    inv->gold += total_price;
+    s.count -= count;
+    if (s.count == 0) s = ItemSlot{};
+    spdlog::debug("ItemSystem: sold slot {} x{} for {} gold", slot, count, total_price);
+    return true;
+}
+
+bool ItemSystem::EnchantItem(entt::registry& registry, entt::entity entity, size_t slot) {
+    auto* inv = registry.try_get<Inventory>(entity);
+    if (!inv || slot >= inv->slots.size()) return false;
+    auto& s = inv->slots[slot];
+    if (s.item_id == 0) return false;
+    if (s.enchant >= 15) {
+        spdlog::info("ItemSystem: item already max enchant (+{})", s.enchant);
+        return false;
+    }
+    float prob = 1.0f - static_cast<float>(s.enchant) * 0.05f;
+    prob = std::max(0.01f, prob);
+    uint32_t cost = 100 + s.enchant * 50;
+    if (inv->gold < cost) {
+        spdlog::warn("ItemSystem: not enough gold for enchant (need {}, have {})", cost, inv->gold);
+        return false;
+    }
+    inv->gold -= cost;
+    bool success = std::uniform_real_distribution<float>(0, 1)(rng_) < prob;
+    if (success) {
+        s.enchant++;
+        spdlog::info("ItemSystem: enchant success! Item now +{}", s.enchant);
+    } else {
+        spdlog::warn("ItemSystem: enchant failed! Item +{} destroyed", s.enchant);
+        s = ItemSlot{};
+    }
+    return success;
+}
+
+bool ItemSystem::MixItem(entt::registry& registry, entt::entity entity, const std::vector<size_t>& slots, uint32_t recipe_id) {
+    auto* inv = registry.try_get<Inventory>(entity);
+    if (!inv || slots.size() < 2) return false;
+    std::vector<uint32_t> input_ids;
+    for (auto& slot_idx : slots) {
+        if (slot_idx >= inv->slots.size() || inv->slots[slot_idx].item_id == 0) return false;
+        input_ids.push_back(inv->slots[slot_idx].item_id);
+    }
+    uint32_t result_id = input_ids[0];
+    for (size_t i = 1; i < input_ids.size(); i++) {
+        result_id = result_id * 7 + input_ids[i] * 13;
+    }
+    result_id = (result_id % 9000) + 1000;
+    ItemSlot result;
+    result.item_id = result_id;
+    result.count = 1;
+    if (!AddItem(registry, entity, result)) return false;
+    for (auto& slot_idx : slots) {
+        inv->slots[slot_idx] = ItemSlot{};
+    }
+    spdlog::info("ItemSystem: mixed {} items into result item {} (recipe {})",
+                  slots.size(), result_id, recipe_id);
+    return true;
+}
+
+bool ItemSystem::ComposeItem(entt::registry& registry, entt::entity entity, const std::vector<size_t>& slots) {
+    auto* inv = registry.try_get<Inventory>(entity);
+    if (!inv || slots.size() < 2) return false;
+    uint32_t base_id = 0;
+    uint16_t total_count = 0;
+    for (auto& slot_idx : slots) {
+        if (slot_idx >= inv->slots.size()) return false;
+        auto& s = inv->slots[slot_idx];
+        if (s.item_id == 0) return false;
+        if (base_id == 0) base_id = s.item_id;
+        else if (s.item_id != base_id) return false;
+        total_count += s.count;
+    }
+    if (total_count < 3) return false;
+    uint16_t consume_count = 3;
+    for (auto& slot_idx : slots) {
+        auto& s = inv->slots[slot_idx];
+        uint16_t take = std::min(consume_count, s.count);
+        s.count -= take;
+        consume_count -= take;
+        if (s.count == 0) s = ItemSlot{};
+        if (consume_count == 0) break;
+    }
+    ItemSlot result;
+    result.item_id = base_id + 1000;
+    result.count = 1;
+    if (!AddItem(registry, entity, result)) return false;
+    spdlog::info("ItemSystem: composed 3x{} into {}", base_id, result.item_id);
+    return true;
+}
+
+bool ItemSystem::DissolveItem(entt::registry& registry, entt::entity entity, size_t slot) {
+    auto* inv = registry.try_get<Inventory>(entity);
+    if (!inv || slot >= inv->slots.size()) return false;
+    auto& s = inv->slots[slot];
+    if (s.item_id == 0) return false;
+    ItemSlot material;
+    material.item_id = s.item_id / 100 * 100 + 1;
+    material.count = 1;
+    if (!AddItem(registry, entity, material)) return false;
+    s = ItemSlot{};
+    spdlog::info("ItemSystem: dissolved item {} into material {}", s.item_id, material.item_id);
+    return true;
+}
+
+void ItemSystem::DurabilityDegrade(entt::registry& registry, entt::entity entity, size_t slot, uint16_t amount) {
+    auto* inv = registry.try_get<Inventory>(entity);
+    if (!inv || slot >= inv->slots.size()) return;
+    auto& s = inv->slots[slot];
+    if (s.item_id == 0) return;
+    auto it = s_item_defs.find(s.item_id);
+    if (it == s_item_defs.end() || it->second.max_durability == 0) return;
+    if (s.count >= amount) {
+        s.count -= amount;
+        if (s.count == 0) s = ItemSlot{};
+        spdlog::debug("ItemSystem: durability degraded for slot {} (-{})", slot, amount);
+    }
+}
+
+ItemSlot ItemSystem::GenerateItemOption(uint32_t item_id, int monster_level) {
+    ItemSlot item;
+    item.item_id = item_id;
+    item.count = 1;
+    if (monster_level > 10) {
+        int max_enchant = std::min(5, (monster_level - 10) / 10);
+        if (max_enchant > 0) {
+            item.enchant = static_cast<uint8_t>(std::uniform_int_distribution<int>(0, max_enchant)(rng_));
+        }
+    }
+    auto it = s_item_defs.find(item_id);
+    if (it != s_item_defs.end() && it->second.is_bound_on_pickup) {
+        item.is_bound = true;
+    }
+    spdlog::debug("ItemSystem: generated option for item {} (enchant +{})", item_id, item.enchant);
+    return item;
+}
+
 bool ItemSystem::UpgradeItem(ItemSlot& item) {
     int rate = GetUpgradeSuccessRate(item.enchant);
     int roll = std::uniform_int_distribution<int>(1, 100)(rng_);

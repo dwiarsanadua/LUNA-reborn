@@ -625,6 +625,10 @@ CREATE TABLE IF NOT EXISTS _migration_version (
     description     TEXT
 );
 
+-- Migration v2: Add missing columns
+ALTER TABLE TB_GUILD ADD COLUMN GP INTEGER DEFAULT 0;
+ALTER TABLE TB_PARTY ADD COLUMN Option INTEGER DEFAULT 0;
+
 -- ============================================================
 -- GAME CONTENT TABLES (migrated from game_data_legacy.db)
 -- These are read-only reference tables for game content.

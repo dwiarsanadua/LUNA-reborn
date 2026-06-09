@@ -84,6 +84,7 @@ public:
     // HP/MP stat calculations (Old: CalcMaxLife/CalcMaxMana)
     static int32_t CalcMaxLife(const CharacterStats& s);
     static int32_t CalcMaxMana(const CharacterStats& s);
+    static int32_t CalcRequiredExp(uint16_t level);
 
     // Stat point distribution (Old: ArrangeCharLevelPoint)
     static constexpr uint8_t STAT_STR = 0;
@@ -99,6 +100,11 @@ public:
     static float CalcMagicAttack(const CharacterStats& s);
     static float CalcMagicDefense(const CharacterStats& s);
     static float CalcHealAmount(const CharacterStats& healer, float skill_factor);
+
+    // Speed calculations (Old: DoGetAttackSpeedRate, DoGetCastingSpeedRate, DoGetMoveSpeedRate)
+    static float CalcAttackSpeed(const CharacterStats& s);
+    static float CalcCastingSpeed(const CharacterStats& s);
+    static float CalcMoveSpeed(const CharacterStats& s);
 
     // Accuracy / Evasion (Agent C)
     static float CalcAccuracy(const CharacterStats& s);
