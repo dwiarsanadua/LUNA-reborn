@@ -1,6 +1,7 @@
 #include "test_harness.hpp"
 #include <flatbuffers/flatbuffers.h>
 #include <Login_generated.h>
+#include <Character_generated.h>
 #include <Movement_generated.h>
 #include <Combat_generated.h>
 #include <Chat_generated.h>
@@ -181,6 +182,43 @@ void RunNetworkTests() {
                      r->npc_id(), static_cast<int>(r->action()),
                      r->shop_items() ? r->shop_items()->size() : 0,
                      r->dialog_text() ? r->dialog_text()->str() : "(null)");
+    }
+
+    // ─── CharacterList round-trip (Login + Character List test) ───
+    TEST_STEP("CharacterListRequest + CharacterListResponse");
+    {
+        flatbuffers::FlatBufferBuilder fbb;
+        auto token = fbb.CreateString("session_token_abc");
+        auto req = luna::protocol::CreateCharacterListRequest(fbb, token);
+        fbb.Finish(req);
+        auto root = flatbuffers::GetRoot<luna::protocol::CharacterListRequest>(fbb.GetBufferPointer());
+        TEST("CharList session_token", root->session_token()->str() == "session_token_abc");
+
+        flatbuffers::FlatBufferBuilder fbb2;
+        std::vector<flatbuffers::Offset<luna::protocol::CharacterInfo>> chars;
+        auto c1 = luna::protocol::CreateCharacterInfoDirect(fbb2, 101, "Hero1", 50, 1, 0, 1001, nullptr, 500, 500);
+        chars.push_back(c1);
+        auto c2 = luna::protocol::CreateCharacterInfoDirect(fbb2, 102, "Hero2", 30, 2, 1, 1002, nullptr, 300, 300);
+        chars.push_back(c2);
+        auto list = fbb2.CreateVector(chars);
+        auto resp = luna::protocol::CreateCharacterListResponse(fbb2, list, 6);
+        fbb2.Finish(resp);
+
+        auto res = flatbuffers::GetRoot<luna::protocol::CharacterListResponse>(fbb2.GetBufferPointer());
+        TEST("CharList max_slots = 6", res->max_slots() == 6);
+        TEST("CharList count = 2", res->characters()->size() == 2);
+        if (res->characters() && res->characters()->size() >= 2) {
+            auto first = (*res->characters())[0];
+            TEST("Char1 id = 101", first->id() == 101);
+            TEST("Char1 name = Hero1", first->name()->str() == "Hero1");
+            TEST("Char1 level = 50", first->level() == 50);
+            auto second = (*res->characters())[1];
+            TEST("Char2 id = 102", second->id() == 102);
+            TEST("Char2 name = Hero2", second->name()->str() == "Hero2");
+            TEST("Char2 level = 30", second->level() == 30);
+        }
+        spdlog::info("    CharacterList: {} chars, max_slots={}",
+                     res->characters() ? res->characters()->size() : 0, res->max_slots());
     }
 
     // ─── PacketType enum values ───

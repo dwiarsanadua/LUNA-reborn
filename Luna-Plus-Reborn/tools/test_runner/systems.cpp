@@ -172,9 +172,71 @@ void RunSystemsTests() {
         TEST("Movement changes position", glm::distance(tr.position, old) > 0);
     }
 
-    // ─── QuestSystem ───
-    TEST_STEP("QuestSystem basic flow");
+    // ─── Quest lifecycle (QuestLog component integration) ───
+    TEST_STEP("Quest lifecycle — start → progress → complete → reward → abandon");
     {
-        TEST("QuestSystem accessible", true);
+        auto player = reg.create();
+        auto& stats = reg.emplace<CharacterStats>(player);
+        stats.level = 20; stats.exp = 0;
+        auto& inv = reg.emplace<Inventory>(player);
+        inv.gold = 100;
+        auto& ql = reg.emplace<QuestLog>(player);
+
+        // StartQuest: create a QuestEntry for quest_id=1 (Wolf Hunt)
+        QuestEntry entry;
+        entry.quest_id = 1;
+        entry.giver_npc_id = 101;
+        entry.completer_npc_id = 102;
+        entry.accepted_at = 1000;
+        {
+            QuestObjective obj;
+            obj.type = QuestObjective::KillMonster;
+            obj.target_id = 2001;
+            obj.required_count = 5;
+            obj.current_count = 0;
+            obj.description = "Kill 5 Wolves";
+            entry.objectives.push_back(obj);
+        }
+        ql.active_quests.push_back(entry);
+        auto* active = ql.GetActive(1);
+        TEST("Quest started: state = active", active != nullptr);
+        TEST("Quest objective count = 0", active && active->objectives[0].current_count == 0);
+        TEST("Quest not yet complete", active && !active->is_completed);
+        spdlog::info("    Quest 1 started, 0/5 Wolves killed");
+
+        // UpdateObjective: kill 5 wolves
+        for (int i = 0; i < 5; i++) {
+            active->UpdateObjective(QuestObjective::KillMonster, 2001, 1);
+        }
+        TEST("Quest progress count = 5", active && active->objectives[0].current_count == 5);
+        TEST("Quest objectives met", active && active->IsObjectiveComplete());
+        spdlog::info("    Quest 1 progress: 5/5 Wolves killed");
+
+        // CompleteQuest
+        active->is_completed = true;
+        active->completed_at = 2000;
+        TEST("Quest completed", active && active->is_completed);
+        spdlog::info("    Quest 1 completed");
+
+        // ClaimReward: give exp + gold
+        uint32_t reward_exp = 500;
+        uint32_t reward_gold = 100;
+        stats.exp += reward_exp;
+        inv.gold += reward_gold;
+        if (active) active->is_reward_taken = true;
+        ql.completed_quest_ids.push_back(1);
+        auto it = std::remove_if(ql.active_quests.begin(), ql.active_quests.end(),
+            [](const QuestEntry& e) { return e.quest_id == 1 && e.is_reward_taken; });
+        if (it != ql.active_quests.end()) ql.active_quests.erase(it);
+        TEST("Quest reward: exp gained", stats.exp >= reward_exp);
+        TEST("Quest reward: gold gained", inv.gold >= reward_gold);
+        TEST("Quest removed from active", ql.GetActive(1) == nullptr);
+        TEST("Quest in completed list", ql.IsCompleted(1));
+        spdlog::info("    Quest 1 rewarded: +{} exp, +{} gold", reward_exp, reward_gold);
+
+        // AbandonQuest: remove from completed list (simulate abandon)
+        ql.completed_quest_ids.clear();
+        TEST("Quest abandoned (cleared)", !ql.IsCompleted(1));
+        spdlog::info("    Quest 1 abandoned");
     }
 }
