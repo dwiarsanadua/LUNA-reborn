@@ -6,6 +6,13 @@ add_executable(test_runner
     database.cpp
     performance.cpp
     visual.cpp
+    integration.cpp
+    functional.cpp
+    multiplayer.cpp
+    content.cpp
+    security.cpp
+    ui_widgets.cpp
+    screens_audio.cpp
 )
 target_link_libraries(test_runner PRIVATE
     game_core

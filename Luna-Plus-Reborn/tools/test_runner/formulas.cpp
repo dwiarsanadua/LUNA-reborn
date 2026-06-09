@@ -184,11 +184,14 @@ void RunFormulaTests() {
         atk.weapon_attack = 30;
         def.level = 48; def.armor_defense = 100; def.constitution = 60;
 
-        auto normal = CombatSystem::CalculateDamage(atk, def, 0, 1, 0, 0, 1.0f, CombatContext::Normal);
-        auto pvp = CombatSystem::CalculateDamage(atk, def, 0, 1, 0, 0, 1.0f, CombatContext::PvP);
-        spdlog::info("    Normal dmg={}, PvP dmg={} (should be ~35%)", normal.damage, pvp.damage);
-        if (normal.damage > 0) {
-            float ratio = (float)pvp.damage / (float)normal.damage;
+        int total_normal = 0, total_pvp = 0, n = 5;
+        for (int i = 0; i < n; i++) {
+            total_normal += CombatSystem::CalculateDamage(atk, def, 0, 1, 0, 0, 1.0f, CombatContext::Normal).damage;
+            total_pvp += CombatSystem::CalculateDamage(atk, def, 0, 1, 0, 0, 1.0f, CombatContext::PvP).damage;
+        }
+        spdlog::info("    Normal dmg={}, PvP dmg={} (should be ~35%)", total_normal, total_pvp);
+        if (total_normal > 0) {
+            float ratio = (float)total_pvp / (float)total_normal;
             spdlog::info("    PvP/Normal ratio = {:.3f} (expected ~0.35)", ratio);
             TEST("PvP damage ~35% of normal", ratio > 0.20f && ratio < 0.50f);
         }
@@ -259,9 +262,13 @@ void RunFormulaTests() {
 
         auto no_skill = CombatSystem::CalculateDamage(atk, def, 0, 1, 0, 0, 1.0f, CombatContext::Normal);
         auto with_skill = CombatSystem::CalculateDamage(atk, def, 500, 1, 50, 30, 1.0f, CombatContext::Normal);
-        spdlog::info("    Without skill: dmg={}", no_skill.damage);
-        spdlog::info("    With skill (add=500, rate=50%, plus=30): dmg={}", with_skill.damage);
-        TEST("Skill adds damage", with_skill.damage >= no_skill.damage);
+        int avg_no = 0, avg_skill = 0, n2 = 5;
+        for (int i = 0; i < n2; i++) {
+            avg_no += CombatSystem::CalculateDamage(atk, def, 0, 1, 0, 0, 1.0f, CombatContext::Normal).damage;
+            avg_skill += CombatSystem::CalculateDamage(atk, def, 500, 1, 50, 30, 1.0f, CombatContext::Normal).damage;
+        }
+        spdlog::info("    Without skill: avg={}, With skill: avg={}", avg_no/n2, avg_skill/n2);
+        TEST("Skill adds damage", avg_skill >= avg_no);
     }
 
     // ─── Test Heal Formula ───
