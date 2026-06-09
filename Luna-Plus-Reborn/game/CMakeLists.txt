@@ -23,6 +23,7 @@ add_library(game_core STATIC
     ecs/systems/GameDataDB.cpp
     ecs/systems/FSMEngine.cpp
     ecs/systems/WeatherSystem.cpp
+    ecs/systems/ComboSystem.cpp
     network/TcpServer.cpp
     network/LoginHandler.cpp
     network/CharacterDB.cpp

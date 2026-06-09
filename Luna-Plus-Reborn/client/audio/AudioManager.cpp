@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <chrono>
 
 static const std::unordered_map<int, std::string> s_default_bgm_map = {
     {1, "BGM_Title"}, {2, "BGM_AlkerPlains"}, {51, "BGM_AlkerPlains"},
@@ -262,14 +263,25 @@ void AudioManager::SetSFXVolume(float vol) {
 void AudioManager::Update() {
     if (!sound_lib_) return;
 
-    // Handle BGM crossfade
+    auto now = std::chrono::steady_clock::now();
+
+    // Handle BGM crossfade with clock-based timing (not frame-rate dependent)
     if (crossfade_.active) {
-        crossfade_.elapsed += 1.0f / 60.0f; // approximate frame step
+        static auto last_crossfade_time = now;
+        float dt = std::chrono::duration<float>(now - last_crossfade_time).count();
+        last_crossfade_time = now;
+
+        crossfade_.elapsed += dt;
         float t = std::min(crossfade_.elapsed / crossfade_.duration, 1.0f);
-        float prev_vol = static_cast<int>((1.0f - t) * 100);
-        float new_vol = static_cast<int>(t * 100);
-        sound_lib_->SetBGMVolume(crossfade_.prev_bgm_id, std::max(0, static_cast<int>(prev_vol)));
-        sound_lib_->SetBGMVolume(crossfade_.new_bgm_id, static_cast<int>(new_vol));
+
+        // Use smoothstep for more natural fade curve
+        float smooth_t = t * t * (3.0f - 2.0f * t);
+        float prev_vol = (1.0f - smooth_t) * bgm_vol_;
+        float new_vol = smooth_t * bgm_vol_;
+
+        sound_lib_->SetBGMVolume(crossfade_.prev_bgm_id, static_cast<int>(prev_vol * 100));
+        sound_lib_->SetBGMVolume(crossfade_.new_bgm_id, static_cast<int>(new_vol * 100));
+
         if (t >= 1.0f) {
             sound_lib_->StopBGM(crossfade_.prev_bgm_id);
             current_bgm_id_ = crossfade_.new_bgm_id;
@@ -279,21 +291,36 @@ void AudioManager::Update() {
         }
     }
 
-    // Update 3D sound volumes based on listener position
+    // Update listener velocity for Doppler calculation
+    static auto last_pos_update = now;
+    float dt = std::chrono::duration<float>(now - last_pos_update).count();
+    if (dt > 0.001f) {
+        listener_vel_ = (listener_pos_ - prev_listener_pos_) / dt;
+        prev_listener_pos_ = listener_pos_;
+    }
+    last_pos_update = now;
+
+    // Update 3D sound volumes and panning based on listener position
     for (auto& [handle, snd] : active_sounds_) {
-        if (!snd.active) continue;
-        if (!snd.is_3d) continue;
+        if (!snd.active || !snd.is_3d) continue;
 
         int vol = CalculateAttenuation(snd);
         sound_lib_->SetSFXVolume(snd.sound_lib_id, vol);
 
-        // Doppler shift: adjust volume based on relative velocity (pitch not supported by this SoundLib)
+        // Calculate stereo pan based on horizontal angle from listener
+        glm::vec3 to_sound = snd.position - listener_pos_;
+        glm::vec3 forward_flat = glm::normalize(glm::vec3(listener_forward_.x, 0, listener_forward_.z));
+        glm::vec3 right = glm::normalize(glm::cross(forward_flat, glm::vec3(0, 1, 0)));
+        float lateral = glm::dot(glm::normalize(glm::vec3(to_sound.x, 0, to_sound.z)), right);
+
+        // Map -1..1 to pan 0..1 (0 = full left, 1 = full right, 0.5 = center)
+        float pan = std::clamp((lateral + 1.0f) * 0.5f, 0.0f, 1.0f);
+        sound_lib_->SetSFXPan(snd.sound_lib_id, pan);
     }
 
-    // Clean up finished sounds (if sound lib supports query)
+    // Clean up finished sounds
     std::vector<int> to_remove;
     for (auto& [handle, snd] : active_sounds_) {
-        // Check if sound has finished playing
         if (!sound_lib_->IsSFXPlaying(snd.sound_lib_id)) {
             to_remove.push_back(handle);
         }
@@ -305,19 +332,54 @@ int AudioManager::CalculateAttenuation(const SoundInstance& snd) const {
     float dist = glm::distance(listener_pos_, snd.position);
     float vol = 1.0f;
 
-    if (distance_model_ == 0) {
-        // Linear attenuation
-        if (dist <= snd.reference_distance) {
-            vol = 1.0f;
-        } else if (dist >= snd.max_distance) {
-            vol = 0.0f;
-        } else {
-            vol = 1.0f - (dist - snd.reference_distance) / (snd.max_distance - snd.reference_distance);
-        }
+    switch (distance_model_) {
+        case 0: // Linear (OpenAL AL_LINEAR_DISTANCE)
+            if (dist <= snd.reference_distance) {
+                vol = 1.0f;
+            } else if (dist >= snd.max_distance) {
+                vol = 0.0f;
+            } else {
+                vol = 1.0f - (dist - snd.reference_distance) / (snd.max_distance - snd.reference_distance);
+            }
+            break;
+
+        case 1: // Inverse distance (OpenAL AL_INVERSE_DISTANCE)
+            if (dist <= snd.reference_distance) {
+                vol = 1.0f;
+            } else {
+                vol = snd.reference_distance / (snd.reference_distance + snd.rolloff * (dist - snd.reference_distance));
+            }
+            break;
+
+        case 2: // Linear clamped
+            vol = std::max(0.0f, 1.0f - dist / snd.max_distance);
+            break;
+
+        case 3: // Logarithmic
+            if (dist > 0.1f) {
+                vol = 1.0f - std::log10(dist / snd.reference_distance) / std::log10(snd.max_distance / snd.reference_distance);
+            }
+            break;
+
+        default: // Linear fallback
+            vol = std::max(0.0f, 1.0f - dist / snd.max_distance);
+            break;
     }
+
+    // Apply Doppler effect (simplified: volume modulation based on relative velocity)
+    if (doppler_factor_ > 0.0f && snd.is_3d) {
+        glm::vec3 relative_vel = snd.velocity - listener_vel_;
+        float approach = glm::dot(glm::normalize(snd.position - listener_pos_), relative_vel);
+        float doppler_mod = 1.0f + (approach * doppler_factor_ * 0.01f);
+        vol *= std::clamp(doppler_mod, 0.5f, 2.0f);
+    }
+
+    // Apply global SFX volume
+    vol *= sfx_vol_;
+
     // Clamp and convert to 0-100 scale for sound lib
     vol = std::max(0.0f, std::min(1.0f, vol));
-    return (int)(vol * 100);
+    return static_cast<int>(vol * 100);
 }
 
 void AudioManager::ScanAudioDirectory() {

@@ -16,6 +16,8 @@ table GuildInfo {
     name: string;
     level: uint8;
     gp: uint32;
+    guild_point: uint32;       // Old: dwGuildPoint (MISSING - ADDED)
+    guild_mark: string;        // Old: szGuildMark[256] (MISSING - ADDED)
     master_id: uint32;
     members: [GuildMemberInfo];
 }
@@ -42,4 +44,16 @@ table GuildLeaveRequest {
 table GuildResponse {
     result: byte;
     guild: GuildInfo;
+}
+
+// Guild mark upload/download
+table GuildMarkUpload {
+    guild_id: uint32;
+    mark_data: string;  // Base64-encoded emblem image
+}
+
+table GuildMarkResponse {
+    success: bool;
+    guild_id: uint32;
+    mark_data: string;
 }

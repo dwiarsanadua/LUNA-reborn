@@ -1,5 +1,7 @@
 add_library(Database STATIC
     Database.cpp
+    BcryptUtils.cpp
+    RateLimiter.cpp
 )
 
 target_include_directories(Database PUBLIC

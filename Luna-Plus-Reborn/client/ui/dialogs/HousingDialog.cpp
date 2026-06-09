@@ -1,6 +1,8 @@
 #include "HousingDialog.hpp"
+#include <ui/ColorPalette.hpp>
 #include <cstdio>
 #include <algorithm>
+#include <cstdlib>
 
 void HousingDialog::SetNetworkCallbacks(
     std::function<void(uint8_t template_id)> buy_fn,
@@ -11,6 +13,17 @@ void HousingDialog::SetNetworkCallbacks(
     enter_fn_ = std::move(enter_fn);
     place_fn_ = std::move(place_fn);
     refresh_fn_ = std::move(refresh_fn);
+}
+
+void HousingDialog::SetWarehouseCallbacks(
+    std::function<void(uint32_t, int, int)> deposit_item,
+    std::function<void(uint32_t, int, int)> withdraw_item,
+    std::function<void(uint32_t)> deposit_gold,
+    std::function<void(uint32_t)> withdraw_gold) {
+    wh_deposit_item_ = std::move(deposit_item);
+    wh_withdraw_item_ = std::move(withdraw_item);
+    wh_deposit_gold_ = std::move(deposit_gold);
+    wh_withdraw_gold_ = std::move(withdraw_gold);
 }
 
 const GameState::NetworkHouseInfo* HousingDialog::SelectedHouse(const GameState* state) const {
@@ -136,6 +149,55 @@ void HousingDialog::Open(GameState* state, WindowManager* wm) {
         }
     });
 
+    // --- Warehouse Tab ---
+    auto* wh_panel = new Panel(0, 0, 480, 340);
+
+    wh_gold_label_ = wh_panel->AddWidget<Label>("Warehouse Gold: 0", 10, 4, ColorPalette::TEXT_GOLD);
+    wh_gold_label_->SetRect(10, 4, 300, 20);
+
+    warehouse_grid_ = wh_panel->AddWidget<Grid>(5, 6, 60, 50, 10, 28);
+    warehouse_grid_->SetPadding(4);
+
+    // Warehouse item deposit/withdraw
+    auto* wh_lbl1 = wh_panel->AddWidget<Label>("Item Slot:", 10, 260, ColorPalette::BTN_NORMAL);
+    wh_lbl1->SetRect(10, 260, 70, 20);
+    wh_item_input_ = wh_panel->AddWidget<InputField>(80, 258, 50, 22);
+    wh_item_input_->SetPlaceholder("0");
+    wh_item_input_->SetValidation(InputValidation::PositiveInteger);
+
+    auto* wh_dep_btn = wh_panel->AddWidget<Button>("Deposit", 140, 258, 70, 22);
+    wh_dep_btn->SetColors({40,80,40,220}, {60,120,60,220}, {30,50,30,220});
+    wh_dep_btn->OnEvent([this](const UIEvent& e) {
+        if (e.type == UIEvent::Click) DoDepositItem();
+    });
+
+    auto* wh_wd_btn = wh_panel->AddWidget<Button>("Withdraw", 220, 258, 80, 22);
+    wh_wd_btn->SetColors({80,40,40,220}, {120,60,60,220}, {50,30,30,220});
+    wh_wd_btn->OnEvent([this](const UIEvent& e) {
+        if (e.type == UIEvent::Click) DoWithdrawItem();
+    });
+
+    // Warehouse gold deposit/withdraw
+    auto* wh_lbl2 = wh_panel->AddWidget<Label>("Gold:", 10, 286, ColorPalette::BTN_NORMAL);
+    wh_lbl2->SetRect(10, 286, 70, 20);
+    wh_gold_input_ = wh_panel->AddWidget<InputField>(60, 284, 80, 22);
+    wh_gold_input_->SetPlaceholder("0");
+    wh_gold_input_->SetValidation(InputValidation::PositiveInteger);
+
+    auto* wh_dep_gold = wh_panel->AddWidget<Button>("Deposit Gold", 150, 284, 100, 22);
+    wh_dep_gold->SetColors({40,80,40,220}, {60,120,60,220}, {30,50,30,220});
+    wh_dep_gold->OnEvent([this](const UIEvent& e) {
+        if (e.type == UIEvent::Click) DoDepositGold();
+    });
+
+    auto* wh_wd_gold = wh_panel->AddWidget<Button>("Withdraw Gold", 260, 284, 110, 22);
+    wh_wd_gold->SetColors({80,40,40,220}, {120,60,60,220}, {50,30,30,220});
+    wh_wd_gold->OnEvent([this](const UIEvent& e) {
+        if (e.type == UIEvent::Click) DoWithdrawGold();
+    });
+
+    tabs_->AddTab("Warehouse", wh_panel);
+
     auto* refresh_btn = window_->AddWidget<Button>("Refresh", 10, 390, 80, 24);
     refresh_btn->OnEvent([this](const UIEvent& e) {
         if (e.type == UIEvent::Click && refresh_fn_) refresh_fn_();
@@ -212,6 +274,68 @@ void HousingDialog::Refresh(GameState* state) {
                 furniture_grid_->SetSlot(i / 4, i % 4, gs);
             }
         }
+    }
+}
+
+void HousingDialog::RefreshWarehouse(GameState* state) {
+    if (!warehouse_grid_ || !state) return;
+
+    warehouse_grid_->ClearAll();
+    if (wh_gold_label_) {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "Warehouse Gold: %u", state->storage_gold);
+        wh_gold_label_->SetText(buf);
+    }
+
+    // Display sample warehouse items
+    for (size_t i = 0; i < state->storage_items.size() && i < 30; i++) {
+        auto& si = state->storage_items[i];
+        if (si.id > 0) {
+            GridSlot gs;
+            gs.empty = false;
+            gs.count = si.count;
+            gs.text = si.name.empty() ? ("Item_" + std::to_string(si.id)) : si.name;
+            gs.userdata = static_cast<int>(si.id);
+            int row = static_cast<int>(i / 5);
+            int col = static_cast<int>(i % 5);
+            warehouse_grid_->SetSlot(row, col, gs);
+        }
+    }
+}
+
+void HousingDialog::DoDepositItem() {
+    if (!wh_item_input_) return;
+    int slot = std::atoi(wh_item_input_->GetText().c_str());
+    if (slot >= 0 && wh_deposit_item_) {
+        wh_deposit_item_(selected_house_id_, slot, 1);
+        wh_item_input_->SetText("");
+    }
+}
+
+void HousingDialog::DoWithdrawItem() {
+    if (!wh_item_input_) return;
+    int slot = std::atoi(wh_item_input_->GetText().c_str());
+    if (slot >= 0 && wh_withdraw_item_) {
+        wh_withdraw_item_(selected_house_id_, slot, 1);
+        wh_item_input_->SetText("");
+    }
+}
+
+void HousingDialog::DoDepositGold() {
+    if (!wh_gold_input_) return;
+    uint32_t amount = static_cast<uint32_t>(std::atoi(wh_gold_input_->GetText().c_str()));
+    if (amount > 0 && wh_deposit_gold_) {
+        wh_deposit_gold_(amount);
+        wh_gold_input_->SetText("");
+    }
+}
+
+void HousingDialog::DoWithdrawGold() {
+    if (!wh_gold_input_) return;
+    uint32_t amount = static_cast<uint32_t>(std::atoi(wh_gold_input_->GetText().c_str()));
+    if (amount > 0 && wh_withdraw_gold_) {
+        wh_withdraw_gold_(amount);
+        wh_gold_input_->SetText("");
     }
 }
 

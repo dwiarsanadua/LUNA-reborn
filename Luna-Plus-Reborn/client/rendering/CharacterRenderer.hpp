@@ -8,8 +8,28 @@
 #include <cstdint>
 #include <engine/gx_render/RenderDevice.h>
 
-enum class CharAnim { Idle, Walk, Run, Attack, Die };
+enum class CharAnim { Idle, Walk, Run, Attack, Die, Selected, Deselected };
 struct CharInstanceData;  // PIMPL
+
+struct PreviewSlotConfig {
+    glm::vec3 position{0.0f};
+    float scale = 0.4f;
+};
+
+struct PreviewCameraConfig {
+    glm::vec3 position{0.0f, 80.0f, -200.0f};
+    glm::vec3 target{0.0f, 50.0f, 0.0f};
+    float fov = 45.0f;
+    float orbit_speed = 0.3f;
+    bool auto_orbit = true;
+};
+
+struct PreviewLightingConfig {
+    glm::vec3 light_dir{-0.5f, -1.0f, -0.5f};
+    glm::vec3 ambient{0.3f, 0.3f, 0.4f};
+    glm::vec4 bg_color{0.1f, 0.1f, 0.2f, 1.0f};
+    bool use_rim_light = true;
+};
 
 class CharacterRenderer {
 public:
@@ -31,6 +51,18 @@ public:
 
     void Render(const glm::mat4& view, const glm::mat4& proj, float time, const EnvData& env = EnvData());
     void Shutdown();
+
+    bool LoadPreviewConfig(const std::string& cfg_path);
+    void SetPreviewSlot(size_t index, const glm::vec3& pos, float scale);
+    void SetPreviewCamera(const glm::vec3& pos, const glm::vec3& target, float fov, float orbit_speed);
+    void SetPreviewLighting(const glm::vec3& light_dir, const glm::vec3& ambient, const glm::vec4& bg_color);
+    void SetupPreviewView(glm::mat4& out_view, glm::mat4& out_proj, float time, uint16_t fb_w, uint16_t fb_h) const;
+    void SelectSlot(uint32_t id);
+    void DeselectSlot(uint32_t id);
+
+    const PreviewSlotConfig& GetPreviewSlot(size_t index) const;
+    const PreviewCameraConfig& GetPreviewCamera() const;
+    const PreviewLightingConfig& GetPreviewLighting() const;
 
 private:
     struct Impl;

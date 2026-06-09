@@ -189,6 +189,146 @@ int UIRenderer::DecodeUTF8(const char*& s) {
     return codepoint;
 }
 
+bool UIRenderer::LoadCjkFont(const std::string& font_path, float size) {
+    std::ifstream f(font_path, std::ios::binary);
+    if (!f) {
+        spdlog::warn("UIRenderer: CJK font not found: {}", font_path);
+        return false;
+    }
+    std::vector<unsigned char> data((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+
+    stbtt_fontinfo info;
+    if (!stbtt_InitFont(&info, data.data(), 0)) return false;
+
+    int aw = 1024, ah = 1024;
+    std::vector<unsigned char> atlas_data(aw * ah, 0);
+
+    int cjk_start = 0x4E00;
+    int cjk_count = 0x9FFF - 0x4E00 + 1;
+    std::vector<stbtt_bakedchar> chardata(cjk_count + 224);
+
+    FontAtlas& base = font_atlases_[size];
+    int total_start = std::min(base.range_first, cjk_start);
+    int total_end = std::max(base.range_first + base.range_count - 1, cjk_start + cjk_count - 1);
+    int total_count = total_end - total_start + 1;
+
+    int baked = stbtt_BakeFontBitmap(data.data(), 0, size,
+        atlas_data.data(), aw, ah,
+        total_start, total_count, chardata.data());
+    if (!baked) {
+        aw = 2048; ah = 2048;
+        atlas_data.resize(aw * ah, 0);
+        atlas_pending_.clear();
+        baked = stbtt_BakeFontBitmap(data.data(), 0, size,
+            atlas_data.data(), aw, ah,
+            total_start, total_count, chardata.data());
+        if (!baked) {
+            spdlog::warn("UIRenderer: CJK font atlas too large for {}", font_path);
+            return false;
+        }
+    }
+
+    std::vector<unsigned char> rgba(aw * ah * 4);
+    for (int i = 0; i < aw * ah; i++) {
+        rgba[i*4+0] = rgba[i*4+1] = rgba[i*4+2] = 255;
+        rgba[i*4+3] = atlas_data[i];
+    }
+
+    if (bgfx::isValid(base.tex)) bgfx::destroy(base.tex);
+    base.tex = bgfx::createTexture2D((uint16_t)aw, (uint16_t)ah, false, 1,
+        bgfx::TextureFormat::RGBA8, 0, bgfx::copy(rgba.data(), (uint32_t)rgba.size()));
+
+    base.glyphs.resize(total_count);
+    for (int i = 0; i < total_count; i++) {
+        auto& g = base.glyphs[i];
+        g.u0 = (float)chardata[i].x0 / aw;
+        g.v0 = (float)chardata[i].y0 / ah;
+        g.u1 = (float)chardata[i].x1 / aw;
+        g.v1 = (float)chardata[i].y1 / ah;
+        g.xoff = chardata[i].xoff;
+        g.yoff = chardata[i].yoff + size;
+        g.xadvance = chardata[i].xadvance;
+        g.w = (float)(chardata[i].x1 - chardata[i].x0);
+        g.h = (float)(chardata[i].y1 - chardata[i].y0);
+    }
+    base.range_first = total_start;
+    base.range_count = total_count;
+    base.atlas_w = aw;
+    base.atlas_h = ah;
+
+    CjkFontConfig cfg;
+    cfg.path = font_path;
+    cfg.codepoint_start = cjk_start;
+    cfg.codepoint_end = 0x9FFF;
+    cjk_fonts_.push_back(cfg);
+
+    spdlog::info("UIRenderer: CJK font loaded from {} with {} glyphs", font_path, total_count);
+    return true;
+}
+
+void UIRenderer::SetLanguage(const std::string& lang) {
+    active_language_ = lang;
+    font_atlases_.clear();
+
+    font_atlas_w_ = 1024;
+    font_atlas_h_ = 1024;
+
+    if (lang == "ko" || lang == "kr") {
+        std::string fontPaths[] = {
+            VFS::Resolve("assets/fonts/NotoSansKR-Regular.otf"),
+            VFS::Resolve("assets/fonts/NanumGothic.ttf"),
+            VFS::Resolve("assets/fonts/gulim.ttf"),
+        };
+        for (auto& fp : fontPaths) {
+            if (LoadCjkFont(fp, current_font_size_)) break;
+        }
+        if (!font_atlases_[current_font_size_].ready) {
+            GetOrCreateFontAtlas(current_font_size_);
+            LoadCjkFont(fontPaths[0], current_font_size_);
+        }
+    } else if (lang == "zh" || lang == "zh-cn" || lang == "zh-tw") {
+        std::string fontPaths[] = {
+            VFS::Resolve("assets/fonts/NotoSansSC-Regular.otf"),
+            VFS::Resolve("assets/fonts/NotoSansTC-Regular.otf"),
+            VFS::Resolve("assets/fonts/msyh.ttf"),
+        };
+        for (auto& fp : fontPaths) {
+            if (LoadCjkFont(fp, current_font_size_)) break;
+        }
+        if (!font_atlases_[current_font_size_].ready) {
+            GetOrCreateFontAtlas(current_font_size_);
+            LoadCjkFont(fontPaths[0], current_font_size_);
+        }
+    } else if (lang == "ja") {
+        std::string fontPaths[] = {
+            VFS::Resolve("assets/fonts/NotoSansJP-Regular.otf"),
+            VFS::Resolve("assets/fonts/msgothic.ttc"),
+        };
+        for (auto& fp : fontPaths) {
+            if (LoadCjkFont(fp, current_font_size_)) break;
+        }
+        if (!font_atlases_[current_font_size_].ready) {
+            GetOrCreateFontAtlas(current_font_size_);
+            LoadCjkFont(fontPaths[0], current_font_size_);
+        }
+    } else {
+        GetOrCreateFontAtlas(current_font_size_);
+    }
+
+    spdlog::info("UIRenderer: language set to '{}'", lang);
+}
+
+std::string UIRenderer::GetLanguage() const {
+    return active_language_;
+}
+
+void UIRenderer::SetFontFallback(const std::string& primary, const std::string& fallback) {
+    font_fallbacks_.clear();
+    if (!primary.empty()) font_fallbacks_.push_back(primary);
+    if (!fallback.empty()) font_fallbacks_.push_back(fallback);
+    spdlog::info("UIRenderer: font fallback: '{}' -> '{}'", primary, fallback);
+}
+
 void UIRenderer::DrawText(float x, float y, uint32_t color, const char* fmt, ...) {
     FontAtlas& atlas = font_atlases_[current_font_size_];
     if (!atlas.ready) return;
@@ -200,7 +340,30 @@ void UIRenderer::DrawText(float x, float y, uint32_t color, const char* fmt, ...
         int cp = DecodeUTF8(p);
         if (cp < 0) continue;
         int idx = cp - first;
-        if (idx < 0 || idx >= count) continue;
+
+        if (idx < 0 || idx >= count) {
+            bool loaded = false;
+            for (auto& cjk : cjk_fonts_) {
+                if (cp >= cjk.codepoint_start && cp <= cjk.codepoint_end) {
+                    loaded = true;
+                    break;
+                }
+            }
+            if (!loaded && cjk_fonts_.empty()) {
+                std::string cjkFallback = VFS::Resolve("assets/fonts/NotoSansSC-Regular.otf");
+                if (!cjkFallback.empty()) {
+                    LoadCjkFont(cjkFallback, current_font_size_);
+                    FontAtlas& updated = font_atlases_[current_font_size_];
+                    idx = cp - updated.range_first;
+                    if (idx >= 0 && idx < updated.range_count) {
+                        DrawGlyph(cur_x, y, color, idx);
+                        cur_x += updated.glyphs[idx].xadvance;
+                        continue;
+                    }
+                }
+            }
+            continue;
+        }
         DrawGlyph(cur_x, y, color, idx);
         cur_x += atlas.glyphs[idx].xadvance;
     }
@@ -510,12 +673,14 @@ FontAtlas& UIRenderer::GetOrCreateFontAtlas(float size) {
 }
 
 void UIRenderer::CreateFont() {
-    font_atlas_w_ = 512;
-    font_atlas_h_ = 128;
+    font_atlas_w_ = 1024;
+    font_atlas_h_ = 1024;
     font_atlases_.clear();
 
     GetOrCreateFontAtlas(18.0f);
     current_font_size_ = 18.0f;
+
+    SetLanguage("en");
 
     BuildTextureAtlas();
 

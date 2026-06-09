@@ -1,0 +1,53 @@
+include "Types.fbs";
+include "PacketType.fbs";
+
+namespace luna.protocol;
+
+enum NpcAction : byte {
+    Talk = 0,
+    Shop = 1,
+    Quest = 2,
+    ChangeMap = 3,
+    Recall = 4,
+}
+
+table NpcRequest {
+    npc_id: uint32;
+    character_id: uint32;
+    action: NpcAction;
+    quest_id: uint32;
+}
+
+table NpcShopItem {
+    item_id: uint32;
+    price: uint32;
+    stock: uint16;
+    is_buyback: bool;
+}
+
+table NpcChangeMapDestination {
+    map_id: uint16;
+    map_name: string;
+    position: Vec3;
+    fee: uint32;
+}
+
+table NpcRecallDestination {
+    recall_id: uint32;
+    name: string;
+    map_id: uint16;
+    position: Vec3;
+    fee: uint32;
+    condition: uint8;
+}
+
+table NpcResponse {
+    result: uint8;
+    npc_id: uint32;
+    action: NpcAction;
+    dialog_text: string;
+    shop_items: [NpcShopItem];
+    destinations: [NpcChangeMapDestination];
+    recall_destinations: [NpcRecallDestination];
+    quest_ids: [uint32];
+}

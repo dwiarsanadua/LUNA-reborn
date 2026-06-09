@@ -16,6 +16,7 @@ table AttackResult {
     damage_type: DamageType;
     is_critical: bool;
     is_miss: bool;
+    is_blocked: bool;
     target_hp_remaining: int32;
     effects: [DamageEffect];
 }

@@ -1,6 +1,7 @@
 add_executable(AgentServer
     main.cpp
     AgentServer.cpp
+    GiftManager.cpp
 )
 
 target_include_directories(AgentServer PRIVATE

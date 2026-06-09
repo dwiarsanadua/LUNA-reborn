@@ -21,15 +21,18 @@
 
 namespace {
 constexpr int MAX_BONES = 64;
+constexpr size_t MAX_PREVIEW_SLOTS = 5;
 
 const char* AnimNameForCharAnim(CharAnim anim) {
     switch (anim) {
-    case CharAnim::Idle:   return "idle";
-    case CharAnim::Walk:   return "walk";
-    case CharAnim::Run:    return "run";
-    case CharAnim::Attack: return "attack";
-    case CharAnim::Die:    return "die";
-    default:               return "idle";
+    case CharAnim::Idle:       return "idle";
+    case CharAnim::Walk:       return "walk";
+    case CharAnim::Run:        return "run";
+    case CharAnim::Attack:     return "attack";
+    case CharAnim::Die:        return "die";
+    case CharAnim::Selected:   return "selected";
+    case CharAnim::Deselected: return "deselected";
+    default:                   return "idle";
     }
 }
 
@@ -75,14 +78,23 @@ struct CharacterRenderer::Impl {
     std::unordered_map<uint32_t, RenderInstance> instances;
 
     bgfx::ProgramHandle prog = BGFX_INVALID_HANDLE;
+    bgfx::ProgramHandle preview_prog = BGFX_INVALID_HANDLE;
     bgfx::UniformHandle tex = BGFX_INVALID_HANDLE;
     bgfx::UniformHandle bones_uniform = BGFX_INVALID_HANDLE;
     bgfx::UniformHandle light_dir = BGFX_INVALID_HANDLE;
     bgfx::UniformHandle u_color = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle u_ambient = BGFX_INVALID_HANDLE;
     bgfx::TextureHandle white = BGFX_INVALID_HANDLE;
 
     ModelManager model_mgr;
     bool initialized = false;
+
+    PreviewSlotConfig preview_slots[MAX_PREVIEW_SLOTS];
+    PreviewCameraConfig preview_camera;
+    PreviewLightingConfig preview_lighting;
+    int selected_slot = -1;
+    float select_anim_time = 0.0f;
+    bool preview_config_loaded = false;
 };
 
 CharacterRenderer::CharacterRenderer()
@@ -98,12 +110,24 @@ bool CharacterRenderer::Init(const std::string& shader_dir) {
     std::string fs = shader_dir + "fs_lit.bin";
 
     i.prog = ShaderUtils::LoadProgram(vs, fs);
+    std::string preview_vs = shader_dir + "vs_skinned_preview.bin";
+    std::string preview_fs = shader_dir + "fs_preview.bin";
+    i.preview_prog = ShaderUtils::LoadProgram(preview_vs, preview_fs);
+    if (!bgfx::isValid(i.preview_prog))
+        i.preview_prog = i.prog;
+
     i.tex = bgfx::createUniform("s_texColor", bgfx::UniformType::Sampler);
     i.bones_uniform = bgfx::createUniform("u_bones", bgfx::UniformType::Mat4, MAX_BONES);
     i.light_dir = bgfx::createUniform("u_lightDir", bgfx::UniformType::Vec4);
     i.u_color = bgfx::createUniform("u_color", bgfx::UniformType::Vec4);
+    i.u_ambient = bgfx::createUniform("u_ambient", bgfx::UniformType::Vec4);
     uint32_t white = 0xffffffff;
     i.white = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::makeRef(&white, 4));
+
+    for (size_t si = 0; si < MAX_PREVIEW_SLOTS; si++) {
+        i.preview_slots[si].position = glm::vec3((static_cast<float>(si) - 2.0f) * 120.0f, 27930.0f, 7834.0f);
+        i.preview_slots[si].scale = 0.4f;
+    }
 
     i.initialized = true;
     return true;
@@ -329,6 +353,159 @@ void CharacterRenderer::Render(const glm::mat4& view, const glm::mat4& proj, flo
             }
         }
     }
+}
+
+bool CharacterRenderer::LoadPreviewConfig(const std::string& cfg_path) {
+    auto& i = *impl_;
+    std::ifstream file(cfg_path);
+    if (!file.is_open()) {
+        if (!cfg_path.empty())
+            spdlog::warn("CharRenderer: cannot open preview config: {}", cfg_path);
+        return false;
+    }
+
+    std::string section, line;
+    while (std::getline(file, line)) {
+        if (line.empty() || line[0] == '#') continue;
+        if (line[0] == '[') { section = line; continue; }
+
+        std::istringstream iss(line);
+        std::string key;
+        iss >> key;
+
+        if (section.find("select") != std::string::npos || section.find("preview") != std::string::npos) {
+            if (key == "cameraPosition") {
+                iss >> i.preview_camera.position.x >> i.preview_camera.position.y >> i.preview_camera.position.z;
+            } else if (key == "cameraRotation") {
+                float rx, ry, rz;
+                iss >> rx >> ry >> rz;
+                glm::vec3 dir;
+                dir.x = cosf(ry) * cosf(rx);
+                dir.y = sinf(rx);
+                dir.z = sinf(ry) * cosf(rx);
+                i.preview_camera.target = i.preview_camera.position + dir * 300.0f;
+            } else if (key == "orbitSpeed") {
+                iss >> i.preview_camera.orbit_speed;
+            } else if (key == "fov") {
+                iss >> i.preview_camera.fov;
+            } else if (key == "autoOrbit") {
+                iss >> i.preview_camera.auto_orbit;
+            } else if (key == "lightDir") {
+                iss >> i.preview_lighting.light_dir.x >> i.preview_lighting.light_dir.y >> i.preview_lighting.light_dir.z;
+            } else if (key == "ambient") {
+                iss >> i.preview_lighting.ambient.r >> i.preview_lighting.ambient.g >> i.preview_lighting.ambient.b;
+            } else if (key == "bgColor") {
+                iss >> i.preview_lighting.bg_color.r >> i.preview_lighting.bg_color.g >> i.preview_lighting.bg_color.b >> i.preview_lighting.bg_color.a;
+            } else if (key == "player1" || key == "player2" || key == "player3" || key == "player4" || key == "player5") {
+                size_t idx = key[6] - '1';
+                if (idx < MAX_PREVIEW_SLOTS) {
+                    iss >> i.preview_slots[idx].position.x >> i.preview_slots[idx].position.y >> i.preview_slots[idx].position.z;
+                }
+            } else if (key == "playerScale") {
+                float s; iss >> s;
+                for (auto& slot : i.preview_slots) slot.scale = s;
+            }
+        }
+    }
+
+    i.preview_config_loaded = true;
+    return true;
+}
+
+void CharacterRenderer::SetPreviewSlot(size_t index, const glm::vec3& pos, float scale) {
+    if (index < MAX_PREVIEW_SLOTS) {
+        impl_->preview_slots[index].position = pos;
+        impl_->preview_slots[index].scale = scale;
+    }
+}
+
+void CharacterRenderer::SetPreviewCamera(const glm::vec3& pos, const glm::vec3& target, float fov, float orbit_speed) {
+    impl_->preview_camera.position = pos;
+    impl_->preview_camera.target = target;
+    impl_->preview_camera.fov = fov;
+    impl_->preview_camera.orbit_speed = orbit_speed;
+}
+
+void CharacterRenderer::SetPreviewLighting(const glm::vec3& light_dir, const glm::vec3& ambient, const glm::vec4& bg_color) {
+    impl_->preview_lighting.light_dir = light_dir;
+    impl_->preview_lighting.ambient = ambient;
+    impl_->preview_lighting.bg_color = bg_color;
+}
+
+void CharacterRenderer::SetupPreviewView(glm::mat4& out_view, glm::mat4& out_proj,
+                                         float time, uint16_t fb_w, uint16_t fb_h) const {
+    auto& i = *impl_;
+    float aspect = (fb_w > 0 && fb_h > 0) ? static_cast<float>(fb_w) / fb_h : 16.0f / 9.0f;
+
+    if (i.preview_camera.auto_orbit) {
+        float angle = time * i.preview_camera.orbit_speed;
+        glm::vec3 offset = i.preview_camera.position - i.preview_camera.target;
+        float radius = glm::length(offset);
+        glm::vec3 orbited(
+            i.preview_camera.target.x + radius * cosf(angle),
+            i.preview_camera.position.y,
+            i.preview_camera.target.z + radius * sinf(angle)
+        );
+        out_view = glm::lookAt(orbited, i.preview_camera.target, glm::vec3(0.0f, 1.0f, 0.0f));
+    } else {
+        out_view = glm::lookAt(i.preview_camera.position, i.preview_camera.target, glm::vec3(0.0f, 1.0f, 0.0f));
+    }
+
+    out_proj = glm::perspective(glm::radians(i.preview_camera.fov), aspect, 1.0f, 5000.0f);
+}
+
+void CharacterRenderer::SelectSlot(uint32_t id) {
+    auto& i = *impl_;
+    auto it = i.instances.find(id);
+    if (it == i.instances.end()) return;
+    i.selected_slot = static_cast<int>(id);
+    i.select_anim_time = 0.0f;
+
+    auto ait = i.anim_states.find(it->second.model_key);
+    if (ait != i.anim_states.end()) {
+        auto clip_it = ait->second.clips.find("selected");
+        if (clip_it != ait->second.clips.end()) {
+            ait->second.anim_sys.Play(&clip_it->second, false, 0.0f);
+            ait->second.current_anim = CharAnim::Selected;
+        }
+    }
+}
+
+void CharacterRenderer::DeselectSlot(uint32_t id) {
+    auto& i = *impl_;
+    auto it = i.instances.find(id);
+    if (it == i.instances.end()) return;
+    i.selected_slot = -1;
+    i.select_anim_time = 0.0f;
+
+    auto ait = i.anim_states.find(it->second.model_key);
+    if (ait != i.anim_states.end()) {
+        auto clip_it = ait->second.clips.find("deselected");
+        if (clip_it != ait->second.clips.end()) {
+            ait->second.anim_sys.Play(&clip_it->second, false, 0.0f);
+            ait->second.current_anim = CharAnim::Deselected;
+        } else {
+            clip_it = ait->second.clips.find("idle");
+            if (clip_it != ait->second.clips.end()) {
+                ait->second.anim_sys.BlendTo(&clip_it->second, 0.3f);
+                ait->second.current_anim = CharAnim::Idle;
+            }
+        }
+    }
+}
+
+const PreviewSlotConfig& CharacterRenderer::GetPreviewSlot(size_t index) const {
+    static PreviewSlotConfig fallback;
+    if (index < MAX_PREVIEW_SLOTS) return impl_->preview_slots[index];
+    return fallback;
+}
+
+const PreviewCameraConfig& CharacterRenderer::GetPreviewCamera() const {
+    return impl_->preview_camera;
+}
+
+const PreviewLightingConfig& CharacterRenderer::GetPreviewLighting() const {
+    return impl_->preview_lighting;
 }
 
 void CharacterRenderer::Shutdown() {

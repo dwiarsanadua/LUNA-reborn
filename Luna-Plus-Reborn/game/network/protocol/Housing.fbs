@@ -1,0 +1,92 @@
+include "Types.fbs";
+include "PacketType.fbs";
+
+namespace luna.protocol;
+
+table HouseInfo {
+    house_id: uint32;
+    owner_id: uint32;
+    owner_name: string;
+    map_id: uint32;
+    pos_x: float;
+    pos_z: float;
+    house_type: uint8;
+    furniture_count: uint16;
+    state: uint8;
+    rank: uint8;
+    house_name: string;
+    can_enter: bool;
+}
+
+table FurnitureInfo {
+    furniture_id: uint32;
+    item_db_id: uint32;
+    pos_x: float;
+    pos_y: float;
+    pos_z: float;
+    rot_y: float;
+}
+
+table HousingInfoRequest {
+    character_id: uint32;
+}
+
+table HousingBuyRequest {
+    character_id: uint32;
+    house_type: uint8;
+    map_id: uint32;
+}
+
+table HousingEnterRequest {
+    character_id: uint32;
+    house_id: uint32;
+}
+
+table HousingPlaceFurnitureRequest {
+    character_id: uint32;
+    house_id: uint32;
+    item_db_id: uint32;
+    pos_x: float;
+    pos_y: float;
+    pos_z: float;
+    rot_y: float;
+}
+
+table HousingRemoveFurnitureRequest {
+    character_id: uint32;
+    house_id: uint32;
+    furniture_id: uint32;
+}
+
+table HousingDecorateRequest {
+    character_id: uint32;
+    house_id: uint32;
+    action: uint8;
+    furniture_id: uint32;
+    pos_x: float;
+    pos_y: float;
+    pos_z: float;
+    rot_y: float;
+}
+
+table HousingKickRequest {
+    character_id: uint32;
+    house_id: uint32;
+    target_id: uint32;
+}
+
+table HousingInfoResponse {
+    result: uint8;
+    house: HouseInfo;
+    furniture: [FurnitureInfo];
+    can_buy: bool;
+    buy_price: uint32;
+    message: string;
+}
+
+table HousingActionResponse {
+    result: uint8;
+    house: HouseInfo;
+    furniture: [FurnitureInfo];
+    message: string;
+}

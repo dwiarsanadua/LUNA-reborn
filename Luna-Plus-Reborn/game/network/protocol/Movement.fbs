@@ -7,6 +7,8 @@ table MoveRequest {
     direction: Vec3;
     target_position: Vec3;
     move_mode: MoveMode;
+    kyung_gong_idx: uint16 = 0;  // Dash skill index (0 = none), Old: KyungGongIdx
+    added_move_speed: float = 0.0;  // Speed modifier, Old: AddedMoveSpeed
 }
 
 table MoveResponse {

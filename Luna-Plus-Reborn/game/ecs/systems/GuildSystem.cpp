@@ -1,6 +1,7 @@
 #include "GuildSystem.hpp"
 #include "../components/Guild.hpp"
 #include "../components/Inventory.hpp"
+#include "../components/CharacterStats.hpp"
 #include "../components/Tag.hpp"
 #include <spdlog/spdlog.h>
 #include <algorithm>
@@ -307,12 +308,171 @@ void GuildSystem::AddAuditEntry(uint32_t guild_id, uint32_t character_id,
     }
 }
 
+bool GuildSystem::DisbandGuild(entt::registry& reg, entt::entity actor) {
+    if (!reg.valid(actor) || !reg.all_of<Guild>(actor)) return false;
+    auto& guild = reg.get<Guild>(actor);
+    auto master_it = std::find_if(guild.members.begin(), guild.members.end(),
+        [&](const GuildMember& m) { return m.character_id == static_cast<uint32_t>(actor); });
+    if (master_it == guild.members.end() || master_it->rank != 1) return false;
+
+    uint32_t guild_id = guild.guild_id;
+    std::string guild_name = guild.name;
+
+    // Exp penalty: reduce master's exp by 5%
+    if (reg.all_of<CharacterStats>(actor)) {
+        auto& stats = reg.get<CharacterStats>(actor);
+        uint32_t penalty = static_cast<uint32_t>(stats.exp * 0.05f);
+        stats.exp = (stats.exp > penalty) ? stats.exp - penalty : 0;
+    }
+
+    // Notify all members
+    BroadcastToGuild(reg, guild_id, "Guild '" + guild_name + "' has been disbanded.");
+
+    // Remove Guild component from all members
+    for (auto& m : guild.members) {
+        entt::entity member_entity = static_cast<entt::entity>(m.character_id);
+        if (reg.valid(member_entity) && reg.all_of<Guild>(member_entity))
+            reg.remove<Guild>(member_entity);
+    }
+
+    // Cleanup warehouse
+    guild_warehouses_.erase(guild_id);
+    guild_skills_.erase(guild_id);
+    guild_audit_logs_.erase(guild_id);
+    war_scores_.erase(guild_id);
+    guild_marks_.erase(guild_id);
+    warehouse_rank_access_.erase(guild_id);
+
+    spdlog::info("Guild '{}' (id={}) disbanded by master", guild_name, guild_id);
+    return true;
+}
+
+bool GuildSystem::ChangeMaster(entt::registry& reg, entt::entity actor, uint32_t target_id) {
+    if (!reg.valid(actor) || !reg.all_of<Guild>(actor)) return false;
+    auto& guild = reg.get<Guild>(actor);
+    auto actor_it = std::find_if(guild.members.begin(), guild.members.end(),
+        [&](const GuildMember& m) { return m.character_id == static_cast<uint32_t>(actor); });
+    if (actor_it == guild.members.end() || actor_it->rank != 1) return false;
+
+    auto target_it = std::find_if(guild.members.begin(), guild.members.end(),
+        [&](const GuildMember& m) { return m.character_id == target_id; });
+    if (target_it == guild.members.end()) return false;
+
+    actor_it->rank = 2;
+    target_it->rank = 1;
+    guild.master_id = target_id;
+
+    spdlog::info("Guild '{}' master changed to member {}", guild.name, target_id);
+    return true;
+}
+
+bool GuildSystem::SetNickname(entt::registry& reg, entt::entity actor, uint32_t target_id, const std::string& nickname) {
+    if (!reg.valid(actor) || !reg.all_of<Guild>(actor)) return false;
+    auto& guild = reg.get<Guild>(actor);
+    auto it = std::find_if(guild.members.begin(), guild.members.end(),
+        [&](const GuildMember& m) { return m.character_id == target_id; });
+    if (it == guild.members.end()) return false;
+    nicknames_[guild.guild_id][target_id] = nickname;
+    spdlog::info("Guild '{}' member {} nicknamed '{}'", guild.name, target_id, nickname);
+    return true;
+}
+
+std::string GuildSystem::GetNickname(uint32_t guild_id, uint32_t character_id) const {
+    auto git = nicknames_.find(guild_id);
+    if (git == nicknames_.end()) return {};
+    auto it = git->second.find(character_id);
+    return (it != git->second.end()) ? it->second : std::string();
+}
+
+bool GuildSystem::SetMark(entt::registry& reg, entt::entity actor, const std::vector<uint8_t>& mark_data, uint32_t mark_len) {
+    if (!reg.valid(actor) || !reg.all_of<Guild>(actor)) return false;
+    auto& guild = reg.get<Guild>(actor);
+    auto it = std::find_if(guild.members.begin(), guild.members.end(),
+        [&](const GuildMember& m) { return m.character_id == static_cast<uint32_t>(actor); });
+    if (it == guild.members.end() || it->rank > 2) return false;
+
+    GuildMarkData& mark = guild_marks_[guild.guild_id];
+    mark.data = mark_data;
+    mark.len = mark_len;
+    spdlog::info("Guild '{}' mark updated ({} bytes)", guild.name, mark_len);
+    return true;
+}
+
+bool GuildSystem::GetMark(uint32_t guild_id, GuildMarkData& out_mark) const {
+    auto it = guild_marks_.find(guild_id);
+    if (it == guild_marks_.end()) return false;
+    out_mark = it->second;
+    return true;
+}
+
+void GuildSystem::GuildChat(entt::registry& reg, entt::entity actor, const std::string& message) {
+    if (!reg.valid(actor) || !reg.all_of<Guild>(actor)) return;
+    auto& guild = reg.get<Guild>(actor);
+    BroadcastToGuild(reg, guild.guild_id, message);
+}
+
+void GuildSystem::BroadcastToGuild(entt::registry& reg, uint32_t guild_id, const std::string& message) {
+    auto view = reg.view<Guild>();
+    for (auto entity : view) {
+        auto& g = view.get<Guild>(entity);
+        if (g.guild_id == guild_id) {
+            spdlog::info("[Guild {}] {}", guild_id, message);
+        }
+    }
+}
+
+void GuildSystem::AddWarKillScore(uint32_t guild_id, uint32_t score) {
+    war_scores_[guild_id].kill_score += score;
+    war_scores_[guild_id].war_score += score;
+}
+
+void GuildSystem::AddWarDeathScore(uint32_t guild_id, uint32_t score) {
+    war_scores_[guild_id].death_score += score;
+    if (war_scores_[guild_id].war_score > score)
+        war_scores_[guild_id].war_score -= score;
+    else
+        war_scores_[guild_id].war_score = 0;
+}
+
+void GuildSystem::AddHuntedMonsterScore(uint32_t guild_id, uint32_t score) {
+    war_scores_[guild_id].hunted_monster_score += score;
+    war_scores_[guild_id].war_score += score;
+}
+
+uint32_t GuildSystem::GetWarScore(uint32_t guild_id) const {
+    auto it = war_scores_.find(guild_id);
+    return (it != war_scores_.end()) ? it->second.war_score : 0;
+}
+
+const GuildWarScore* GuildSystem::GetGuildWarScore(uint32_t guild_id) const {
+    auto it = war_scores_.find(guild_id);
+    return (it != war_scores_.end()) ? &it->second : nullptr;
+}
+
+void GuildSystem::SetWarehouseRankAccess(uint32_t guild_id, uint8_t min_rank) {
+    warehouse_rank_access_[guild_id] = min_rank;
+}
+
+uint8_t GuildSystem::GetWarehouseRankAccess(uint32_t guild_id) const {
+    auto it = warehouse_rank_access_.find(guild_id);
+    return (it != warehouse_rank_access_.end()) ? it->second : 3;
+}
+
+void GuildSystem::NotifyMemberLevelUp(entt::registry& reg, entt::entity player) {
+    if (!reg.valid(player) || !reg.all_of<Guild>(player)) return;
+    if (!reg.all_of<CharacterStats>(player)) return;
+    auto& guild = reg.get<Guild>(player);
+    auto& stats = reg.get<CharacterStats>(player);
+    BroadcastToGuild(reg, guild.guild_id,
+        "Member reached level " + std::to_string(stats.level));
+}
+
 void GuildSystem::Update(entt::registry& reg, float dt) {
     (void)dt;
     auto view = reg.view<Guild>();
     for (auto entity : view) {
         auto& guild = view.get<Guild>(entity);
-        uint32_t gain = 1 + guild.members.size();
+        uint32_t gain = 1 + static_cast<uint32_t>(guild.members.size());
         AddExp(reg, entity, gain);
     }
 }

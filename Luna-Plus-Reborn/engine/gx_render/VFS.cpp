@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <unordered_set>
 
 #if defined(__APPLE__)
 #include <mach-o/dyld.h>
@@ -17,6 +18,9 @@ namespace fs = std::filesystem;
 
 std::string VFS::base_path_ = "./";
 std::vector<std::string> VFS::search_roots_;
+
+// Cache of known missing files to avoid repeated warnings
+static std::unordered_set<std::string> s_missing_file_cache;
 
 std::string VFS::NormalizeRoot(const std::string& path) {
     if (path.empty()) return "./";
@@ -120,6 +124,15 @@ std::string VFS::Find(const std::string& relative_path) {
         std::string full = root + relative_path;
         if (fs::exists(full)) return full;
     }
+
+    // File not found — check cache to avoid log spam
+    if (s_missing_file_cache.find(relative_path) == s_missing_file_cache.end()) {
+        s_missing_file_cache.insert(relative_path);
+        spdlog::warn("VFS: file not found '{}' — searched {} roots, returning fallback path",
+                     relative_path, search_roots_.size());
+    }
+
+    // Return the base path + relative path as fallback (caller should handle missing)
     return Resolve(relative_path);
 }
 

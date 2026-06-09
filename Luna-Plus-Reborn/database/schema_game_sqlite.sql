@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS TB_CHARACTER (
     LastLogout      TEXT,
     LoginTime       INTEGER DEFAULT 0,
     PlayTime        INTEGER DEFAULT 0,
+    InventoryExpansion INTEGER DEFAULT 0,
     PvpKillCount    INTEGER DEFAULT 0,
     PvpDeathCount   INTEGER DEFAULT 0,
     PvpPoint        INTEGER DEFAULT 0,
@@ -46,7 +47,8 @@ CREATE TABLE IF NOT EXISTS TB_CHARACTER (
     RestExp         INTEGER DEFAULT 0,
     ServerGroup     INTEGER DEFAULT 0,
     ChannelIdx      INTEGER DEFAULT 0,
-    Attribute       INTEGER DEFAULT 0
+    Attribute       INTEGER DEFAULT 0,
+    BattleStyle     INTEGER DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_char_account ON TB_CHARACTER(AccountID);
@@ -174,6 +176,8 @@ CREATE TABLE IF NOT EXISTS TB_GUILD (
     DeleteDate      TEXT,
     MarkData        BLOB,
     MarkLen         INTEGER DEFAULT 0,
+    EmblemData      BLOB,
+    EmblemLen       INTEGER DEFAULT 0,
     Notice          TEXT
 );
 
@@ -209,6 +213,7 @@ CREATE TABLE IF NOT EXISTS TB_FRIEND (
     CharacterIdx    INTEGER NOT NULL REFERENCES TB_CHARACTER(CharacterIdx),
     FriendIdx       INTEGER NOT NULL REFERENCES TB_CHARACTER(CharacterIdx),
     FriendGroup     INTEGER DEFAULT 0,
+    Memo            TEXT,
     RegDate         TEXT DEFAULT (datetime('now')),
     PRIMARY KEY (CharacterIdx, FriendIdx)
 );
@@ -263,6 +268,13 @@ CREATE TABLE IF NOT EXISTS TB_FARM (
     TaxRate         REAL DEFAULT 0,
     State           INTEGER DEFAULT 0,
     DelayTime       INTEGER DEFAULT 0,
+    GardenGrade     INTEGER DEFAULT 0,
+    HouseGrade      INTEGER DEFAULT 0,
+    WarehouseGrade  INTEGER DEFAULT 0,
+    AnimalCageGrade INTEGER DEFAULT 0,
+    FenceGrade      INTEGER DEFAULT 0,
+    TaxArrearageFreq INTEGER DEFAULT 0,
+    TaxPayPlayerName TEXT,
     CreateDate      TEXT DEFAULT (datetime('now')),
     UNIQUE(CharacterIdx)
 );
@@ -271,6 +283,11 @@ CREATE TABLE IF NOT EXISTS TB_FARM_CROP (
     CropIdx         INTEGER PRIMARY KEY AUTOINCREMENT,
     FarmIdx         INTEGER NOT NULL REFERENCES TB_FARM(FarmIdx) ON DELETE CASCADE,
     ItemDBIdx       INTEGER NOT NULL,
+    CropOwner       INTEGER DEFAULT 0,
+    CropStep        INTEGER DEFAULT 0,
+    CropLife        INTEGER DEFAULT 100,
+    CropNextStepTime INTEGER DEFAULT 0,
+    CropSeedGrade   INTEGER DEFAULT 0,
     PosX            INTEGER DEFAULT 0,
     PosY            INTEGER DEFAULT 0,
     State           INTEGER DEFAULT 0,
@@ -282,6 +299,12 @@ CREATE TABLE IF NOT EXISTS TB_FARM_ANIMAL (
     AnimalIdx       INTEGER PRIMARY KEY AUTOINCREMENT,
     FarmIdx         INTEGER NOT NULL REFERENCES TB_FARM(FarmIdx) ON DELETE CASCADE,
     ItemDBIdx       INTEGER NOT NULL,
+    AnimalOwner     INTEGER DEFAULT 0,
+    AnimalStep      INTEGER DEFAULT 0,
+    AnimalLife      INTEGER DEFAULT 100,
+    AnimalNextStepTime INTEGER DEFAULT 0,
+    Contentment     INTEGER DEFAULT 100,
+    Interest        INTEGER DEFAULT 100,
     PosX            INTEGER DEFAULT 0,
     PosY            INTEGER DEFAULT 0,
     State           INTEGER DEFAULT 0,
@@ -299,10 +322,16 @@ CREATE TABLE IF NOT EXISTS TB_HOUSE (
     FurnitureCount  INTEGER DEFAULT 0,
     CreateDate      TEXT DEFAULT (datetime('now')),
     LastRepairDate  TEXT,
-    State           INTEGER DEFAULT 0
+    State           INTEGER DEFAULT 0,
+    HouseName       TEXT,
+    HousePoint      INTEGER DEFAULT 0,
+    ExteriorKind    INTEGER DEFAULT 0,
+    DecoratePoint   INTEGER DEFAULT 0,
+    VisitCount      INTEGER DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_house_char ON TB_HOUSE(CharacterIdx);
+CREATE INDEX IF NOT EXISTS idx_house_point ON TB_HOUSE(HousePoint DESC);
 
 -- ─── Pet ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS TB_PET (
@@ -442,10 +471,17 @@ CREATE TABLE IF NOT EXISTS TB_HOUSE_FURNITURE (
     FurnitureIdx    INTEGER PRIMARY KEY AUTOINCREMENT,
     HouseIdx        INTEGER NOT NULL REFERENCES TB_HOUSE(HouseIdx) ON DELETE CASCADE,
     ItemDBIdx       INTEGER NOT NULL,
+    MaterialIdx     INTEGER DEFAULT 0,
     PosX            REAL DEFAULT 0,
     PosY            REAL DEFAULT 0,
     PosZ            REAL DEFAULT 0,
-    RotY            REAL DEFAULT 0
+    RotY            REAL DEFAULT 0,
+    Category        INTEGER DEFAULT 0,
+    Slot            INTEGER DEFAULT 0,
+    State           INTEGER DEFAULT 0,
+    NotDelete       INTEGER DEFAULT 0,
+    RemainTime      INTEGER DEFAULT 0,
+    RegDate         TEXT DEFAULT (datetime('now'))
 );
 
 -- ─── Vehicle Passenger ──────────────────────────────────────
@@ -852,5 +888,392 @@ CREATE TABLE IF NOT EXISTS map_data (
 );
 
 CREATE INDEX IF NOT EXISTS idx_map_data_name ON map_data(name);
+
+-- ─── Auction House ──────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_AUCTION (
+    AuctionIdx      INTEGER PRIMARY KEY AUTOINCREMENT,
+    CharacterIdx    INTEGER NOT NULL REFERENCES TB_CHARACTER(CharacterIdx),
+    ItemIdx         INTEGER NOT NULL REFERENCES TB_ITEM(ItemIdx),
+    Price           INTEGER NOT NULL,
+    BuyNowPrice     INTEGER DEFAULT 0,
+    DurationHours   INTEGER DEFAULT 24,
+    RegDate         TEXT DEFAULT (datetime('now')),
+    ExpireDate      TEXT,
+    IsSold          INTEGER DEFAULT 0,
+    SoldDate        TEXT,
+    IsCanceled      INTEGER DEFAULT 0,
+    BidderIdx       INTEGER REFERENCES TB_CHARACTER(CharacterIdx),
+    BidPrice        INTEGER DEFAULT 0,
+    BidDate         TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_auction_char ON TB_AUCTION(CharacterIdx);
+CREATE INDEX IF NOT EXISTS idx_auction_item ON TB_AUCTION(ItemIdx);
+CREATE INDEX IF NOT EXISTS idx_auction_active ON TB_AUCTION(IsSold, IsCanceled);
+CREATE INDEX IF NOT EXISTS idx_auction_expire ON TB_AUCTION(ExpireDate);
+
+-- ─── Billing ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_BILLING (
+    BillingIdx      INTEGER PRIMARY KEY AUTOINCREMENT,
+    AccountID       TEXT NOT NULL,
+    CharacterIdx    INTEGER REFERENCES TB_CHARACTER(CharacterIdx),
+    Amount          INTEGER NOT NULL,
+    Currency        TEXT DEFAULT 'KRW',
+    PaymentMethod   TEXT,
+    ProductID       TEXT,
+    ProductName     TEXT,
+    RegDate         TEXT DEFAULT (datetime('now')),
+    CompleteDate    TEXT,
+    State           INTEGER DEFAULT 0,
+    TransactionID   TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_billing_account ON TB_BILLING(AccountID);
+CREATE INDEX IF NOT EXISTS idx_billing_char ON TB_BILLING(CharacterIdx);
+CREATE INDEX IF NOT EXISTS idx_billing_state ON TB_BILLING(State);
+
+-- ─── Ranking ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_RANKING (
+    RankingIdx      INTEGER PRIMARY KEY AUTOINCREMENT,
+    RankingType     INTEGER NOT NULL,
+    CharacterIdx    INTEGER NOT NULL REFERENCES TB_CHARACTER(CharacterIdx),
+    Score           INTEGER DEFAULT 0,
+    Rank            INTEGER DEFAULT 0,
+    RegDate         TEXT DEFAULT (datetime('now')),
+    UpdateDate      TEXT,
+    UNIQUE(RankingType, CharacterIdx)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ranking_type ON TB_RANKING(RankingType);
+CREATE INDEX IF NOT EXISTS idx_ranking_score ON TB_RANKING(RankingType, Score DESC);
+
+CREATE TABLE IF NOT EXISTS TB_RANKING_HISTORY (
+    HistoryIdx      INTEGER PRIMARY KEY AUTOINCREMENT,
+    RankingType     INTEGER NOT NULL,
+    CharacterIdx    INTEGER NOT NULL REFERENCES TB_CHARACTER(CharacterIdx),
+    Rank            INTEGER DEFAULT 0,
+    Score           INTEGER DEFAULT 0,
+    RecordDate      TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_ranking_history ON TB_RANKING_HISTORY(RankingType, RecordDate);
+
+-- ─── Guild War ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_GUILD_WAR (
+    WarIdx          INTEGER PRIMARY KEY AUTOINCREMENT,
+    GuildIdx1       INTEGER NOT NULL REFERENCES TB_GUILD(GuildIdx),
+    GuildIdx2       INTEGER NOT NULL REFERENCES TB_GUILD(GuildIdx),
+    Money           INTEGER DEFAULT 0,
+    WarDate         TEXT DEFAULT (datetime('now')),
+    State           INTEGER DEFAULT 0,
+    WinnerIdx       INTEGER REFERENCES TB_GUILD(GuildIdx)
+);
+
+CREATE INDEX IF NOT EXISTS idx_guildwar_guild1 ON TB_GUILD_WAR(GuildIdx1);
+CREATE INDEX IF NOT EXISTS idx_guildwar_guild2 ON TB_GUILD_WAR(GuildIdx2);
+
+CREATE TABLE IF NOT EXISTS TB_GUILD_WAR_RECORD (
+    RecordIdx       INTEGER PRIMARY KEY AUTOINCREMENT,
+    GuildIdx        INTEGER NOT NULL REFERENCES TB_GUILD(GuildIdx),
+    Victory         INTEGER DEFAULT 0,
+    Draw            INTEGER DEFAULT 0,
+    Loose           INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_guildwar_record ON TB_GUILD_WAR_RECORD(GuildIdx);
+
+-- ─── Farm Time Delay ───────────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_FARM_TIMEDELAY (
+    DelayIdx        INTEGER PRIMARY KEY AUTOINCREMENT,
+    CharacterIdx    INTEGER NOT NULL REFERENCES TB_CHARACTER(CharacterIdx),
+    Kind            INTEGER NOT NULL,
+    RemainSecond    INTEGER DEFAULT 0,
+    UNIQUE(CharacterIdx, Kind)
+);
+
+-- ─── House Rank ────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_HOUSE_RANK (
+    HouseIdx        INTEGER PRIMARY KEY REFERENCES TB_HOUSE(HouseIdx) ON DELETE CASCADE,
+    Rank            INTEGER DEFAULT 0,
+    HousePoint      INTEGER DEFAULT 0,
+    CalcDate        TEXT
+);
+
+-- ============================================================
+-- SQL QUERY TEMPLATES (migrated from MSSQL stored procedures)
+-- SQLite does not support stored procedures; these are
+-- parameterized query templates used by the C++ DB layer.
+-- ============================================================
+
+-- ─── USP_HOUSE_FURNITURE_LOAD ──────────────────────────────
+-- Old: EXEC dbo.MP_HOUSE_FURNITURE_LOAD %d, %d, %d, %d, %d, %d, %d, %d
+-- Reborn: SELECT * FROM TB_HOUSE_FURNITURE WHERE HouseIdx = ?
+
+-- ─── USP_HOUSE_FURNITURE_UPDATE ────────────────────────────
+-- Old: EXEC dbo.MP_HOUSE_FURNITURE_UPDATE %d, %d, %d, %d, %d, %f, %f, %f, %f, %d, %d, %d, %d, %d
+-- Reborn INSERT/UPDATE:
+--   INSERT INTO TB_HOUSE_FURNITURE (HouseIdx, ItemDBIdx, MaterialIdx, PosX, PosY, PosZ, RotY, Category, Slot, State, NotDelete, RemainTime)
+--   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+--   ON CONFLICT(FurnitureIdx) DO UPDATE SET PosX=excluded.PosX, PosY=excluded.PosY, PosZ=excluded.PosZ, RotY=excluded.Roty, State=excluded.State, RemainTime=excluded.RemainTime
+
+-- ─── USP_HOUSE_DELETE ───────────────────────────────────────
+-- Old: EXEC dbo.MP_HOUSEDELETE %d, %d, %d, '%s'
+-- Reborn: DELETE FROM TB_HOUSE WHERE CharacterIdx = (SELECT CharacterIdx FROM TB_CHARACTER WHERE CharName = ?)
+
+-- ─── USP_HOUSE_RANK_LOAD ────────────────────────────────────
+-- Old: EXEC dbo.MP_HOUSERANK_LOAD
+-- Reborn: SELECT h.HouseIdx, h.HouseName, h.HousePoint, h.ExteriorKind, h.CharacterIdx, c.CharName
+--         FROM TB_HOUSE h JOIN TB_CHARACTER c ON h.CharacterIdx = c.CharacterIdx
+--         ORDER BY h.HousePoint DESC LIMIT 3
+
+-- ─── USP_HOUSE_RANK_UPDATE ──────────────────────────────────
+-- Old: EXEC dbo.MP_HOUSERANK
+-- Reborn: INSERT INTO TB_HOUSE_RANK (HouseIdx, Rank, HousePoint, CalcDate)
+--         SELECT HouseIdx,
+--                ROW_NUMBER() OVER (ORDER BY HousePoint DESC) as Rank,
+--                HousePoint, datetime('now')
+--         FROM TB_HOUSE ORDER BY HousePoint DESC LIMIT 3
+--         ON CONFLICT(HouseIdx) DO UPDATE SET Rank=excluded.Rank, HousePoint=excluded.HousePoint
+
+-- ─── USP_HOUSE_CREATE ───────────────────────────────────────
+-- Old: EXEC dbo.MP_HOUSECREATE %d, %d, %d, %f, %f, %d
+-- Reborn: INSERT INTO TB_HOUSE (CharacterIdx, MapIdx, PosX, PosY, HouseType) VALUES (?, ?, ?, ?, ?)
+
+-- ─── USP_HOUSE_DATA_LOAD ────────────────────────────────────
+-- Old: EXEC dbo.MP_HOUSEDATA_LOAD %d
+-- Reborn: SELECT * FROM TB_HOUSE WHERE CharacterIdx = ?
+
+-- ─── USP_FARM_SET_FARMSTATE ─────────────────────────────────
+-- Old: EXEC dbo.MP_FARM_SETFARMSTATE %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d
+-- Reborn: UPDATE TB_FARM SET State = ?, GardenGrade = ?, HouseGrade = ?, WarehouseGrade = ?,
+--         AnimalCageGrade = ?, FenceGrade = ?, TaxArrearageFreq = ?, TaxPayPlayerName = ?
+--         WHERE MapIdx = ? AND FarmIdx = ?
+
+-- ─── USP_FARM_SET_CROPINFO ──────────────────────────────────
+-- Old: EXEC dbo.MP_FARM_SETCROPINFO %d, %d, %d, %d, %d, %d, %d, %d
+-- Reborn: INSERT INTO TB_FARM_CROP (FarmIdx, ItemDBIdx, CropOwner, CropStep, CropLife, CropNextStepTime, CropSeedGrade)
+--         VALUES (?, ?, ?, ?, ?, ?, ?)
+--         ON CONFLICT(CropIdx) DO UPDATE SET CropStep=excluded.CropStep, CropLife=excluded.CropLife,
+--         CropNextStepTime=excluded.CropNextStepTime, CropSeedGrade=excluded.CropSeedGrade
+
+-- ─── USP_FARM_SET_ANIMALINFO ────────────────────────────────
+-- Old: EXEC dbo.MP_FARM_SETANIMALINFO %d, %d, %d, %d, %d, %d, %d, %d, %d
+-- Reborn: INSERT INTO TB_FARM_ANIMAL (FarmIdx, ItemDBIdx, AnimalOwner, AnimalStep, AnimalLife, AnimalNextStepTime, Contentment, Interest)
+--         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+--         ON CONFLICT(AnimalIdx) DO UPDATE SET AnimalStep=excluded.AnimalStep, AnimalLife=excluded.AnimalLife,
+--         AnimalNextStepTime=excluded.AnimalNextStepTime, Contentment=excluded.Contentment, Interest=excluded.Interest
+
+-- ─── USP_FARM_SET_TAXINFO ───────────────────────────────────
+-- Old: EXEC dbo.MP_FARM_SETTAXINFO %d, %d, %d, %d
+-- Reborn: UPDATE TB_FARM SET TaxArrearageFreq = ?, TaxPayPlayerName = (SELECT CharName FROM TB_CHARACTER WHERE CharacterIdx = ?)
+--         WHERE MapIdx = ? AND FarmIdx = ?
+
+-- ─── USP_FARM_SET_TIMEDELAY ─────────────────────────────────
+-- Old: EXEC dbo.MP_FARM_SETTIMEDELAY %d, %d, %d
+-- Reborn: INSERT INTO TB_FARM_TIMEDELAY (CharacterIdx, Kind, RemainSecond) VALUES (?, ?, ?)
+--         ON CONFLICT(CharacterIdx, Kind) DO UPDATE SET RemainSecond = excluded.RemainSecond
+
+-- ─── USP_FARM_LOAD_TIMEDELAY ────────────────────────────────
+-- Old: EXEC dbo.MP_FARM_LOADTIMEDELAY %d
+-- Reborn: SELECT * FROM TB_FARM_TIMEDELAY WHERE CharacterIdx = ?
+
+-- ─── USP_FARM_LOAD_FARMSTATE ────────────────────────────────
+-- Old: EXEC dbo.MP_FARM_LOADFARMSTATE %d, %d
+-- Reborn: SELECT * FROM TB_FARM WHERE MapIdx = ? AND FarmIdx = ?
+
+-- ─── USP_SIEGE_RECALL_INSERT ────────────────────────────────
+-- Old: EXEC dbo.MP_SIEGERECALL_INSERT %d, %d, %f, %f, %f
+-- Reborn: INSERT INTO TB_SIEGE_RECALL (CharacterIdx, MapIdx, PosX, PosY, PosZ) VALUES (?, ?, ?, ?, ?)
+
+-- ─── USP_SIEGE_RECALL_LOAD ──────────────────────────────────
+-- Old: EXEC dbo.MP_SIEGERECALL_LOAD %d
+-- Reborn: SELECT * FROM TB_SIEGE_RECALL WHERE CharacterIdx = ?
+
+-- ─── USP_SIEGE_WARFARE_INFO_LOAD ────────────────────────────
+-- Old: EXEC dbo.MP_SIEGEWARFARE_INFO_LOAD
+-- Reborn: SELECT MapIdx as MapType, GuildIdx as CastleGuildIdx, State FROM TB_SIEGE_WARFARE
+
+-- ─── USP_SIEGE_WARFARE_INFO_UPDATE ──────────────────────────
+-- Old: EXEC dbo.MP_SIEGEWARFARE_INFO_UPDATE %d, %d, %d
+-- Reborn: UPDATE TB_SIEGE_WARFARE SET GuildIdx = ?, State = ? WHERE MapIdx = ?
+
+-- ─── USP_SIEGE_WAR_WATERSEED_COMPLETE ───────────────────────
+-- Old: EXEC dbo.MP_SIEGEWAR_WATERSEED_COMPLETE %d, %d, %d, %d
+-- Reborn: UPDATE TB_SIEGE_WARFARE SET WaterSeed = 1 WHERE MapIdx = ? AND GuildIdx = ?
+
+-- ─── USP_GUILD_WAR_LOAD ─────────────────────────────────────
+-- Old: EXEC dbo.MP_GUILDFIELDWAR_LOAD %d
+-- Reborn: SELECT * FROM TB_GUILD_WAR WHERE WarIdx > ? ORDER BY WarIdx LIMIT 100
+
+-- ─── USP_GUILD_WAR_INSERT ───────────────────────────────────
+-- Old: EXEC dbo.MP_GUILDFIELDWAR_INSERT %d, %d, %u
+-- Reborn: INSERT INTO TB_GUILD_WAR (GuildIdx1, GuildIdx2, Money) VALUES (?, ?, ?)
+
+-- ─── USP_GUILD_WAR_DELETE ───────────────────────────────────
+-- Old: EXEC dbo.MP_GUILDFIELDWAR_DELETE %d, %d
+-- Reborn: DELETE FROM TB_GUILD_WAR WHERE GuildIdx1 = ? AND GuildIdx2 = ?
+
+-- ─── USP_GUILD_WAR_RECORD_UPDATE ────────────────────────────
+-- Old: EXEC dbo.MP_GUILDFIELDWAR_RECORD %d, %d, %d, %d
+-- Reborn: INSERT INTO TB_GUILD_WAR_RECORD (GuildIdx, Victory, Draw, Loose) VALUES (?, ?, ?, ?)
+--         ON CONFLICT(RecordIdx) DO UPDATE SET Victory=excluded.Victory, Draw=excluded.Draw, Loose=excluded.Loose
+
+-- ─── USP_GUILD_WAR_RECORD_DELETE ────────────────────────────
+-- Old: EXEC dbo.MP_GUILDWARRECORD_DELETE %d
+-- Reborn: DELETE FROM TB_GUILD_WAR_RECORD WHERE GuildIdx = ?
+
+-- ─── USP_GUILD_WAR_RECORD_LOAD ──────────────────────────────
+-- Old: EXEC dbo.MP_GUILDWARRECORD_LOAD %d
+-- Reborn: SELECT * FROM TB_GUILD_WAR_RECORD WHERE GuildIdx > ? ORDER BY GuildIdx LIMIT 100
+
+-- ─── USP_GUILD_UNION_LOAD ───────────────────────────────────
+-- Old: EXEC dbo.MP_GUILD_UNION_LOAD %d
+-- Reborn: SELECT u.*, m.GuildIdx as MemberGuildIdx FROM TB_GUILD_UNION u
+--         LEFT JOIN TB_GUILD_UNION_MEMBER m ON u.UnionIdx = m.UnionIdx
+--         WHERE u.UnionIdx > ? ORDER BY u.UnionIdx LIMIT 100
+
+-- ─── USP_GUILD_UNION_LOADMARK ───────────────────────────────
+-- Old: EXEC dbo.MP_GUILD_UNION_LOADMARK %d
+-- Reborn: SELECT UnionIdx, MarkLen, MarkData FROM TB_GUILD_UNION WHERE UnionIdx > ? ORDER BY UnionIdx LIMIT 100
+
+-- ─── USP_GUILD_UNION_CREATE ─────────────────────────────────
+-- Old: EXEC dbo.MP_GUILD_UNION_CREATE %d, '%s'
+-- Reborn: INSERT INTO TB_GUILD_UNION (UnionName, MasterGuildIdx) VALUES (?, ?)
+
+-- ─── USP_GUILD_UNION_DESTROY ────────────────────────────────
+-- Old: EXEC dbo.MP_GUILD_UNION_DESTROY %d, %d, %d, %d
+-- Reborn: DELETE FROM TB_GUILD_UNION WHERE UnionIdx = ?
+
+-- ─── USP_GUILD_UNION_ADDGUILD ───────────────────────────────
+-- Old: EXEC dbo.MP_GUILD_UNION_ADDGUILD %d, %d, %d
+-- Reborn: INSERT INTO TB_GUILD_UNION_MEMBER (UnionIdx, GuildIdx) VALUES (?, ?)
+
+-- ─── USP_GUILD_UNION_REMOVEGUILD ────────────────────────────
+-- Old: EXEC dbo.MP_GUILD_UNION_REMOVEGUILD %d, %d, %d
+-- Reborn: DELETE FROM TB_GUILD_UNION_MEMBER WHERE UnionIdx = ? AND GuildIdx = ?
+
+-- ─── USP_GUILD_UNION_SECEDEGUILD ────────────────────────────
+-- Old: EXEC dbo.MP_GUILD_UNION_SECEDEGUILD %d, %d, %d, %d
+-- Reborn: DELETE FROM TB_GUILD_UNION_MEMBER WHERE UnionIdx = ? AND GuildIdx = ?
+
+-- ─── USP_GUILD_UNION_MARKREGIST ─────────────────────────────
+-- Old: EXEC dbo.MP_GUILD_UNION_MARKREGIST %d, %d, %d, 0x...
+-- Reborn: UPDATE TB_GUILD_UNION SET MarkData = ?, MarkLen = ? WHERE UnionIdx = ?
+
+-- ─── USP_AUCTION_REGISTER ───────────────────────────────────
+-- Reborn: INSERT INTO TB_AUCTION (CharacterIdx, ItemIdx, Price, BuyNowPrice, DurationHours, ExpireDate)
+--         VALUES (?, ?, ?, ?, ?, datetime('now', '+' || ? || ' hours'))
+
+-- ─── USP_AUCTION_CANCEL ─────────────────────────────────────
+-- Reborn: UPDATE TB_AUCTION SET IsCanceled = 1 WHERE AuctionIdx = ? AND CharacterIdx = ?
+
+-- ─── USP_AUCTION_BUY ────────────────────────────────────────
+-- Reborn: UPDATE TB_AUCTION SET IsSold = 1, SoldDate = datetime('now'), BidderIdx = ?, BidPrice = ?
+--         WHERE AuctionIdx = ? AND IsSold = 0 AND IsCanceled = 0
+
+-- ─── USP_AUCTION_BID ────────────────────────────────────────
+-- Reborn: UPDATE TB_AUCTION SET BidderIdx = ?, BidPrice = ?, BidDate = datetime('now')
+--         WHERE AuctionIdx = ? AND IsSold = 0 AND IsCanceled = 0 AND BidPrice < ?
+
+-- ─── USP_AUCTION_LIST ───────────────────────────────────────
+-- Reborn: SELECT a.*, c.CharName FROM TB_AUCTION a
+--         JOIN TB_CHARACTER c ON a.CharacterIdx = c.CharacterIdx
+--         WHERE a.IsSold = 0 AND a.IsCanceled = 0 AND a.ExpireDate > datetime('now')
+--         ORDER BY a.RegDate DESC LIMIT ?
+
+-- ─── USP_AUCTION_MY_LIST ────────────────────────────────────
+-- Reborn: SELECT a.*, c.CharName FROM TB_AUCTION a
+--         JOIN TB_CHARACTER c ON a.CharacterIdx = c.CharacterIdx
+--         WHERE a.CharacterIdx = ? ORDER BY a.RegDate DESC
+
+-- ─── USP_BILLING_CHARGE ─────────────────────────────────────
+-- Reborn: INSERT INTO TB_BILLING (AccountID, CharacterIdx, Amount, Currency, PaymentMethod, ProductID, ProductName, State)
+--         VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+
+-- ─── USP_BILLING_COMPLETE ───────────────────────────────────
+-- Reborn: UPDATE TB_BILLING SET State = 1, CompleteDate = datetime('now'), TransactionID = ?
+--         WHERE BillingIdx = ?
+
+-- ─── USP_BILLING_HISTORY ────────────────────────────────────
+-- Reborn: SELECT * FROM TB_BILLING WHERE AccountID = ? ORDER BY RegDate DESC LIMIT ?
+
+-- ─── USP_EVENT_LOAD ─────────────────────────────────────────
+-- Reborn: SELECT * FROM TB_EVENT WHERE CharacterIdx = ? AND EventID = ?
+
+-- ─── USP_EVENT_SAVE ─────────────────────────────────────────
+-- Reborn: INSERT INTO TB_EVENT (CharacterIdx, EventID, EventData) VALUES (?, ?, ?)
+--         ON CONFLICT(CharacterIdx, EventID) DO UPDATE SET EventData = excluded.EventData
+
+-- ─── USP_EVENT_CHECK ────────────────────────────────────────
+-- Old: EXEC dbo.MP_QUEST_EVENTCHECK %d, %d, %d, %d, '%s'
+-- Reborn: SELECT COUNT(*) FROM TB_EVENT WHERE CharacterIdx = ? AND EventID = ?
+
+-- ─── USP_RANKING_UPDATE ─────────────────────────────────────
+-- Reborn: INSERT INTO TB_RANKING (RankingType, CharacterIdx, Score, Rank, UpdateDate)
+--         VALUES (?, ?, ?, ?, datetime('now'))
+--         ON CONFLICT(RankingType, CharacterIdx) DO UPDATE SET Score = excluded.Score, Rank = excluded.Rank, UpdateDate = excluded.UpdateDate
+
+-- ─── USP_RANKING_GET ────────────────────────────────────────
+-- Reborn: SELECT r.*, c.CharName FROM TB_RANKING r
+--         JOIN TB_CHARACTER c ON r.CharacterIdx = c.CharacterIdx
+--         WHERE r.RankingType = ? ORDER BY r.Score DESC LIMIT ?
+
+-- ─── USP_RANKING_SAVE_HISTORY ───────────────────────────────
+-- Reborn: INSERT INTO TB_RANKING_HISTORY (RankingType, CharacterIdx, Rank, Score, RecordDate)
+--         SELECT RankingType, CharacterIdx, Rank, Score, datetime('now') FROM TB_RANKING WHERE RankingType = ?
+
+-- ─── USP_GUILD_MARK_UPDATE ──────────────────────────────────
+-- Old: EXEC dbo.MP_GUILD_MARKUPDATE %d, %d, 0x...
+-- Reborn: UPDATE TB_GUILD SET MarkData = ?, MarkLen = ? WHERE GuildIdx = ?
+
+-- ─── USP_GUILD_MARK_LOAD ────────────────────────────────────
+-- Old: EXEC dbo.MP_GUILD_LOADMARK %d
+-- Reborn: SELECT MarkData, MarkLen FROM TB_GUILD WHERE GuildIdx = ?
+
+-- ─── Resident Registration ─────────────────────────────────
+CREATE TABLE IF NOT EXISTS TB_RESIDENTREGIST (
+    CharacterIdx    INTEGER PRIMARY KEY REFERENCES TB_CHARACTER(CharacterIdx),
+    NickName        TEXT,
+    Sex             INTEGER DEFAULT 0,
+    Age             INTEGER DEFAULT 0,
+    Location        INTEGER DEFAULT 0,
+    Favor           INTEGER DEFAULT 0,
+    PropensityLike01   INTEGER DEFAULT 0,
+    PropensityLike02   INTEGER DEFAULT 0,
+    PropensityLike03   INTEGER DEFAULT 0,
+    PropensityDisLike01 INTEGER DEFAULT 0,
+    PropensityDisLike02 INTEGER DEFAULT 0,
+    Introduction    TEXT
+);
+
+-- ─── USP_RESIDENTREGIST_LOAD ────────────────────────────────
+-- Old: EXEC dbo.MP_RESIDENTREGIST_LOADINFO %d
+-- Reborn: SELECT * FROM TB_RESIDENTREGIST WHERE CharacterIdx = ?
+
+-- ─── USP_RESIDENTREGIST_SAVE ────────────────────────────────
+-- Old: EXEC dbo.MP_RESIDENTREGIST_SAVEINFO %d, %s, %d, %d, %d, %d, %d, %d, %d, %d, %d
+-- Reborn: INSERT INTO TB_RESIDENTREGIST (CharacterIdx, NickName, Sex, Age, Location, Favor,
+--         PropensityLike01, PropensityLike02, PropensityLike03, PropensityDisLike01, PropensityDisLike02)
+--         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+--         ON CONFLICT(CharacterIdx) DO UPDATE SET Sex=excluded.Sex, Age=excluded.Age, Location=excluded.Location,
+--         Favor=excluded.Favor, PropensityLike01=excluded.PropensityLike01, PropensityLike02=excluded.PropensityLike02,
+--         PropensityLike03=excluded.PropensityLike03, PropensityDisLike01=excluded.PropensityDisLike01,
+--         PropensityDisLike02=excluded.PropensityDisLike02
+
+-- ─── USP_RESIDENTREGIST_UPDATE_INTRODUCTION ─────────────────
+-- Old: EXEC dbo.MP_RESIDENTREGIST_UPDATEINTRODUCTION %d, '%s'
+-- Reborn: UPDATE TB_RESIDENTREGIST SET Introduction = ? WHERE CharacterIdx = ?
+
+-- ─── USP_RESIDENTREGIST_RESET ───────────────────────────────
+-- Old: EXEC dbo.MP_RESIDENTREGIST_RESET %d
+-- Reborn: DELETE FROM TB_RESIDENTREGIST WHERE CharacterIdx = ?
+
+-- ─── USP_INVENTORY_EXPANSION ────────────────────────────────
+-- Old: EXEC dbo.MP_INCREASE_CHARACTER_INVENTORY %d
+-- Reborn: UPDATE TB_CHARACTER SET InventoryExpansion = InventoryExpansion + 1 WHERE CharacterIdx = ?
+
+-- ─── USP_INVENTORY_RESET ────────────────────────────────────
+-- Old: EXEC dbo.MP_RESET_CHARACTER_INVENTORY %d
+-- Reborn: UPDATE TB_CHARACTER SET InventoryExpansion = 0 WHERE CharacterIdx = ?
 
 COMMIT;

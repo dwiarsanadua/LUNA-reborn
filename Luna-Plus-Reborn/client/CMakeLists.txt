@@ -33,6 +33,7 @@ add_executable(LunaPlusClient
     ui/UiCaptureMode.cpp
     ui/LegacyHudOverlay.cpp
     ui/ScriptDialogPanel.cpp
+    ui/NoticeView.cpp
     ui/UiTabSheetController.cpp
     ui/UiTooltip.cpp
     util/ScreenshotCapture.cpp
@@ -47,6 +48,7 @@ add_executable(LunaPlusClient
     ui/dialogs/ChatPanel.cpp
     ui/dialogs/PartyDialog.cpp
     ui/dialogs/GuildDialog.cpp
+    ui/dialogs/GuildWarehouseDialog.cpp
     ui/dialogs/FriendDialog.cpp
     effects/EffectManager.cpp
     effects/WeatherSystem.cpp
@@ -96,7 +98,9 @@ add_executable(LunaPlusClient
     ui/dialogs/UpgradeDialog.cpp
     ui/dialogs/MacroDialog.cpp
     ui/dialogs/ChatRoomDialog.cpp
+    ui/dialogs/DateMatchingDialog.cpp
     ui/dialogs/FamilyDialog.cpp
+    ui/dialogs/FarmGetDialog.cpp
     ui/dialogs/HousingDialog.cpp
     ui/dialogs/DungeonDialog.cpp
     ui/dialogs/CostumeDialog.cpp
@@ -107,7 +111,9 @@ add_executable(LunaPlusClient
     ui/dialogs/MiniMapDlg.cpp
     ui/dialogs/HelperDlg.cpp
     ui/dialogs/FadeDlg.cpp
+    ui/dialogs/GameOutDialog.cpp
     ui/dialogs/PKManagerDlg.cpp
+    ui/dialogs/WeatherDialog.cpp
     ui/dialogs/OptionsDialog.cpp
     ui/dialogs/StorageDialog.cpp
     engine/GraphicEngine.cpp

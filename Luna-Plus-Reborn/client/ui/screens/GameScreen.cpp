@@ -33,6 +33,7 @@
 #include <Fishing_generated.h>
 #include <Secondary_generated.h>
 #include <Farm_generated.h>
+#include <Vehicle_generated.h>
 #include <PacketType_generated.h>
 #include <algorithm>
 #include <string>
@@ -51,6 +52,16 @@ void GameScreen::Enter() {
     ObjectBalloon::Clear();
     sky_.Init();
     weather_.SetWeather(WeatherSystem::Rain);
+    weather_dlg_.SetCurrentWeather(WeatherDialog::CLEAR);
+    weather_dlg_.SetWeatherCallback([this](WeatherDialog::WeatherType type) {
+        switch (type) {
+            case WeatherDialog::CLEAR:      weather_.SetWeather(WeatherSystem::Clear); break;
+            case WeatherDialog::RAIN:       weather_.SetWeather(WeatherSystem::Rain); break;
+            case WeatherDialog::HEAVY_RAIN: weather_.SetWeather(WeatherSystem::HeavyRain); break;
+            case WeatherDialog::SNOW:       weather_.SetWeather(WeatherSystem::Snow); break;
+        }
+        state_->chat_messages.push_back("Weather changed.");
+    });
     farm_.Init();
     farm_.AllocatePlots(9);
     consignment_.Init();
@@ -441,6 +452,57 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         ApplyFarmResponse(resp);
         return true;
     }
+    // Vehicle packets
+    case luna::protocol::PacketType_MP_VEHICLE_SUMMON_ACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::VehicleSummonResponse>(payload.data());
+        state_->chat_messages.push_back("Vehicle summoned!");
+        return true;
+    }
+    case luna::protocol::PacketType_MP_VEHICLE_SUMMON_NACK:
+    case luna::protocol::PacketType_MP_VEHICLE_UNSUMMON_NACK:
+    case luna::protocol::PacketType_MP_VEHICLE_MOUNT_REQUEST_NACK:
+    case luna::protocol::PacketType_MP_VEHICLE_MOUNT_REJECT_ACK: {
+        auto err = flatbuffers::GetRoot<luna::protocol::VehicleErrorResponse>(payload.data());
+        (void)err;
+        state_->chat_messages.push_back("Vehicle error occurred");
+        return true;
+    }
+    case luna::protocol::PacketType_MP_VEHICLE_UNSUMMON_ACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::VehicleUnsummonResponse>(payload.data());
+        (void)resp;
+        state_->chat_messages.push_back("Vehicle dismissed");
+        return true;
+    }
+    case luna::protocol::PacketType_MP_VEHICLE_MOUNT_REQUEST_SYN: {
+        auto req = flatbuffers::GetRoot<luna::protocol::VehicleMountAskRequest>(payload.data());
+        (void)req;
+        state_->chat_messages.push_back("Someone wants to ride your vehicle!");
+        return true;
+    }
+    case luna::protocol::PacketType_MP_VEHICLE_MOUNT_ALLOW_ACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::VehicleMountAllowResponse>(payload.data());
+        (void)resp;
+        state_->chat_messages.push_back("You mounted the vehicle!");
+        return true;
+    }
+    case luna::protocol::PacketType_MP_VEHICLE_DISMOUNT_ACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::VehicleDismountResponse>(payload.data());
+        (void)resp;
+        state_->chat_messages.push_back("You dismounted the vehicle");
+        return true;
+    }
+    case luna::protocol::PacketType_MP_VEHICLE_GET_OPTION_ACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::VehicleGetOptionResponse>(payload.data());
+        (void)resp;
+        state_->chat_messages.push_back("Vehicle toll info received");
+        return true;
+    }
+    case luna::protocol::PacketType_MP_VEHICLE_PASSENGER_ACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::VehiclePassengerInfo>(payload.data());
+        (void)resp;
+        state_->chat_messages.push_back("Passenger info received");
+        return true;
+    }
     default: return false;
     }
 }
@@ -501,6 +563,9 @@ void GameScreen::ToggleDialog(const std::string& name) {
     } else if (name == "mount") {
         state_->mount_open = open;
         if (open) mount_dlg_.Open(state_, &wm_);
+    } else if (name == "weather") {
+        if (open) weather_dlg_.Open(&wm_);
+        else weather_dlg_.Close();
     }
 
     if (open && audio_)
@@ -527,6 +592,7 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
         case 71:  ToggleDialog("guild"); return true;
         case 84:  ToggleDialog("pet"); return true;
         case 82:  ToggleDialog("mount"); return true;
+        case 87:  ToggleDialog("weather"); return true;
         default: break;
     }
 
@@ -627,7 +693,36 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
             farm_.AllocatePlots(9);
             if (!state_->offline_mode && network_ && network_->IsConnected())
                 RequestFarmInfo();
+
+            auto on_plant = [this](uint8_t plot_id, uint32_t seed_id) {
+                if (!state_->offline_mode && network_ && network_->IsConnected())
+                    SendFarmAction(1, plot_id, seed_id);
+                else
+                    farm_.Plant(plot_id, static_cast<int>(seed_id));
+            };
+            auto on_water = [this](uint8_t plot_id) {
+                if (!state_->offline_mode && network_ && network_->IsConnected())
+                    SendFarmAction(2, plot_id, 0);
+                else
+                    farm_.Water(plot_id);
+            };
+            auto on_harvest = [this](uint8_t plot_id) {
+                if (!state_->offline_mode && network_ && network_->IsConnected())
+                    SendFarmAction(3, plot_id, 0);
+                else {
+                    int item_id = 0, count = 0;
+                    if (farm_.Harvest(plot_id, item_id, count)) {
+                        if (state_) {
+                            char buf[128];
+                            snprintf(buf, sizeof(buf), "Harvested: +%d item_%d", count, item_id);
+                            state_->chat_messages.push_back(buf);
+                        }
+                    }
+                }
+            };
+            farm_get_dlg_.Open(state_, &wm_, on_plant, on_water, on_harvest);
         } else {
+            farm_get_dlg_.Close();
             farm_poll_timer_ = 0.0f;
         }
         if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_UI, "window_open1.wav");
@@ -949,7 +1044,7 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
                                 static_cast<uint32_t>(price > 0 ? price : 50));
                     } else if (arg.rfind("buy ", 0) == 0) {
                         int owner = 9200, slot = 0;
-                        sscanf(arg.substr(4).c_str(), "%d %hhu", &owner, &slot);
+                        sscanf(arg.substr(4).c_str(), "%d %d", &owner, &slot);
                         SendStreetStallBuy(static_cast<uint32_t>(owner), slot);
                     } else if (arg == "close") SendStreetStallClose();
                     else if (arg == "list") RequestStreetStallList();
@@ -2622,60 +2717,66 @@ void GameScreen::RenderUI(UIRenderer& ui) {
         ui.DrawText(220, ly + 10, 0xff888888, "[F1] Close");
     }
 
-    // === Farm Panel ===
+    // === Farm Panel / Dialog ===
     if (state_->farm_open) {
-        float fx = 80, fy = 80, fw = 420, fh = 320;
-        ui.DrawRect(fx, fy, fw, fh, {20, 40, 20, 235});
-        ui.DrawBorder(fx, fy, fw, fh, {100, 200, 100, 200});
-        ui.DrawText(fx + 8, fy + 6, 0xaaffaa, "FARM  (server sync)");
-        float ly = fy + 28;
-        ui.DrawText(fx + 8, ly, 0xffccffcc, "Seeds — press [1-5] to plant on matching plot:");
-        ly += 18;
-        if (!state_->network_farm_seeds.empty()) {
-            for (size_t i = 0; i < state_->network_farm_seeds.size(); ++i) {
-                const auto& s = state_->network_farm_seeds[i];
-                ui.DrawText(fx + 12, ly, 0xffffffff, "[%zu] %s  (%us grow)",
-                    i + 1, s.name.c_str(), s.growth_time_sec);
-                ly += 16;
-            }
+        if (farm_get_dlg_.GetWindow()) {
+            farm_get_dlg_.Refresh(state_);
+            farm_get_dlg_.GetWindow()->Render(ui);
         } else {
-            auto seeds = farm_.GetAllSeeds();
-            for (size_t i = 0; i < seeds.size(); ++i) {
-                ui.DrawText(fx + 12, ly, 0xffffffff, "[%zu] %s  (%ds)", i + 1,
-                    seeds[i].name.c_str(), seeds[i].growth_time);
-                ly += 16;
-            }
-        }
-        ly += 4;
-        ui.DrawText(fx + 8, ly, 0xffaaaaaa, "[W] Water   [R] Harvest   [H] Close");
-        ly += 20;
-        for (int p = 0; p < 9; p++) {
-            float px = fx + 12 + (p % 3) * 132;
-            float py = ly + (p / 3) * 58;
-            const GameState::NetworkFarmPlot* np = (p < (int)state_->network_farm_plots.size())
-                ? &state_->network_farm_plots[p] : nullptr;
-            auto* plot = farm_.GetPlot(p);
-            bool empty = !plot || plot->seed_id <= 0;
-            uint32_t col = empty ? 0xff2a3a2a : (np && np->ready ? 0xffddaa22 : 0xff44aa44);
-            ui.DrawRect(px, py, 120, 48, {(uint8_t)(col & 0xff), (uint8_t)((col >> 8) & 0xff),
-                (uint8_t)((col >> 16) & 0xff), 220});
-            ui.DrawBorder(px, py, 120, 48, {120, 200, 120, 180});
-            char title[64];
-            snprintf(title, sizeof(title), "Plot %d", p + 1);
-            ui.DrawText(px + 4, py + 2, 0xffffffff, "%s", title);
-            if (!empty && plot) {
-                ui.DrawText(px + 4, py + 14, 0xffeeeeee, "%s", plot->plant_name.c_str());
-                uint8_t pct = np ? np->growth_pct : 0;
-                if (plot->max_stages > 0 && pct == 0)
-                    pct = static_cast<uint8_t>((plot->growth_stage * 100) / plot->max_stages);
-                ui.DrawRect(px + 4, py + 28, 112, 8, {30, 30, 30, 200});
-                ui.DrawRect(px + 4, py + 28, 112.0f * pct / 100.0f, 8, {80, 180, 80, 255});
-                char stg[32];
-                snprintf(stg, sizeof(stg), "%u%% S%d/%d", pct, plot->growth_stage, plot->max_stages);
-                ui.DrawText(px + 4, py + 38, 0xffcccccc, "%s%s", stg,
-                    plot->watered ? " ~" : (np && np->ready ? " READY" : ""));
+            // Fallback inline rendering when script dialog unavailable
+            float fx = 80, fy = 80, fw = 420, fh = 320;
+            ui.DrawRect(fx, fy, fw, fh, {20, 40, 20, 235});
+            ui.DrawBorder(fx, fy, fw, fh, {100, 200, 100, 200});
+            ui.DrawText(fx + 8, fy + 6, 0xaaffaa, "FARM  (server sync)");
+            float ly = fy + 28;
+            ui.DrawText(fx + 8, ly, 0xffccffcc, "Seeds — press [1-5] to plant on matching plot:");
+            ly += 18;
+            if (!state_->network_farm_seeds.empty()) {
+                for (size_t i = 0; i < state_->network_farm_seeds.size(); ++i) {
+                    const auto& s = state_->network_farm_seeds[i];
+                    ui.DrawText(fx + 12, ly, 0xffffffff, "[%zu] %s  (%us grow)",
+                        i + 1, s.name.c_str(), s.growth_time_sec);
+                    ly += 16;
+                }
             } else {
-                ui.DrawText(px + 4, py + 20, 0xff888888, "Empty");
+                auto seeds = farm_.GetAllSeeds();
+                for (size_t i = 0; i < seeds.size(); ++i) {
+                    ui.DrawText(fx + 12, ly, 0xffffffff, "[%zu] %s  (%ds)", i + 1,
+                        seeds[i].name.c_str(), seeds[i].growth_time);
+                    ly += 16;
+                }
+            }
+            ly += 4;
+            ui.DrawText(fx + 8, ly, 0xffaaaaaa, "[W] Water   [R] Harvest   [H] Close");
+            ly += 20;
+            for (int p = 0; p < 9; p++) {
+                float px = fx + 12 + (p % 3) * 132;
+                float py = ly + (p / 3) * 58;
+                const GameState::NetworkFarmPlot* np = (p < (int)state_->network_farm_plots.size())
+                    ? &state_->network_farm_plots[p] : nullptr;
+                auto* plot = farm_.GetPlot(p);
+                bool empty = !plot || plot->seed_id <= 0;
+                uint32_t col = empty ? 0xff2a3a2a : (np && np->ready ? 0xffddaa22 : 0xff44aa44);
+                ui.DrawRect(px, py, 120, 48, {(uint8_t)(col & 0xff), (uint8_t)((col >> 8) & 0xff),
+                    (uint8_t)((col >> 16) & 0xff), 220});
+                ui.DrawBorder(px, py, 120, 48, {120, 200, 120, 180});
+                char title[64];
+                snprintf(title, sizeof(title), "Plot %d", p + 1);
+                ui.DrawText(px + 4, py + 2, 0xffffffff, "%s", title);
+                if (!empty && plot) {
+                    ui.DrawText(px + 4, py + 14, 0xffeeeeee, "%s", plot->plant_name.c_str());
+                    uint8_t pct = np ? np->growth_pct : 0;
+                    if (plot->max_stages > 0 && pct == 0)
+                        pct = static_cast<uint8_t>((plot->growth_stage * 100) / plot->max_stages);
+                    ui.DrawRect(px + 4, py + 28, 112, 8, {30, 30, 30, 200});
+                    ui.DrawRect(px + 4, py + 28, 112.0f * pct / 100.0f, 8, {80, 180, 80, 255});
+                    char stg[32];
+                    snprintf(stg, sizeof(stg), "%u%% S%d/%d", pct, plot->growth_stage, plot->max_stages);
+                    ui.DrawText(px + 4, py + 38, 0xffcccccc, "%s%s", stg,
+                        plot->watered ? " ~" : (np && np->ready ? " READY" : ""));
+                } else {
+                    ui.DrawText(px + 4, py + 20, 0xff888888, "Empty");
+                }
             }
         }
     }
@@ -2816,7 +2917,6 @@ void GameScreen::InitScriptDialogs() {
     reg("dissolve", "assets/interface/Windows/DissolveDialog.bin.txt", "Dissolve", 280, 160, 400, 300);
     reg("divide", "assets/interface/Windows/DivideBox.bin.txt", "Divide Item", 300, 180, 360, 240);
     reg("store_search", "assets/interface/Windows/StoreSearchDlg.bin.txt", "Store Search", 200, 80, 500, 420);
-    reg("weather", "assets/interface/Windows/WeatherDlg.bin.txt", "Weather", 400, 80, 320, 200);
     reg("challenge_zone", "assets/interface/Windows/ChallengeZoneListDlg.bin.txt", "Challenge Zone", 180, 100, 520, 400);
     reg("stall_buy", "assets/interface/Windows/StallBuy.bin.txt", "Stall Buy", 200, 100, 480, 380);
     reg("party_matching", "assets/interface/Windows/PartyMatchingDlg.bin.txt", "Party Matching", 260, 120, 420, 340);

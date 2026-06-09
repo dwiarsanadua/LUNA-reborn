@@ -11,7 +11,7 @@ class PhysicsWorld;
 class PKManagerDlg;
 
 enum class HeroState {
-    Idle, Walk, Run, Attack, Skill, Casting, Hit, Stun, Knockback, Die, Sit, Revive
+    Idle, Walk, Run, Attack, Skill, Casting, Hit, Stun, Knockback, Die, Sit, Revive, Dash
 };
 
 class Hero {
@@ -78,6 +78,17 @@ public:
     bool IsPKFlagged() const { return pk_flagged_; }
     void SetPKFlagged(bool f) { pk_flagged_ = f; }
 
+    // KyungGong (Dash)
+    void Dash();
+    bool IsDashing() const { return state_ == HeroState::Dash; }
+    bool CanDash() const { return dash_cooldown_ <= 0.0f && IsAlive() && CanAct(); }
+    float GetDashCooldown() const { return dash_cooldown_; }
+
+    // Bad Fame (PK Penalty)
+    void SetBadFame(int val) { bad_fame_ = val; }
+    int GetBadFame() const { return bad_fame_; }
+    void AddBadFame(int val) { bad_fame_ = std::max(0, bad_fame_ + val); }
+
 private:
     float x_ = 0, y_ = 3, z_ = 0;
     float prev_x_ = 0, prev_z_ = 0;
@@ -124,6 +135,8 @@ private:
     // PK state
     PKManagerDlg* pk_mgr_ = nullptr;
     bool pk_flagged_ = false;
+    int bad_fame_ = 0;
+    float pk_protection_timer_ = 0.0f;
     
     void ProcessStateTransitions(float dt);
 };

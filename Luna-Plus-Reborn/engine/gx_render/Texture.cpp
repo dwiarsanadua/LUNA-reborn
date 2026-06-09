@@ -3,8 +3,35 @@
 #include <stb_image.h>
 #include <spdlog/spdlog.h>
 #include <cstring>
+#include <cstdlib>
 #include <cmath>
 #include <algorithm>
+#include <random>
+
+// Generate fallback checkerboard pixel data for missing textures
+static std::vector<uint8_t> GenerateFallbackPixels(int& w, int& h) {
+    w = 64;
+    h = 64;
+    std::vector<uint8_t> pixels(w * h * 4);
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            int idx = (y * w + x) * 4;
+            bool is_checker = ((x / 8) + (y / 8)) % 2 == 0;
+            if (is_checker) {
+                pixels[idx + 0] = 255;  // Magenta
+                pixels[idx + 1] = 0;
+                pixels[idx + 2] = 255;
+                pixels[idx + 3] = 255;
+            } else {
+                pixels[idx + 0] = 0;
+                pixels[idx + 1] = 0;
+                pixels[idx + 2] = 0;
+                pixels[idx + 3] = 255;
+            }
+        }
+    }
+    return pixels;
+}
 
 Texture::Texture() = default;
 
@@ -41,10 +68,18 @@ void Texture::DownsampleLevel(const uint8_t* src, int src_w, int src_h,
 
 bool Texture::LoadFromFile(const std::string& path) {
     int w, h, channels;
+    bool is_fallback = false;
     unsigned char* data = stbi_load(path.c_str(), &w, &h, &channels, 4);
+
     if (!data) {
-        spdlog::error("Texture: failed to load '{}': {}", path, stbi_failure_reason());
-        return false;
+        spdlog::warn("Texture: failed to load '{}': {} — using fallback checkerboard", path, stbi_failure_reason());
+        auto fallback = GenerateFallbackPixels(w, h);
+        unsigned char* fb_data = (unsigned char*)std::malloc(w * h * 4);
+        if (!fb_data) return false;
+        std::memcpy(fb_data, fallback.data(), w * h * 4);
+        data = fb_data;
+        channels = 4;
+        is_fallback = true;
     }
 
     width_ = w;
@@ -87,7 +122,11 @@ bool Texture::LoadFromFile(const std::string& path) {
             bgfx::TextureFormat::RGBA8, 0, mem);
     }
 
-    stbi_image_free(data);
+    if (is_fallback) {
+        std::free(data);
+    } else {
+        stbi_image_free(data);
+    }
 
     if (!bgfx::isValid(handle_)) {
         spdlog::error("Texture: failed to create GPU texture from '{}'", path);
@@ -98,7 +137,7 @@ bool Texture::LoadFromFile(const std::string& path) {
         bgfx::setName(handle_, path.c_str());
     }
 
-    spdlog::debug("Texture: loaded '{}' ({}x{}, {} mips)", path, w, h, num_mips_);
+    spdlog::debug("Texture: {} '{}' ({}x{}, {} mips)", is_fallback ? "fallback for" : "loaded", path, w, h, num_mips_);
     return true;
 }
 

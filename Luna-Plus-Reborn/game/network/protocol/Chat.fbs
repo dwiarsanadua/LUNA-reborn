@@ -10,3 +10,45 @@ table ChatMessage {
     channel: ChatChannel;
     timestamp: uint64;
 }
+
+table WhisperMessage {
+    sender_id: uint32;
+    sender_name: string;
+    receiver_id: uint32;
+    receiver_name: string;
+    message: string (required);
+    timestamp: uint64;
+}
+
+table PartyChatMessage {
+    sender_id: uint32;
+    sender_name: string;
+    message: string (required);
+    member_ids: [uint32];
+    timestamp: uint64;
+}
+
+table GuildChatMessage {
+    sender_id: uint32;
+    sender_name: string;
+    guild_id: uint32;
+    message: string (required);
+    timestamp: uint64;
+}
+
+table FamilyChatMessage {
+    sender_id: uint32;
+    sender_name: string;
+    family_id: uint32;
+    message: string (required);
+    timestamp: uint64;
+}
+
+table ShoutMessage {
+    sender_id: uint32;
+    sender_name: string;
+    message: string (required);
+    item_id: uint32;
+    item_pos: uint32;
+    timestamp: uint64;
+}

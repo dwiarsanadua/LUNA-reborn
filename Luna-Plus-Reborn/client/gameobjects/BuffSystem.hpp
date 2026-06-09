@@ -109,4 +109,5 @@ private:
     int next_id_ = 1;
     std::vector<BuffInstance> active_buffs_;
     void ApplyMods(const BuffInstance& buff, CharacterStats& stats, bool apply);
+    void RecalculateMods(BuffInstance& buff, CharacterStats& stats);
 };

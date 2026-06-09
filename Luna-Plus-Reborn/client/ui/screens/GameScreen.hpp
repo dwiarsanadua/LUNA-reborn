@@ -32,6 +32,14 @@ struct HousingActionResponse;
 struct CashShopListResponse;
 struct CashShopBuyResponse;
 struct FarmResponse;
+struct VehicleSummonResponse;
+struct VehicleUnsummonResponse;
+struct VehicleMountAllowResponse;
+struct VehicleMountAskRequest;
+struct VehicleDismountResponse;
+struct VehicleGetOptionResponse;
+struct VehicleErrorResponse;
+struct VehiclePassengerInfo;
 }
 
 struct EntityInterp {
@@ -74,6 +82,7 @@ struct EntityInterp {
 #include <ui/dialogs/AvatarDialog.hpp>
 #include <ui/dialogs/UpgradeDialog.hpp>
 #include <ui/dialogs/MacroDialog.hpp>
+#include <ui/dialogs/WeatherDialog.hpp>
 #include <gameobjects/Pet.hpp>
 #include <gameobjects/TradingSystem.hpp>
 #include <gameobjects/TelemetrySystem.hpp>
@@ -103,6 +112,7 @@ struct EntityInterp {
 #include <ui/dialogs/MiniMapDlg.hpp>
 #include <ui/dialogs/HelperDlg.hpp>
 #include <ui/dialogs/FadeDlg.hpp>
+#include <ui/dialogs/FarmGetDialog.hpp>
 #include <ui/dialogs/PKManagerDlg.hpp>
 #include <engine/EngineMap.hpp>
 #include <engine/EngineSky.hpp>
@@ -291,6 +301,7 @@ private:
 
     // Farming
     FarmSystem farm_;
+    FarmGetDialog farm_get_dlg_;
     
     // Effects
     EffectManager effect_mgr_;
@@ -338,6 +349,7 @@ private:
     AvatarDialog avatar_dlg_;
     UpgradeDialog upgrade_dlg_;
     MacroDialog macro_dlg_;
+    WeatherDialog weather_dlg_;
     float farm_poll_timer_ = 0.0f;
     float farm_local_tick_ = 0.0f;
     float pet_poll_timer_ = 0.0f;

@@ -59,16 +59,27 @@ void FamilyDialog::Open(GameState* state, WindowManager* wm, FamilySystem* famil
         else if (family_) family_->CreateFamily(0, name);
     });
 
-    window_->AddWidget<Label>("Partner ID:", 14, 330, 0xffcccccc);
-    partner_id_input_ = window_->AddWidget<InputField>(90, 328, 60, 22);
+    // Family Invite section
+    window_->AddWidget<Label>("Invite player:", 14, 326, 0xff88ff88);
+    invite_name_input_ = window_->AddWidget<InputField>(100, 324, 120, 22);
+    invite_name_input_->SetPlaceholder("player name");
+
+    auto* invite_btn = window_->AddWidget<Button>("Invite", 230, 324, 70, 24);
+    invite_btn->SetColors({40,80,40,220}, {80,130,80,220}, {30,50,30,220});
+    invite_btn->OnEvent([this, state](const UIEvent& e) {
+        if (e.type == UIEvent::Click) DoInvite(state);
+    });
+
+    window_->AddWidget<Label>("Partner ID:", 14, 354, 0xffcccccc);
+    partner_id_input_ = window_->AddWidget<InputField>(90, 352, 60, 22);
     partner_id_input_->SetPlaceholder("999");
     partner_id_input_->SetValidation(InputValidation::PositiveInteger);
 
-    window_->AddWidget<Label>("Name:", 160, 330, 0xffcccccc);
-    partner_name_input_ = window_->AddWidget<InputField>(200, 328, 100, 22);
+    window_->AddWidget<Label>("Name:", 160, 354, 0xffcccccc);
+    partner_name_input_ = window_->AddWidget<InputField>(200, 352, 100, 22);
     partner_name_input_->SetPlaceholder("Partner");
 
-    auto* propose_btn = window_->AddWidget<Button>("Propose", 310, 328, 80, 24);
+    auto* propose_btn = window_->AddWidget<Button>("Propose", 310, 352, 80, 24);
     propose_btn->SetColors({80,40,80,220}, {130,80,130,220}, {50,30,50,220});
     propose_btn->OnEvent([this](const UIEvent& e) {
         if (e.type != UIEvent::Click) return;
@@ -81,7 +92,7 @@ void FamilyDialog::Open(GameState* state, WindowManager* wm, FamilySystem* famil
         else if (family_) family_->Propose(0, "Hero", target_id, target_name);
     });
 
-    auto* accept_btn = window_->AddWidget<Button>("Accept", 14, 362, 70, 24);
+    auto* accept_btn = window_->AddWidget<Button>("Accept", 14, 386, 70, 24);
     accept_btn->SetColors({40,80,40,220}, {80,130,80,220}, {30,50,30,220});
     accept_btn->OnEvent([this](const UIEvent& e) {
         if (e.type == UIEvent::Click) {
@@ -90,13 +101,13 @@ void FamilyDialog::Open(GameState* state, WindowManager* wm, FamilySystem* famil
         }
     });
 
-    auto* reject_btn = window_->AddWidget<Button>("Reject", 92, 362, 70, 24);
+    auto* reject_btn = window_->AddWidget<Button>("Reject", 92, 386, 70, 24);
     reject_btn->SetColors({80,60,40,220}, {130,100,80,220}, {50,40,30,220});
     reject_btn->OnEvent([this](const UIEvent& e) {
         if (e.type == UIEvent::Click && reject_fn_) reject_fn_();
     });
 
-    auto* divorce_btn = window_->AddWidget<Button>("Divorce", 170, 362, 70, 24);
+    auto* divorce_btn = window_->AddWidget<Button>("Divorce", 170, 386, 70, 24);
     divorce_btn->SetColors({80,30,30,220}, {130,60,60,220}, {50,20,20,220});
     divorce_btn->OnEvent([this, state](const UIEvent& e) {
         if (e.type == UIEvent::Click) {
@@ -108,7 +119,7 @@ void FamilyDialog::Open(GameState* state, WindowManager* wm, FamilySystem* famil
         }
     });
 
-    auto* leave_btn = window_->AddWidget<Button>("Leave Family", 248, 362, 100, 24);
+    auto* leave_btn = window_->AddWidget<Button>("Leave Family", 248, 386, 100, 24);
     leave_btn->SetColors({60,60,80,220}, {100,100,130,220}, {40,40,50,220});
     leave_btn->OnEvent([this](const UIEvent& e) {
         if (e.type == UIEvent::Click && leave_fn_) leave_fn_();
@@ -241,6 +252,34 @@ void FamilyDialog::Refresh(GameState* state) {
         "Pending proposals:\n%s",
         family_->IsEngaged(state->selected_char) ? "Engaged — accept or reject" : "None");
     tab3_label_->SetText(buf);
+}
+
+void FamilyDialog::DoInvite(GameState* state) {
+    if (!invite_name_input_) return;
+    std::string name = invite_name_input_->GetText();
+    if (name.empty()) {
+        state->chat_messages.push_back("Enter a player name to invite!");
+        return;
+    }
+    if (invite_fn_) {
+        invite_fn_(name);
+        state->chat_messages.push_back("Family invite sent to " + name);
+    } else if (family_) {
+        // Offline: lookup character ID by name, then invite
+        uint32_t invitee_id = 0;
+        auto members = family_->GetFamilyMembers(0);
+        for (const auto& m : members) {
+            if (m.name == name) { invitee_id = m.character_id; break; }
+        }
+        if (invitee_id == 0) {
+            state->chat_messages.push_back("Player '" + name + "' not found");
+            return;
+        }
+        bool ok = family_->InviteToFamily(state->selected_char, invitee_id);
+        state->chat_messages.push_back(ok
+            ? "Invitation sent to " + name
+            : "Failed to invite " + name);
+    }
 }
 
 void FamilyDialog::UpdateFromState(GameState* state) {

@@ -1,7 +1,9 @@
 #include "OptionsDialog.hpp"
 #include <ui/UiScriptParser.hpp>
-#include <spdlog/spdlog.h>
+#include <ui/ColorPalette.hpp>
+#include <ui/widgets/ListBox.hpp>
 #include <config/ConfigManager.hpp>
+#include <spdlog/spdlog.h>
 #include <cstdio>
 
 void OptionsDialog::Open(WindowManager* wm) {
@@ -11,50 +13,176 @@ void OptionsDialog::Open(WindowManager* wm) {
 
     if (!window_) {
         spdlog::warn("OptionsDialog: failed to load UI script, using C++ fallback");
-        window_ = new Window("OPTIONS", 200, 80, 400, 350);
+        window_ = new Window("OPTIONS", 200, 80, 480, 420);
         window_->SetClosable(true);
         window_->SetMovable(true);
     }
 
-    auto* tabs = window_->AddWidget<TabPanel>(10, 24, 380, 290);
+    tabs_ = window_->AddWidget<TabPanel>(10, 24, 460, 330);
 
-    // === Video Tab ===
-    auto* video_list = new ListBox(0, 0, 360, 270);
-    char buf[256];
-    snprintf(buf, sizeof(buf), "Resolution: %dx%d", ConfigManager::GetResolutionWidth(), ConfigManager::GetResolutionHeight());
-    video_list->AddItem(buf);
-    snprintf(buf, sizeof(buf), "Fullscreen: %s", ConfigManager::GetFullscreen() ? "ON" : "OFF");
-    video_list->AddItem(buf);
-    snprintf(buf, sizeof(buf), "VSync: %s", ConfigManager::GetVSync() ? "ON" : "OFF");
-    video_list->AddItem(buf);
-    snprintf(buf, sizeof(buf), "FPS Limit: %d", ConfigManager::GetFPSLimit());
-    video_list->AddItem(buf);
-    video_list->AddItem("");
-    video_list->AddItem("[1] Toggle Fullscreen  [2] Toggle VSync");
-    tabs->AddTab("Video", video_list);
+    BuildGameplayTab();
+    BuildChatFilterTab();
+    BuildGraphicsTab();
+    BuildAudioTab();
+    BuildActionButtons();
+    ReadSettings();
+}
 
-    // === Audio Tab ===
-    auto* audio_list = new ListBox(0, 0, 360, 270);
-    snprintf(buf, sizeof(buf), "Master Volume: %.0f%%", ConfigManager::GetMasterVolume() * 100);
-    audio_list->AddItem(buf);
-    snprintf(buf, sizeof(buf), "BGM Volume: %.0f%%", ConfigManager::GetBGMVolume() * 100);
-    audio_list->AddItem(buf);
-    snprintf(buf, sizeof(buf), "SFX Volume: %.0f%%", ConfigManager::GetSFXVolume() * 100);
-    audio_list->AddItem(buf);
-    audio_list->AddItem("");
-    audio_list->AddItem("[Q] Master-  [W] Master+  [A] BGM-  [S] BGM+");
-    audio_list->AddItem("[Z] SFX-  [X] SFX+");
-    tabs->AddTab("Audio", audio_list);
+void OptionsDialog::BuildGameplayTab() {
+    auto* list = new ListBox(0, 0, 440, 310);
+    const char* items[] = {
+        "Block Trade Requests",
+        "Block Party Invites",
+        "Block Friend Requests",
+        "Block Duel Requests",
+        "Show Battle Gauge",
+        "Show Guild Name",
+        "Show Party Name",
+        "Show Other Names",
+        "Show Party Damage",
+        "Show Game Tips",
+        "Hide Other Players",
+        "Hide Other Pets",
+        "Hide Stall Titles",
+        "Auto Quest Notice",
+        "",
+        "[1-9] Toggle options  [R] Reset tab",
+    };
+    for (auto* s : items) list->AddItem(s);
+    tabs_->AddTab("Gameplay", list);
+}
 
-    // === Gameplay Tab ===
-    auto* gameplay_list = new ListBox(0, 0, 360, 270);
-    snprintf(buf, sizeof(buf), "Show Damage: %s", ConfigManager::ShowDamageNumbers() ? "YES" : "NO");
-    gameplay_list->AddItem(buf);
-    snprintf(buf, sizeof(buf), "Camera Speed: %.1f", ConfigManager::GetCameraSpeed());
-    gameplay_list->AddItem(buf);
-    snprintf(buf, sizeof(buf), "Language: %s", ConfigManager::GetLanguage().c_str());
-    gameplay_list->AddItem(buf);
-    gameplay_list->AddItem("");
-    gameplay_list->AddItem("[D] Toggle Damage Numbers");
-    tabs->AddTab("Gameplay", gameplay_list);
+void OptionsDialog::BuildChatFilterTab() {
+    auto* list = new ListBox(0, 0, 440, 310);
+    const char* items[] = {
+        "Block Whispers",
+        "Block General Chat",
+        "Hide Speech Bubbles",
+        "Block Party Chat",
+        "Block Family Chat",
+        "Block Shout/World Chat",
+        "Block Guild Chat",
+        "Block Alliance Chat",
+        "Block System Messages",
+        "Block EXP/Acquire Msgs",
+        "Block Item Messages",
+        "",
+        "[1-9] Toggle filters",
+    };
+    for (auto* s : items) list->AddItem(s);
+    tabs_->AddTab("Chat Filter", list);
+}
+
+void OptionsDialog::BuildGraphicsTab() {
+    auto* list = new ListBox(0, 0, 440, 310);
+    char buf[128];
+
+    snprintf(buf, sizeof(buf), "View Distance: %d", sight_distance_);
+    list->AddItem(buf);
+    list->AddItem("[PageUp/Dn] Adjust view distance");
+    list->AddItem("");
+
+    bool hs = ConfigManager::GetBool("video.hero_shadow", true);
+    snprintf(buf, sizeof(buf), "Hero Shadow: %s", hs ? "ON" : "OFF");
+    list->AddItem(buf);
+
+    bool ms = ConfigManager::GetBool("video.monster_shadow", true);
+    snprintf(buf, sizeof(buf), "Monster Shadow: %s", ms ? "ON" : "OFF");
+    list->AddItem(buf);
+
+    bool os = ConfigManager::GetBool("video.others_shadow", true);
+    snprintf(buf, sizeof(buf), "Others Shadow: %s", os ? "ON" : "OFF");
+    list->AddItem(buf);
+    list->AddItem("[1/2/3] Toggle Hero/Monster/Others Shadow");
+    list->AddItem("");
+
+    bool ac = ConfigManager::GetBool("video.auto_graphics", false);
+    snprintf(buf, sizeof(buf), "Auto Graphics Control: %s", ac ? "ON" : "OFF");
+    list->AddItem(buf);
+    list->AddItem("[4] Toggle Auto Graphics");
+    list->AddItem("");
+
+    snprintf(buf, sizeof(buf), "Graphic Quality: %s", graphic_quality_basic_ ? "Basic" : "Lower");
+    list->AddItem(buf);
+    list->AddItem("[5] Toggle Graphic Quality");
+
+    tabs_->AddTab("Graphics", list);
+}
+
+void OptionsDialog::BuildAudioTab() {
+    auto* list = new ListBox(0, 0, 440, 310);
+    char buf[128];
+
+    snprintf(buf, sizeof(buf), "BGM: %s  Volume: %d%%",
+             (bgm_volume_ > 0) ? "ON" : "OFF", bgm_volume_);
+    list->AddItem(buf);
+    list->AddItem("[Q] BGM-  [W] BGM+  [Z] Toggle BGM");
+    list->AddItem("");
+
+    snprintf(buf, sizeof(buf), "SFX: %s  Volume: %d%%",
+             (sfx_volume_ > 0) ? "ON" : "OFF", sfx_volume_);
+    list->AddItem(buf);
+    list->AddItem("[A] SFX-  [S] SFX+  [X] Toggle SFX");
+
+    tabs_->AddTab("Audio", list);
+}
+
+void OptionsDialog::BuildActionButtons() {
+    auto* ok = window_->AddWidget<Button>("OK", 140, 365, 80, 28);
+    ok->SetColors({50,90,130,220}, {80,120,160,220}, {30,60,100,220});
+    ok->OnEvent([this](const UIEvent& e) {
+        if (e.type == UIEvent::Click) OnOK();
+    });
+
+    auto* cancel = window_->AddWidget<Button>("Cancel", 230, 365, 80, 28);
+    cancel->SetColors({50,90,130,220}, {80,120,160,220}, {30,60,100,220});
+    cancel->OnEvent([this](const UIEvent& e) {
+        if (e.type == UIEvent::Click) OnCancel();
+    });
+
+    auto* reset = window_->AddWidget<Button>("Reset", 320, 365, 80, 28);
+    reset->SetColors({50,90,130,220}, {80,120,160,220}, {30,60,100,220});
+    reset->OnEvent([this](const UIEvent& e) {
+        if (e.type == UIEvent::Click) OnReset();
+    });
+}
+
+void OptionsDialog::ReadSettings() {
+    sight_distance_ = ConfigManager::GetInt("video.view_distance", 100);
+    bgm_volume_ = static_cast<int>(ConfigManager::GetFloat("audio.bgm_volume", 0.7f) * 100);
+    sfx_volume_ = static_cast<int>(ConfigManager::GetFloat("audio.sfx_volume", 0.8f) * 100);
+}
+
+void OptionsDialog::ApplySettings() {
+    ConfigManager::SetInt("video.view_distance", sight_distance_);
+    ConfigManager::SetFloat("audio.bgm_volume", bgm_volume_ / 100.0f);
+    ConfigManager::SetFloat("audio.sfx_volume", sfx_volume_ / 100.0f);
+    ConfigManager::Save();
+    spdlog::info("OptionsDialog: settings applied and saved");
+}
+
+void OptionsDialog::OnOK() {
+    ApplySettings();
+    Close();
+}
+
+void OptionsDialog::OnCancel() {
+    Close();
+}
+
+void OptionsDialog::OnReset() {
+    sight_distance_ = 100;
+    bgm_volume_ = 80;
+    sfx_volume_ = 80;
+    graphic_quality_basic_ = true;
+    ApplySettings();
+    Close();
+    spdlog::info("OptionsDialog: reset to defaults");
+}
+
+void OptionsDialog::Close() {
+    if (window_) {
+        window_->Close();
+        window_ = nullptr;
+    }
 }

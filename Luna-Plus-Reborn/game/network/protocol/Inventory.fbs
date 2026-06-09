@@ -8,6 +8,7 @@ table InventorySlot {
     item_id: uint32;
     count: uint16;
     enchant: uint8;
+    durability: uint16 = 100;  // Old: wDurability
 }
 
 table InventoryData {
@@ -15,8 +16,42 @@ table InventoryData {
     slots: [InventorySlot];
 }
 
+// MP_ITEM_MOVE_SYN: Moving items between slots/storages
+table InventoryMoveRequest {
+    src_slot: uint8;           // Old: bySrcSlot
+    dst_slot: uint8;           // Old: byDstSlot (MISSING - ADDED)
+    src_storage_type: uint8;   // Old: wSrcStorageType (MISSING - ADDED)
+    dst_storage_type: uint8;   // Old: wDstStorageType (MISSING - ADDED)
+    item_id: uint32;           // Old: dwItemDBIdx
+    count: uint16;             // Old: byCount
+}
+
+// MP_ITEM_MOVE_ACK / NACK response
+table InventoryMoveResponse {
+    success: bool;
+    src_slot: uint8;
+    dst_slot: uint8;
+    item_id: uint32;
+    count: uint16;
+}
+
+// MP_ITEM_USE_SYN: Using an item
+table InventoryUseRequest {
+    slot_index: uint8;         // Old: bySlot
+    target_id: uint32;         // Old: dwTargetID
+}
+
+// MP_ITEM_USE_ACK / NACK response
+table InventoryUseResponse {
+    success: bool;
+    slot_index: uint8;
+    effect_id: uint16;
+}
+
+// General inventory update from server
 table InventoryUpdate {
     slot_index: uint8;
     item_id: uint32;
     count: uint16;
+    durability: uint16 = 100;  // Current durability after update
 }

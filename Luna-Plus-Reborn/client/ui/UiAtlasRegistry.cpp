@@ -14,15 +14,19 @@ static std::string ResolveAtlasFile(const std::string& legacy_path) {
     auto slash = name.find_last_of("/\\");
     if (slash != std::string::npos) name = name.substr(slash + 1);
 
+    // 1. Try exact filename in known texture directories
     const std::string candidates[] = {
         "assets/textures/" + name,
         "assets/textures/unpacked/image/" + name,
         "assets/interface/2DImage/image/" + name,
+        "assets/interface/image/" + name,
     };
     for (const auto& rel : candidates) {
         std::string found = VFS::Find(rel);
         if (!found.empty() && fs::exists(found)) return found;
     }
+
+    // 2. Strip extension and try .png (handles .spr → .png, .tga → .png, etc.)
     std::string base = name;
     auto dot = base.find_last_of('.');
     if (dot != std::string::npos) {
@@ -31,11 +35,50 @@ static std::string ResolveAtlasFile(const std::string& legacy_path) {
         const std::string png_candidates[] = {
             "assets/textures/" + png,
             "assets/textures/unpacked/image/" + png,
+            "assets/interface/2DImage/image/" + png,
+            "assets/interface/image/" + png,
         };
         for (const auto& rel : png_candidates) {
             std::string found = VFS::Find(rel);
             if (!found.empty() && fs::exists(found)) return found;
         }
+    }
+
+    // 3. .spr fallback: treat entire name as stem and try common paths
+    std::string spr_ext[] = {".spr", ".tga", ".bmp", ".dds", ".jpg"};
+    bool is_spr_like = false;
+    for (const auto& ext : spr_ext) {
+        auto pos = base.rfind(ext);
+        if (pos != std::string::npos && pos + ext.size() == base.size()) {
+            is_spr_like = true;
+            break;
+        }
+    }
+    if (is_spr_like || dot == std::string::npos) {
+        std::string stem = dot != std::string::npos ? base.substr(0, dot) : base;
+        const std::string fallback_candidates[] = {
+            "assets/textures/" + stem + ".png",
+            "assets/textures/unpacked/image/" + stem + ".png",
+            "assets/interface/2DImage/image/" + stem + ".png",
+            "assets/interface/image/" + stem + ".png",
+        };
+        for (const auto& rel : fallback_candidates) {
+            std::string found = VFS::Find(rel);
+            if (!found.empty() && fs::exists(found)) return found;
+        }
+        // Try with ui_ prefix (some old sprites were prefixed)
+        const std::string ui_candidates[] = {
+            "assets/textures/ui/" + stem + ".png",
+            "assets/textures/" + stem + ".png",
+        };
+        for (const auto& rel : ui_candidates) {
+            std::string found = VFS::Find(rel);
+            if (!found.empty() && fs::exists(found)) return found;
+        }
+    }
+
+    if (is_spr_like) {
+        spdlog::warn("UiAtlasRegistry: .spr file '{}' not resolved to any .png", legacy_path);
     }
     return {};
 }

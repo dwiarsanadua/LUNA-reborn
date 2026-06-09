@@ -1,5 +1,12 @@
 #pragma once
 #include <string>
+#include <vector>
+#include <cstdarg>
+
+struct StringEntry {
+    int id;
+    std::string text;
+};
 
 class UiStringTable {
 public:
@@ -8,6 +15,12 @@ public:
 
     static const char* Get(int id);
     static const char* GetOrEmpty(int id);
+    static std::string Format(int id, ...);
+    static std::string FormatV(int id, va_list args);
+    static bool Has(int id);
+    static int Count();
+    static std::vector<StringEntry> GetAll();
+    static void DumpMissing();
 
 private:
     static bool ready_;

@@ -64,6 +64,8 @@ void Hero::Init(GameState* state, AudioManager* audio, PhysicsWorld* physics) {
     skill_cooldown_ = 0;
     dash_cooldown_ = 0;
     pk_flagged_ = false;
+    bad_fame_ = 0;
+    pk_protection_timer_ = 0.0f;
 
     // Create physics character
     if (physics_world_) {
@@ -98,6 +100,7 @@ void Hero::Move(float dx, float dz, float dt) {
     }
     // Anti-speedhack: cap movement speed
     float max_speed = 150.0f; // units/sec
+    if (state_ == HeroState::Dash) max_speed = 350.0f; // dash speed boost
     float dist = std::sqrt(dx * dx + dz * dz);
     float max_delta = max_speed * dt;
     if (dist > max_delta) {
@@ -107,7 +110,8 @@ void Hero::Move(float dx, float dz, float dt) {
     }
     prev_x_ = x_; prev_z_ = z_;
     x_ += dx; z_ += dz;
-    state_ = (dist > 50.0f * dt) ? HeroState::Run : HeroState::Walk;
+    state_ = (state_ == HeroState::Dash) ? HeroState::Dash :
+             (dist > 50.0f * dt) ? HeroState::Run : HeroState::Walk;
 }
 
 void Hero::SetState(HeroState s, float duration) {
@@ -209,6 +213,13 @@ void Hero::Heal(int amount) {
     hp_ = std::min(max_hp_, hp_ + amount);
 }
 
+void Hero::Dash() {
+    if (!CanDash()) return;
+    dash_cooldown_ = 8.0f;
+    SetState(HeroState::Dash, 0.4f);
+    if (audio_) audio_->PlaySFXByCategory(AudioManager::SFX_Character, "dash.wav");
+}
+
 void Hero::LevelUp() {
     level_++;
     exp_next_ = level_ * 500;
@@ -272,10 +283,16 @@ void Hero::ProcessStateTransitions(float dt) {
         }
         break;
         
+    case HeroState::Dash:
+        if (state_timer_ >= state_duration_) {
+            SetState(HeroState::Idle);
+        }
+        break;
+
     case HeroState::Sit:
         // Stay sitting until key press
         break;
-        
+
     default:
         break;
     }
@@ -318,6 +335,8 @@ void Hero::Update(float dt) {
         skill_cooldown_ = std::max(0.0f, skill_cooldown_ - dt);
     if (dash_cooldown_ > 0.0f)
         dash_cooldown_ = std::max(0.0f, dash_cooldown_ - dt);
+    if (pk_protection_timer_ > 0.0f)
+        pk_protection_timer_ = std::max(0.0f, pk_protection_timer_ - dt);
 
     if (has_waypoint_ && CanAct()) {
         float dx = waypoint_x_ - x_, dz = waypoint_z_ - z_;
@@ -366,6 +385,7 @@ void Hero::Update(float dt) {
     CharAnim anim = CharAnim::Idle;
     if (state_ == HeroState::Attack || state_ == HeroState::Skill) anim = CharAnim::Attack;
     else if (state_ == HeroState::Die) anim = CharAnim::Die;
+    else if (state_ == HeroState::Dash) anim = CharAnim::Walk;
     else if (moving_ || state_ == HeroState::Walk || state_ == HeroState::Run) anim = CharAnim::Walk;
     CharRenderer_Move(0, x_, y_, z_, moving_ || state_ == HeroState::Walk || state_ == HeroState::Run, anim);
     
@@ -395,7 +415,7 @@ void Hero::Render(UIRenderer& ui) {
         // State indicator (show current state)
         const char* state_names[] = {
             "Idle", "Walk", "Run", "Attack", "Skill", "Casting",
-            "Hit", "Stun", "Knockback", "Die", "Sit", "Revive"
+            "Hit", "Stun", "Knockback", "Die", "Sit", "Revive", "Dash"
         };
         ui.DrawText(hx + 140, hy + 6, 0xff88ff88, "[%s]", state_names[(int)state_]);
 
@@ -428,6 +448,8 @@ void Hero::Render(UIRenderer& ui) {
             ui.DrawText(hx + 85, hy + 65, 0xff88ff88, "CASTING...");
         } else if (state_ == HeroState::Knockback) {
             ui.DrawText(hx + 85, hy + 65, 0xffff8800, "KNOCKBACK!");
+        } else if (state_ == HeroState::Dash) {
+            ui.DrawText(hx + 85, hy + 65, 0xff44ff44, "DASH!");
         }
     } else {
         ui.DrawText(hx + 1, hy + 1, 0x88000000, "%s  Lv.%d", name_.c_str(), level_);
@@ -435,7 +457,7 @@ void Hero::Render(UIRenderer& ui) {
         
         const char* state_names[] = {
             "Idle", "Walk", "Run", "Attack", "Skill", "Casting",
-            "Hit", "Stun", "Knockback", "Die", "Sit", "Revive"
+            "Hit", "Stun", "Knockback", "Die", "Sit", "Revive", "Dash"
         };
         ui.DrawText(hx + 120, hy, 0xff88ff88, "[%s]", state_names[(int)state_]);
 
@@ -461,8 +483,13 @@ void Hero::Render(UIRenderer& ui) {
             ui.DrawText(hx, hy+82, 0xff88ff88, "CASTING...");
         } else if (state_ == HeroState::Knockback) {
             ui.DrawText(hx, hy+82, 0xffff8800, "KNOCKBACK!");
+        } else if (state_ == HeroState::Dash) {
+            ui.DrawText(hx, hy+82, 0xff44ff44, "DASH!");
         }
         
         ui.DrawText(hx, hy+96, 0xffcccccc, "Gold: %d", gold_);
+        if (bad_fame_ > 0) {
+            ui.DrawText(hx, hy+110, 0xffff6644, "BadFame: %d", bad_fame_);
+        }
     }
 }

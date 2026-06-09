@@ -1,0 +1,119 @@
+include "Types.fbs";
+include "PacketType.fbs";
+
+namespace luna.protocol;
+
+enum VehicleError : ushort {
+    None = 0,
+    SummonByItem = 1,
+    SummonByDistance = 2,
+    SummonByUsingItem = 3,
+    SummonByCreateVehicle = 4,
+    SummonAlready = 5,
+    SummonByMount = 6,
+    UnsummonByDistance = 7,
+    UnsummonByNoMine = 8,
+    UnsummonByPassenger = 9,
+    MountByDistance = 10,
+    MountByFullSeat = 11,
+    MountBySitAlready = 12,
+    MountByNoVehicle = 13,
+    MountByOverSeatIndex = 14,
+    MountByNoOwner = 15,
+    MountByPlayerLevel = 16,
+    MountBySummonedAlready = 17,
+    DismountByDistance = 18,
+    DismountByNotSit = 19,
+    MoveByNoOwner = 20,
+    TollByFullSeat = 21,
+    TollByNoOwner = 22,
+    TollByNoPassenger = 23,
+    TollByOwnerHasFullMoney = 24,
+    TollByPassengerHasInsufficientMoney = 25,
+}
+
+table VehicleInfo {
+    vehicle_id: uint32;
+    owner_id: uint32;
+    name: string;
+    monster_kind: uint16;
+    max_passengers: uint8;
+    current_passengers: uint8;
+    speed: float;
+    position: Vec3;
+}
+
+table VehicleSummonRequest {
+    item_slot: uint8;
+}
+
+table VehicleSummonResponse {
+    vehicle_id: uint32;
+    owner_id: uint32;
+    item_slot: uint8;
+    summoned_by_player: bool;
+    vehicle: VehicleInfo;
+}
+
+table VehicleUnsummonRequest {
+    vehicle_id: uint32;
+}
+
+table VehicleUnsummonResponse {
+    player_id: uint32;
+    vehicle_id: uint32;
+}
+
+table VehicleMountRequest {
+    vehicle_id: uint32;
+    seat_index: uint8;
+}
+
+table VehicleMountAskRequest {
+    asked_player_id: uint32;
+    vehicle_id: uint32;
+    charged_money: uint32;
+    key: uint32;
+}
+
+table VehicleMountAllowResponse {
+    mounted_player_id: uint32;
+    vehicle_id: uint32;
+    seat_index: uint8;
+    owner_id: uint32;
+    toll_money: uint32;
+    vehicle_name: string;
+    player_name: string;
+}
+
+table VehicleMountRejectResponse {
+    result: byte;
+}
+
+table VehicleDismountRequest {
+    vehicle_id: uint32;
+}
+
+table VehicleDismountResponse {
+    player_id: uint32;
+    vehicle_id: uint32;
+    seat_index: uint8;
+}
+
+table VehicleGetOptionResponse {
+    vehicle_id: uint32;
+    charged_money: uint32;
+    key: uint32;
+}
+
+table VehicleErrorResponse {
+    error: VehicleError;
+    data: uint32;
+}
+
+table VehiclePassengerInfo {
+    vehicle_id: uint32;
+    owner_id: uint32;
+    passenger_id: uint32;
+    seat_index: uint8;
+}

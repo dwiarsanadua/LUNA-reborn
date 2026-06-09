@@ -8,9 +8,24 @@
 #include <ui/widgets/TabPanel.hpp>
 #include <ui/widgets/InputField.hpp>
 #include <ui/widgets/ListBox.hpp>
+#include <ui/widgets/ComboBox.hpp>
 #include <gameobjects/ConsignmentSystem.hpp>
 #include <cstdint>
 #include <functional>
+#include <vector>
+#include <string>
+
+struct Category1Entry {
+    int id;
+    std::string name;
+};
+
+struct Category2Entry {
+    int cat1_id;
+    int cat2_id;
+    std::string name;
+    int item_type_detail;
+};
 
 struct ConsignmentNetworkCallbacks {
     bool enabled = false;
@@ -44,6 +59,8 @@ private:
     InputField* search_input_ = nullptr;
     Label* gold_label_ = nullptr;
     Label* status_label_ = nullptr;
+    ComboBox* cat1_combo_ = nullptr;
+    ComboBox* cat2_combo_ = nullptr;
     ConsignmentSystem* consignment_ = nullptr;
     ConsignmentNetworkCallbacks net_cb_;
     std::vector<AuctionListing> cached_listings_;
@@ -53,6 +70,12 @@ private:
     int selected_stall_owner_ = 0;
     uint8_t selected_stall_slot_ = 0;
 
+    std::vector<Category1Entry> cat1_list_;
+    std::vector<Category2Entry> cat2_list_;
+    std::vector<int> cat2_visible_indices_;
+
+    void LoadCategories(const std::string& path);
+    void RefreshCat2Combo(int cat1_id);
     void RefreshBrowse(GameState* state);
     void RefreshMyListings(GameState* state);
     void RefreshMyBids(GameState* state);

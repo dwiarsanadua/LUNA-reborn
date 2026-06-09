@@ -10,10 +10,62 @@
 #include <spdlog/spdlog.h>
 #include <glm/glm.hpp>
 #include <fstream>
+#include <algorithm>
+#include <cfloat>
 
 // 3.2B: NavMesh placeholder for pathfinding integration
 static glm::vec3 QueryNavMeshPath(const glm::vec3& start, const glm::vec3& end) {
     return end; 
+}
+
+static void AccumulateThreat(AIComponent& ai, uint32_t entity_id, int32_t amount) {
+    for (auto& entry : ai.threat_table) {
+        if (entry.first == entity_id) {
+            entry.second += amount;
+            return;
+        }
+    }
+    ai.threat_table.push_back({entity_id, amount});
+}
+
+static uint32_t GetTopThreatTarget(const AIComponent& ai) {
+    if (ai.threat_table.empty()) return 0;
+    uint32_t top_id = 0;
+    int32_t top_amount = -1;
+    for (auto& entry : ai.threat_table) {
+        if (entry.second > top_amount) {
+            top_amount = entry.second;
+            top_id = entry.first;
+        }
+    }
+    return top_id;
+}
+
+static void RemoveThreat(AIComponent& ai, uint32_t entity_id) {
+    for (size_t i = 0; i < ai.threat_table.size(); i++) {
+        if (ai.threat_table[i].first == entity_id) {
+            ai.threat_table.erase(ai.threat_table.begin() + static_cast<ptrdiff_t>(i));
+            break;
+        }
+    }
+    for (size_t i = 0; i < ai.aggro_list.size(); i++) {
+        if (ai.aggro_list[i] == entity_id) {
+            ai.aggro_list.erase(ai.aggro_list.begin() + static_cast<ptrdiff_t>(i));
+            break;
+        }
+    }
+}
+
+static void DecayThreat(AIComponent& ai, float dt) {
+    if (ai.threat_table.empty()) return;
+    float decay_factor = 1.0f - std::min(dt * 0.5f, 0.95f);
+    for (auto& entry : ai.threat_table) {
+        entry.second = static_cast<int32_t>(entry.second * decay_factor);
+    }
+    ai.threat_table.erase(
+        std::remove_if(ai.threat_table.begin(), ai.threat_table.end(),
+            [](const auto& e) { return e.second <= 0; }),
+        ai.threat_table.end());
 }
 
 void AISystem::Update(entt::registry& registry, float dt) {
@@ -21,6 +73,45 @@ void AISystem::Update(entt::registry& registry, float dt) {
     for (auto entity : view) {
         auto& ai = view.get<AIComponent>(entity);
         auto& xform = view.get<Transform>(entity);
+
+        // --- Aggro decay ---
+        if (!ai.threat_table.empty()) {
+            DecayThreat(ai, dt);
+        }
+
+        // --- Verify aggro_target is still valid ---
+        if (ai.aggro_target != 0) {
+            entt::entity target_entity = static_cast<entt::entity>(ai.aggro_target);
+            if (!registry.valid(target_entity)) {
+                RemoveThreat(ai, ai.aggro_target);
+                ai.aggro_target = GetTopThreatTarget(ai);
+                if (ai.aggro_target == 0) {
+                    TransitionState(ai, AIComponent::Return);
+                }
+            } else {
+                auto* target_stats = registry.try_get<CharacterStats>(target_entity);
+                if (target_stats && target_stats->hp <= 0) {
+                    RemoveThreat(ai, ai.aggro_target);
+                    ai.aggro_target = GetTopThreatTarget(ai);
+                    if (ai.aggro_target == 0) {
+                        TransitionState(ai, AIComponent::Return);
+                    }
+                }
+            }
+        }
+
+        // --- Re-evaluate top threat periodically ---
+        if (ai.aggro_scan_timer >= 3.0f && ai.aggro_target != 0) {
+            uint32_t top = GetTopThreatTarget(ai);
+            if (top != 0 && top != ai.aggro_target) {
+                ai.aggro_target = top;
+                if (ai.state == AIComponent::Attack || ai.state == AIComponent::Chase) {
+                    spdlog::info("Monster {} switches target to {} (higher threat)", 
+                                 static_cast<uint32_t>(entity), top);
+                }
+            }
+            ai.aggro_scan_timer = 0;
+        }
 
         switch (ai.state) {
             case AIComponent::Idle:  UpdateIdle(registry, entity, ai, dt); break;
@@ -89,14 +180,38 @@ void AISystem::UpdatePatrol(entt::registry& reg, entt::entity e,
 void AISystem::UpdateChase(entt::registry& reg, entt::entity e,
                             AIComponent& ai, Transform& xform, Movement& mv, float dt) {
     if (!reg.valid(static_cast<entt::entity>(ai.aggro_target))) {
-        TransitionState(ai, AIComponent::Return);
-        return;
+        RemoveThreat(ai, ai.aggro_target);
+        ai.aggro_target = GetTopThreatTarget(ai);
+        if (ai.aggro_target == 0) {
+            TransitionState(ai, AIComponent::Return);
+            return;
+        }
     }
     auto& target_xform = reg.get<Transform>(static_cast<entt::entity>(ai.aggro_target));
+    auto* target_stats = reg.try_get<CharacterStats>(static_cast<entt::entity>(ai.aggro_target));
+    if (target_stats && target_stats->hp <= 0) {
+        RemoveThreat(ai, ai.aggro_target);
+        ai.aggro_target = GetTopThreatTarget(ai);
+        if (ai.aggro_target == 0) {
+            TransitionState(ai, AIComponent::Return);
+            return;
+        }
+        target_xform = reg.get<Transform>(static_cast<entt::entity>(ai.aggro_target));
+        target_stats = reg.try_get<CharacterStats>(static_cast<entt::entity>(ai.aggro_target));
+        if (!target_stats || target_stats->hp <= 0) {
+            TransitionState(ai, AIComponent::Return);
+            return;
+        }
+    }
     float dist = glm::distance(xform.position, target_xform.position);
     if (dist > ai.chase_range) {
-        TransitionState(ai, AIComponent::Return);
-        return;
+        RemoveThreat(ai, ai.aggro_target);
+        ai.aggro_target = GetTopThreatTarget(ai);
+        if (ai.aggro_target == 0) {
+            TransitionState(ai, AIComponent::Return);
+            return;
+        }
+        target_xform = reg.get<Transform>(static_cast<entt::entity>(ai.aggro_target));
     }
     if (dist <= ai.attack_range) {
         mv.is_moving = false;
@@ -113,8 +228,16 @@ void AISystem::UpdateChase(entt::registry& reg, entt::entity e,
 void AISystem::UpdateAttack(entt::registry& reg, entt::entity e,
                              AIComponent& ai, Transform& xform, float dt) {
     if (!reg.valid(static_cast<entt::entity>(ai.aggro_target))) {
-        TransitionState(ai, AIComponent::Return);
-        return;
+        RemoveThreat(ai, ai.aggro_target);
+        ai.aggro_target = GetTopThreatTarget(ai);
+        if (ai.aggro_target == 0) { TransitionState(ai, AIComponent::Return); return; }
+    }
+    
+    auto* target_stats = reg.try_get<CharacterStats>(static_cast<entt::entity>(ai.aggro_target));
+    if (target_stats && target_stats->hp <= 0) {
+        RemoveThreat(ai, ai.aggro_target);
+        ai.aggro_target = GetTopThreatTarget(ai);
+        if (ai.aggro_target == 0) { TransitionState(ai, AIComponent::Return); return; }
     }
     
     auto& target_xform = reg.get<Transform>(static_cast<entt::entity>(ai.aggro_target));
@@ -161,17 +284,25 @@ void AISystem::UpdateReturn(entt::registry& reg, entt::entity e,
 void AISystem::ScanForTargets(entt::registry& reg, entt::entity e,
                                AIComponent& ai, const Transform& xform) {
     auto view = reg.view<Transform, CharacterStats, TagPlayer>();
+    uint32_t best_target = 0;
+    float best_dist = FLT_MAX;
     for (auto target : view) {
         auto& t_xform = view.get<Transform>(target);
         float dist = glm::distance(xform.position, t_xform.position);
         if (dist < ai.aggro_range) {
-            ai.aggro_target = static_cast<uint32_t>(target);
-            ai.AddThreat(ai.aggro_target, 100);
-            spdlog::info("Monster {} aggroed on player {} (dist: {:.1f})", static_cast<uint32_t>(e), ai.aggro_target, dist);
-            TransitionState(ai, AIComponent::Chase);
-            RequestHelp(reg, e, ai, ai.aggro_target);
-            return;
+            AccumulateThreat(ai, static_cast<uint32_t>(target), 100);
+            if (dist < best_dist) {
+                best_dist = dist;
+                best_target = static_cast<uint32_t>(target);
+            }
         }
+    }
+    if (best_target != 0) {
+        uint32_t top = GetTopThreatTarget(ai);
+        ai.aggro_target = (top != 0) ? top : best_target;
+        spdlog::info("Monster {} aggroed on target {} (dist: {:.1f})", static_cast<uint32_t>(e), ai.aggro_target, best_dist);
+        TransitionState(ai, AIComponent::Chase);
+        RequestHelp(reg, e, ai, ai.aggro_target);
     }
 }
 
@@ -192,8 +323,8 @@ void AISystem::RequestHelp(entt::registry& reg, entt::entity e, AIComponent& ai,
         auto& other_xform = view.get<Transform>(other);
         float dist = glm::distance(xform.position, other_xform.position);
         if (dist < 15.0f && other_ai.aggro_target == 0) {
-            other_ai.aggro_target = target_id;
-            other_ai.AddThreat(target_id, 80);
+            AccumulateThreat(other_ai, target_id, 80);
+            other_ai.aggro_target = GetTopThreatTarget(other_ai);
             if (other_ai.state == AIComponent::Idle || other_ai.state == AIComponent::Patrol) {
                 TransitionState(other_ai, AIComponent::Chase);
             }

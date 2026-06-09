@@ -2,10 +2,228 @@
 #include <spdlog/spdlog.h>
 #include <random>
 #include <glm/glm.hpp>
+#include <fstream>
+#include <sstream>
+#include <algorithm>
 
 static std::mt19937 ai_rng(std::random_device{}());
 
-AISystem::AISystem() = default;
+AISystem::AISystem()
+    : group_manager_(std::make_unique<AIGroupManager>())
+    , rng_(std::random_device{}())
+{
+}
+
+AISystem::~AISystem() = default;
+
+// ─── Monster ID Generator ──────────────────────────────────
+
+uint32_t AISystem::GenerateMonsterId() {
+    return next_monster_id_++;
+}
+
+void AISystem::ReleaseMonsterId(uint32_t id) {
+    (void)id;
+}
+
+// ─── AIGroupManager ────────────────────────────────────────
+
+AIGroup& AIGroupManager::AddGroup(uint32_t group_index, uint32_t grid_index) {
+    GroupKey key{group_index, grid_index};
+    auto it = groups_.find(key);
+    if (it != groups_.end())
+        return *it->second;
+
+    auto group = std::make_unique<AIGroup>();
+    group->SetGroupIndex(group_index);
+    group->SetGridIndex(grid_index);
+    AIGroup& ref = *group;
+    groups_[key] = std::move(group);
+    return ref;
+}
+
+AIGroup* AIGroupManager::GetGroup(uint32_t group_index, uint32_t grid_index) {
+    GroupKey key{group_index, grid_index};
+    auto it = groups_.find(key);
+    return (it != groups_.end()) ? it->second.get() : nullptr;
+}
+
+void AIGroupManager::RegenProcess(entt::registry& registry, float dt) {
+    for (auto& [key, group] : groups_) {
+        group->UpdateRegen(dt);
+        if (group->ReadyToRegen()) {
+            spdlog::info("AIGroup {} (grid {}) regenerating", key.group_index, key.grid_index);
+            group->ResetRegenTimer();
+            for (const auto& monster : group->GetMonsters()) {
+                (void)monster;
+            }
+        }
+    }
+}
+
+// ─── Script Loading ─────────────────────────────────────────
+
+void AISystem::LoadAiScript(const std::string& filepath) {
+    script_spawns_.clear();
+    unique_script_spawns_.clear();
+
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        spdlog::warn("AISystem: cannot open script file: {}", filepath);
+        return;
+    }
+
+    const uint32_t oneMinuteMs = 60000;
+    AIGroupSpawn* current_spawn = nullptr;
+    bool is_unique = false;
+    std::string line;
+
+    while (std::getline(file, line)) {
+        if (line.empty() || line[0] == '#' || line[0] == '@')
+            continue;
+
+        std::istringstream iss(line);
+        std::string token;
+        iss >> token;
+
+        if (token == "group") {
+            uint32_t idx;
+            iss >> idx;
+            is_unique = false;
+            script_spawns_.emplace_back();
+            current_spawn = &script_spawns_.back();
+            current_spawn->group_index = idx;
+            current_spawn->is_unique = false;
+        }
+        else if (token == "unique") {
+            uint32_t idx;
+            iss >> idx;
+            is_unique = true;
+            unique_script_spawns_.emplace_back();
+            current_spawn = &unique_script_spawns_.back();
+            current_spawn->group_index = idx;
+            current_spawn->is_unique = true;
+        }
+        else if (token == "addCondition" && current_spawn) {
+            AIGroupCondition cond;
+            iss >> cond.target_group_index >> cond.ratio >> cond.delay_ms;
+            int regen_flag;
+            iss >> regen_flag;
+            cond.regen = (regen_flag != 0);
+            iss >> cond.range;
+            if (cond.range < 1) cond.range = 1;
+            current_spawn->conditions.push_back(cond);
+        }
+        else if (token == "add" && current_spawn) {
+            AIGroupMonster mon;
+            uint32_t obj_kind, mon_kind;
+            float x, z;
+            std::string machine;
+            iss >> obj_kind >> mon_kind >> x >> z >> machine;
+            mon.object_kind = obj_kind;
+            mon.monster_kind = mon_kind;
+            mon.position = glm::vec3(x, 0.0f, z);
+            mon.machine_name = machine;
+            current_spawn->monsters.push_back(mon);
+        }
+        else if (token == "fieldBossRegenPosition" && current_spawn) {
+            float x, z;
+            iss >> x >> z;
+            current_spawn->field_boss_positions.emplace_back(x, 0.0f, z);
+        }
+        else if (token == "randomRegenDelay" && current_spawn) {
+            uint32_t min_sec, max_sec;
+            iss >> min_sec >> max_sec;
+            current_spawn->regen_min_ms = min_sec * oneMinuteMs;
+            current_spawn->regen_max_ms = max_sec * oneMinuteMs;
+        }
+        else if (token == "uniqueRegenDelay" && current_spawn) {
+            uint32_t sec;
+            iss >> sec;
+            current_spawn->regen_min_ms = sec * oneMinuteMs;
+            current_spawn->regen_max_ms = sec * oneMinuteMs;
+        }
+        else if (token == "uniqueRandomRegenDelay" && current_spawn) {
+            uint32_t max_sec;
+            iss >> max_sec;
+            current_spawn->regen_min_ms = oneMinuteMs;
+            current_spawn->regen_max_ms = max_sec * oneMinuteMs;
+        }
+        else if (token == "uniqueRandomRegenDelay2" && current_spawn) {
+            uint32_t min_sec, max_sec;
+            iss >> min_sec >> max_sec;
+            current_spawn->regen_min_ms = min_sec * oneMinuteMs;
+            current_spawn->regen_max_ms = max_sec * oneMinuteMs;
+        }
+    }
+
+    spdlog::info("AISystem: loaded {} groups, {} unique groups from {}",
+                 script_spawns_.size(), unique_script_spawns_.size(), filepath);
+}
+
+void AISystem::LoadAiScriptFromData(entt::registry& registry,
+                                    const std::vector<AIGroupSpawn>& spawns,
+                                    uint32_t grid_index) {
+    for (const auto& spawn : spawns) {
+        AIGroup& group = group_manager_->AddGroup(spawn.group_index, grid_index);
+        for (const auto& cond : spawn.conditions) {
+            group.AddCondition(cond.target_group_index, cond.ratio,
+                              cond.delay_ms, cond.regen, cond.range);
+        }
+        for (const auto& mon : spawn.monsters) {
+            group.AddMonster(mon.object_kind, mon.monster_kind, mon.position, mon.machine_name);
+        }
+        for (const auto& pos : spawn.field_boss_positions) {
+            group.AddFieldBossPosition(pos);
+        }
+        group.SetRegenDelay(spawn.regen_min_ms, spawn.regen_max_ms);
+        group.SetIsUnique(spawn.is_unique);
+    }
+}
+
+// ─── Summon System ──────────────────────────────────────────
+
+void AISystem::Summon(entt::registry& registry, uint32_t grid_index) {
+    LoadAiScriptFromData(registry, script_spawns_, grid_index);
+}
+
+void AISystem::SummonOnAllChannels(entt::registry& registry, uint32_t channel_count) {
+    for (uint32_t channel = 0; channel < channel_count; ++channel) {
+        LoadAiScriptFromData(registry, script_spawns_, channel);
+    }
+
+    if (channel_count > 0 && !unique_script_spawns_.empty()) {
+        uint32_t random_channel = std::uniform_int_distribution<uint32_t>(0, channel_count - 1)(rng_);
+        LoadAiScriptFromData(registry, unique_script_spawns_, random_channel);
+    }
+}
+
+void AISystem::SummonGroup(entt::registry& registry, const AIGroupSpawn& spawn, uint32_t grid_index) {
+    AIGroup& group = group_manager_->AddGroup(spawn.group_index, grid_index);
+
+    for (const auto& mon : spawn.monsters) {
+        entt::entity entity = registry.create();
+        auto& ai = registry.emplace<AIComponent>(entity);
+        auto& stats = registry.emplace<CharacterStats>(entity);
+        auto& xform = registry.emplace<Transform>(entity);
+
+        uint32_t entity_id = GenerateMonsterId();
+        ai.spawn_position = mon.position;
+        xform.position = mon.position;
+        ai.aggro_range = 10.0f;
+        ai.attack_range = 3.0f;
+        ai.chase_range = 30.0f;
+        stats.max_hp = 100.0f;
+        stats.hp = stats.max_hp;
+        stats.move_speed = 3.0f;
+
+        group.AddAliveEntity(entity_id);
+        spdlog::debug("AISystem: spawned monster kind={} at ({}, {})",
+                      mon.monster_kind, mon.position.x, mon.position.z);
+    }
+}
+
+// ─── AI Update ──────────────────────────────────────────────
 
 void AISystem::Update(entt::registry& registry, float dt) {
     auto view = registry.view<AIComponent, CharacterStats>();
@@ -14,7 +232,6 @@ void AISystem::Update(entt::registry& registry, float dt) {
         auto& stats = view.get<CharacterStats>(entity);
 
         if (stats.hp <= 0) {
-            // Respawn logic: after delay, restore and reset to spawn
             ai.state_timer += dt;
             if (ai.state_timer >= 30.0f) {
                 stats.hp = stats.max_hp;
@@ -30,6 +247,13 @@ void AISystem::Update(entt::registry& registry, float dt) {
         }
 
         UpdateState(registry, entity, ai, stats, dt);
+    }
+
+    // Process group regen every 3 seconds
+    regen_check_timer_ += dt * 1000.0f;
+    if (regen_check_timer_ >= 3000.0f) {
+        regen_check_timer_ = 0.0f;
+        group_manager_->RegenProcess(registry, dt);
     }
 }
 

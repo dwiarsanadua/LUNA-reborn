@@ -8,8 +8,16 @@
 #include <Character_generated.h>
 #include <PacketType_generated.h>
 #include <spdlog/spdlog.h>
+#include <string>
 
 extern ScreenManager* g_screen_mgr;
+
+// Delete confirmation state (inline since header cannot be modified)
+static bool s_delete_confirm_pending = false;
+static int s_delete_target_slot = -1;
+static float s_delete_error_timer = 0.0f;
+static std::string s_delete_error_msg;
+static float s_delete_confirm_timer = 0.0f;
 
 void CharSelectScreen::Init(GameState* state, NetworkClient* network) {
     state_ = state;
@@ -77,11 +85,50 @@ bool CharSelectScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& p
         network_->SendPacket(PacketType_MP_USERCONN_CHARACTERLIST_SYN, fbb.GetBufferPointer(), fbb.GetSize());
         return true;
     }
+    if (type == PacketType_MP_USERCONN_CHARACTER_DELETE_ACK) {
+        // Character deleted successfully, refresh list
+        s_delete_confirm_pending = false;
+        s_delete_target_slot = -1;
+        s_delete_confirm_timer = 0.0f;
+        waiting_for_list_ = true;
+        flatbuffers::FlatBufferBuilder fbb;
+        auto req = CreateCharacterListRequestDirect(fbb, state_->session_token.c_str());
+        fbb.Finish(req);
+        network_->SendPacket(PacketType_MP_USERCONN_CHARACTERLIST_SYN, fbb.GetBufferPointer(), fbb.GetSize());
+        spdlog::info("CharSelect: character deleted successfully");
+        return true;
+    }
+    if (type == PacketType_MP_USERCONN_CHARACTER_REMOVE_NACK) {
+        // Delete failed
+        s_delete_confirm_pending = false;
+        s_delete_target_slot = -1;
+        s_delete_confirm_timer = 0.0f;
+        s_delete_error_msg = "Failed to delete character";
+        s_delete_error_timer = 5.0f;
+        spdlog::warn("CharSelect: character delete failed");
+        return true;
+    }
     return false;
 }
 
 void CharSelectScreen::Update(float dt) {
-    (void)dt;
+    // Delete confirmation timeout
+    if (s_delete_confirm_pending) {
+        s_delete_confirm_timer += dt;
+        if (s_delete_confirm_timer > 10.0f) {
+            s_delete_confirm_pending = false;
+            s_delete_target_slot = -1;
+            s_delete_confirm_timer = 0.0f;
+        }
+    }
+
+    // Error message timer
+    if (s_delete_error_timer > 0.0f) {
+        s_delete_error_timer -= dt;
+        if (s_delete_error_timer <= 0.0f) {
+            s_delete_error_msg.clear();
+        }
+    }
 }
 
 void CharSelectScreen::Render(UIRenderer& ui) {
@@ -137,8 +184,30 @@ void CharSelectScreen::Render(UIRenderer& ui) {
     bool can_enter = !slots_.empty() && selected_slot_ >= 0 && selected_slot_ < (int)slots_.size() && slots_[selected_slot_].exists;
     ui.DrawButton(lw * 0.5f + 50, by, 200, 36, "Enter Game", can_enter);
 
+    // Delete confirmation overlay
+    if (s_delete_confirm_pending) {
+        float cw = 400, ch = 160;
+        float cx = lw * 0.5f - cw * 0.5f;
+        float cy = lh * 0.5f - ch * 0.5f;
+        ui.DrawRect(cx, cy, cw, ch, UIColor{40, 20, 20, 240});
+        ui.DrawBorder(cx, cy, cw, ch, UIColor{200, 60, 60, 255});
+        ui.DrawTextCentered(cy + 20, 0xFFFF6666, "Delete Character?");
+        if (s_delete_target_slot >= 0 && s_delete_target_slot < (int)slots_.size() && slots_[s_delete_target_slot].exists) {
+            ui.DrawTextCentered(cy + 48, 0xFFFFCC88, "Name: %s", slots_[s_delete_target_slot].name.c_str());
+            ui.DrawTextCentered(cy + 68, 0xFFCCCCCC, "Level %d %s", slots_[s_delete_target_slot].level, "");
+        }
+        ui.DrawTextCentered(cy + 96, 0xFFAAAAAA, "Press ENTER to confirm, ESC to cancel");
+        float remaining = 10.0f - s_delete_confirm_timer;
+        ui.DrawTextCentered(cy + 118, 0xFF666666, "Auto-cancel in %.0fs", remaining);
+    }
+
+    // Error message
+    if (s_delete_error_timer > 0.0f && !s_delete_error_msg.empty()) {
+        ui.DrawTextCentered(lh * 0.80f, 0xFFFF4444, "%s", s_delete_error_msg.c_str());
+    }
+
     // Bottom hint
-    ui.DrawTextCentered(lh * 0.90f, 0xFF888888, "Arrows: Select  Enter: Start  C: Create  Esc: Back");
+    ui.DrawTextCentered(lh * 0.90f, 0xFF888888, "Arrows: Select  Enter: Start  C: Create  Del: Delete  Esc: Back");
 
     if (charmake_open_) charmake_dlg_.Render(ui);
 }
@@ -174,6 +243,32 @@ bool CharSelectScreen::HandleKey(int key, int scancode, int action, int mods) {
         }
     }
 
+    // Handle delete confirmation dialog
+    if (s_delete_confirm_pending) {
+        if (key == 257) { // Enter — confirm delete
+            s_delete_confirm_pending = false;
+            s_delete_confirm_timer = 0.0f;
+            if (s_delete_target_slot >= 0 && s_delete_target_slot < (int)slots_.size() && slots_[s_delete_target_slot].exists) {
+                uint32_t char_id = slots_[s_delete_target_slot].entity_id;
+                flatbuffers::FlatBufferBuilder fbb;
+                auto req = luna::protocol::CreateDeleteCharacterRequestDirect(
+                    fbb, state_->session_token.c_str(), char_id);
+                fbb.Finish(req);
+                network_->SendPacket(luna::protocol::PacketType_MP_USERCONN_CHARACTER_DELETE_SYN,
+                    fbb.GetBufferPointer(), fbb.GetSize());
+                spdlog::info("CharSelect: requesting delete of character {}", char_id);
+            }
+            return true;
+        }
+        if (key == 256) { // Escape — cancel delete
+            s_delete_confirm_pending = false;
+            s_delete_target_slot = -1;
+            s_delete_confirm_timer = 0.0f;
+            return true;
+        }
+        return false;
+    }
+
     if (key == 262) { // Right
         if (!slots_.empty())
             selected_slot_ = (selected_slot_ + 1) % (int)slots_.size();
@@ -198,6 +293,15 @@ bool CharSelectScreen::HandleKey(int key, int scancode, int action, int mods) {
         charmake_open_ = true;
         charmake_dlg_.Open(nullptr);
         state_->current_state = ClientState::CharMake;
+        return true;
+    }
+    if (key == 261 || key == 127) { // Delete key or Backspace — delete character
+        if (!slots_.empty() && selected_slot_ >= 0 && selected_slot_ < (int)slots_.size() && slots_[selected_slot_].exists) {
+            s_delete_confirm_pending = true;
+            s_delete_target_slot = selected_slot_;
+            s_delete_confirm_timer = 0.0f;
+            spdlog::info("CharSelect: delete confirmation for slot {}: {}", selected_slot_, slots_[selected_slot_].name);
+        }
         return true;
     }
 

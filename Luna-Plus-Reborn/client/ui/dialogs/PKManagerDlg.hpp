@@ -26,6 +26,8 @@ struct PKState {
     bool is_flagged = false;
     bool is_penalized = false;
     LootMode loot_mode = LootMode::Party;
+    int bad_fame = 0;
+    float pk_protection_remaining = 0.0f; // seconds remaining before PK can be toggled off
 };
 
 class PKManagerDlg {
@@ -43,6 +45,16 @@ public:
     void SetLootMode(LootMode mode);
     void AddPKPoint(int pts);
     void ResetPKPoints();
+
+    // Bad Fame
+    void SetBadFame(int val) { state_.bad_fame = val; }
+    int GetBadFame() const { return state_.bad_fame; }
+    void AddBadFame(int val) { state_.bad_fame = std::max(0, state_.bad_fame + val); }
+
+    // PK Protection Timer
+    void StartPKProtectionTimer();
+    bool CanTogglePKOff() const { return state_.pk_protection_remaining <= 0.0f; }
+    float GetPKProtectionRemaining() const { return state_.pk_protection_remaining; }
 
     // Integration
     bool CanAttack(bool is_player) const;

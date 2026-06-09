@@ -1,14 +1,95 @@
 #include "ConsignmentDialog.hpp"
+#include <engine/gx_render/VFS.h>
+#include <spdlog/spdlog.h>
 #include <cstdio>
 #include <algorithm>
+#include <fstream>
+#include <sstream>
+
+void ConsignmentDialog::LoadCategories(const std::string& path) {
+    cat1_list_.clear();
+    cat2_list_.clear();
+
+    std::string resolved = VFS::Find(path);
+    if (resolved.empty()) resolved = path;
+
+    std::ifstream in(resolved);
+    if (!in.is_open()) {
+        spdlog::warn("ConsignmentCategory: cannot open '{}'", resolved);
+        return;
+    }
+
+    std::string line;
+    int section = 0;
+
+    while (std::getline(in, line)) {
+        if (line.empty() || line[0] == '/' || line[0] == '{' || line[0] == '}') continue;
+
+        if (line.find("$Category1") != std::string::npos) { section = 1; continue; }
+        if (line.find("$Category2") != std::string::npos) { section = 2; continue; }
+
+        std::istringstream iss(line);
+        std::string cmd;
+        iss >> cmd;
+
+        if (cmd == "#AddList" && section == 1) {
+            int id; std::string name;
+            if (iss >> id) {
+                std::getline(iss, name);
+                name.erase(0, name.find_first_not_of(" \t"));
+                Category1Entry e;
+                e.id = id;
+                e.name = name;
+                cat1_list_.push_back(e);
+            }
+        } else if (cmd == "#AddList" && section == 2) {
+            int c1, c2, detail; std::string name;
+            if (iss >> c1 >> c2) {
+                std::getline(iss, name);
+                name.erase(0, name.find_first_not_of(" \t"));
+                size_t tab = name.find('\t');
+                if (tab != std::string::npos) {
+                    std::string rest = name.substr(tab + 1);
+                    name = name.substr(0, tab);
+                    detail = std::atoi(rest.c_str());
+                } else {
+                    detail = 0;
+                }
+                Category2Entry e;
+                e.cat1_id = c1;
+                e.cat2_id = c2;
+                e.name = name;
+                e.item_type_detail = detail;
+                cat2_list_.push_back(e);
+            }
+        }
+    }
+
+    spdlog::info("ConsignmentCategory: loaded {} cat1, {} cat2 entries",
+                 cat1_list_.size(), cat2_list_.size());
+}
+
+void ConsignmentDialog::RefreshCat2Combo(int cat1_id) {
+    if (!cat2_combo_) return;
+    cat2_combo_->Clear();
+    cat2_visible_indices_.clear();
+    for (size_t i = 0; i < cat2_list_.size(); i++) {
+        if (cat2_list_[i].cat1_id == cat1_id) {
+            cat2_combo_->AddItem(cat2_list_[i].name);
+            cat2_visible_indices_.push_back(static_cast<int>(i));
+        }
+    }
+}
 
 void ConsignmentDialog::Open(GameState* state, WindowManager* wm, ConsignmentSystem* cs) {
     consignment_ = cs;
     window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/Consignment.bin.txt",
-        "Auction House", 80, 40, 600, 480);
+        "Auction House", 80, 40, 700, 520);
     window_->SetClosable(true);
     window_->SetMovable(true);
     window_->SetTitleBarH(24);
+
+    LoadCategories("assets/interface/Windows/ConsignmentCategory.bin.txt");
 
     char gold_buf[64];
     snprintf(gold_buf, sizeof(gold_buf), "Gold: %d", state->gold);
@@ -16,14 +97,32 @@ void ConsignmentDialog::Open(GameState* state, WindowManager* wm, ConsignmentSys
 
     auto* search_lbl = window_->AddWidget<Label>("Search:", 10, 28, 0xffcccccc);
     (void)search_lbl;
-    search_input_ = window_->AddWidget<InputField>(70, 28, 180, 20);
+    search_input_ = window_->AddWidget<InputField>(70, 28, 140, 20);
     search_input_->SetPlaceholder("item name...");
-    auto* search_btn = window_->AddWidget<Button>("Search", 260, 28, 70, 20);
+
+    auto* cat1_lbl = window_->AddWidget<Label>("Category:", 220, 28, 0xffcccccc);
+    (void)cat1_lbl;
+    cat1_combo_ = window_->AddWidget<ComboBox>(290, 28, 140, 20);
+    for (const auto& c : cat1_list_) {
+        cat1_combo_->AddItem(c.name);
+    }
+    cat1_combo_->OnEvent([this](const UIEvent& e) {
+        if (e.type == UIEvent::ValueChanged) {
+            int idx = e.int_value;
+            if (idx >= 0 && idx < (int)cat1_list_.size()) {
+                RefreshCat2Combo(cat1_list_[idx].id);
+            }
+        }
+    });
+    if (!cat1_list_.empty()) RefreshCat2Combo(cat1_list_[0].id);
+
+    auto* search_btn = window_->AddWidget<Button>("Search", 440, 28, 70, 20);
     search_btn->SetColors({50,80,50,220}, {80,130,80,220}, {30,50,30,220});
     search_btn->OnEvent([this, state](const UIEvent& e) {
         if (e.type == UIEvent::Click) RefreshBrowse(state);
     });
-    auto* refresh_btn = window_->AddWidget<Button>("Refresh", 340, 28, 70, 20);
+
+    auto* refresh_btn = window_->AddWidget<Button>("Refresh", 520, 28, 70, 20);
     refresh_btn->OnEvent([this, state](const UIEvent& e) {
         if (e.type == UIEvent::Click) {
             RefreshBrowse(state);
@@ -33,7 +132,7 @@ void ConsignmentDialog::Open(GameState* state, WindowManager* wm, ConsignmentSys
         }
     });
 
-    tabs_ = window_->AddWidget<TabPanel>(10, 52, 580, 340);
+    tabs_ = window_->AddWidget<TabPanel>(10, 52, 680, 370);
     tabs_->OnEvent([this](const UIEvent& e) {
         if (e.type == UIEvent::TabSelected) {
             browse_grid_->SetVisible(e.int_value == 0);
@@ -43,7 +142,7 @@ void ConsignmentDialog::Open(GameState* state, WindowManager* wm, ConsignmentSys
         }
     });
 
-    browse_grid_ = window_->AddWidget<Grid>(6, 4, 135, 30, 14, 80);
+    browse_grid_ = window_->AddWidget<Grid>(6, 4, 165, 30, 14, 80);
     browse_grid_->SetPadding(3);
     browse_grid_->OnSlotEvent([this, state](int row, int col, const UIEvent& e) {
         (void)col;
@@ -60,21 +159,20 @@ void ConsignmentDialog::Open(GameState* state, WindowManager* wm, ConsignmentSys
             }
         }
     });
+    tabs_->AddTab("Browse", browse_grid_);
 
-    my_grid_ = window_->AddWidget<Grid>(6, 4, 135, 30, 14, 80);
+    my_grid_ = window_->AddWidget<Grid>(6, 4, 165, 30, 14, 80);
     my_grid_->SetPadding(3);
-    my_grid_->SetVisible(false);
+    tabs_->AddTab("My Listings", my_grid_);
 
-    bid_grid_ = window_->AddWidget<Grid>(6, 4, 135, 30, 14, 80);
+    bid_grid_ = window_->AddWidget<Grid>(6, 4, 165, 30, 14, 80);
     bid_grid_->SetPadding(3);
-    bid_grid_->SetVisible(false);
+    tabs_->AddTab("My Bids", bid_grid_);
 
-    stall_list_ = new ListBox(0, 0, 560, 300);
-    stall_list_->AddItem("Street stalls (online sync)");
+    stall_list_ = new ListBox(0, 0, 660, 340);
     tabs_->AddTab("Stall", stall_list_);
-    stall_list_->SetVisible(false);
 
-    auto* buyout_btn = window_->AddWidget<Button>("Buyout", 10, 410, 80, 24);
+    auto* buyout_btn = window_->AddWidget<Button>("Buyout", 10, 440, 80, 24);
     buyout_btn->SetColors({50,80,50,220}, {80,130,80,220}, {30,50,30,220});
     buyout_btn->OnEvent([this, state](const UIEvent& e) {
         if (e.type != UIEvent::Click) return;
@@ -88,7 +186,7 @@ void ConsignmentDialog::Open(GameState* state, WindowManager* wm, ConsignmentSys
             DoBuyout(state, cached_listings_[idx]);
     });
 
-    auto* bid_btn = window_->AddWidget<Button>("Bid", 100, 410, 70, 24);
+    auto* bid_btn = window_->AddWidget<Button>("Bid", 100, 440, 70, 24);
     bid_btn->OnEvent([this, state](const UIEvent& e) {
         if (e.type != UIEvent::Click || tabs_->GetActive() != 0) return;
         int idx = selected_row_ >= 0 ? selected_row_ * 4 : -1;
@@ -96,7 +194,7 @@ void ConsignmentDialog::Open(GameState* state, WindowManager* wm, ConsignmentSys
             DoBid(state, cached_listings_[idx]);
     });
 
-    auto* cancel_btn = window_->AddWidget<Button>("Cancel", 200, 410, 80, 24);
+    auto* cancel_btn = window_->AddWidget<Button>("Cancel", 200, 440, 80, 24);
     cancel_btn->SetColors({80,40,40,220}, {130,80,80,220}, {50,30,30,220});
     cancel_btn->OnEvent([this, state](const UIEvent& e) {
         if (e.type != UIEvent::Click) return;
@@ -110,7 +208,7 @@ void ConsignmentDialog::Open(GameState* state, WindowManager* wm, ConsignmentSys
             DoCancelListing(state, cached_my_listings_[idx].id);
     });
 
-    auto* list_btn = window_->AddWidget<Button>("List Item", 440, 410, 90, 24);
+    auto* list_btn = window_->AddWidget<Button>("List Item", 520, 440, 90, 24);
     list_btn->SetColors({40,60,100,220}, {80,100,160,220}, {30,40,70,220});
     list_btn->OnEvent([this, state](const UIEvent& e) {
         if (e.type != UIEvent::Click) return;
@@ -121,14 +219,14 @@ void ConsignmentDialog::Open(GameState* state, WindowManager* wm, ConsignmentSys
         DoListItem(state);
     });
 
-    auto* stall_add_btn = window_->AddWidget<Button>("Stall Add", 340, 410, 80, 24);
+    auto* stall_add_btn = window_->AddWidget<Button>("Stall Add", 420, 440, 80, 24);
     stall_add_btn->OnEvent([this, state](const UIEvent& e) {
         if (e.type != UIEvent::Click || tabs_->GetActive() != 3) return;
         if (net_cb_.enabled && net_cb_.on_stall_add && !state->inventory.empty())
             net_cb_.on_stall_add(static_cast<uint8_t>(state->inventory[0].slot), 50);
     });
 
-    status_label_ = window_->AddWidget<Label>("Select a listing or list an item", 10, 442, 0xffaaaaaa);
+    status_label_ = window_->AddWidget<Label>("Select a listing or list an item", 10, 476, 0xffaaaaaa);
     RefreshBrowse(state);
     RefreshMyListings(state);
     RefreshMyBids(state);
@@ -156,6 +254,22 @@ void ConsignmentDialog::PopulateGrid(Grid* grid, const std::vector<AuctionListin
 
 void ConsignmentDialog::RefreshBrowse(GameState* state) {
     if (!browse_grid_) return;
+
+    int cat1 = 0, cat2 = 0;
+    if (cat1_combo_) {
+        int c1_idx = cat1_combo_->GetSelected();
+        if (c1_idx >= 0 && c1_idx < (int)cat1_list_.size())
+            cat1 = cat1_list_[c1_idx].id;
+    }
+    if (cat2_combo_) {
+        int c2_idx = cat2_combo_->GetSelected();
+        if (c2_idx >= 0 && c2_idx < (int)cat2_visible_indices_.size()) {
+            int real_idx = cat2_visible_indices_[c2_idx];
+            if (real_idx >= 0 && real_idx < (int)cat2_list_.size())
+                cat2 = cat2_list_[real_idx].cat2_id;
+        }
+    }
+
     if (net_cb_.enabled && net_cb_.on_search) {
         std::string q = search_input_ ? search_input_->GetText() : "";
         net_cb_.on_search(q);
@@ -163,6 +277,20 @@ void ConsignmentDialog::RefreshBrowse(GameState* state) {
     } else if (consignment_) {
         std::string q = search_input_ ? search_input_->GetText() : "";
         cached_listings_ = consignment_->SearchListings(q);
+        if (cat1 > 0 && !cached_listings_.empty()) {
+            std::string cat1_name;
+            for (const auto& c : cat1_list_) {
+                if (c.id == cat1) { cat1_name = c.name; break; }
+            }
+            if (!cat1_name.empty()) {
+                auto it = std::remove_if(cached_listings_.begin(), cached_listings_.end(),
+                    [&cat1_name](const AuctionListing& l) {
+                        return l.item_name.find(cat1_name) == std::string::npos &&
+                               l.item_name.find(cat1_name.substr(0, 4)) == std::string::npos;
+                    });
+                cached_listings_.erase(it, cached_listings_.end());
+            }
+        }
     }
     PopulateGrid(browse_grid_, cached_listings_);
     if (status_label_) {

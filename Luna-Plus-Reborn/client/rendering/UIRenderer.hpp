@@ -102,6 +102,17 @@ private:
     static int DecodeUTF8(const char*& s);
 
     FontAtlas& GetOrCreateFontAtlas(float size);
+    bool LoadCjkFont(const std::string& font_path, float size);
+    void SetLanguage(const std::string& lang);
+    std::string GetLanguage() const;
+    void SetFontFallback(const std::string& primary, const std::string& fallback);
+
+    struct CjkFontConfig {
+        std::string path;
+        std::string language;
+        int codepoint_start = 0x4E00;
+        int codepoint_end   = 0x9FFF;
+    };
 
     // Batch accumulator
     std::vector<UIVertex> batch_verts_;
@@ -120,8 +131,12 @@ private:
     // Font system — per-size atlases
     std::unordered_map<float, FontAtlas> font_atlases_;
     float current_font_size_ = 18.0f;
-    int font_atlas_w_ = 512;
-    int font_atlas_h_ = 128;
+    int font_atlas_w_ = 1024;
+    int font_atlas_h_ = 1024;
+
+    std::string active_language_ = "en";
+    std::vector<CjkFontConfig> cjk_fonts_;
+    std::vector<std::string> font_fallbacks_;
 
     // Texture atlas for UI textures
     static constexpr int ATLAS_SIZE = 2048;

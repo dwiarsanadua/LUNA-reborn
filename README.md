@@ -193,3 +193,4 @@ Luna-Plus-Reborn/
 ---
 
 *"Kita tidak mem-porting kode. Kita membangkitkan jiwa Luna dengan teknologi masa depan."*
+

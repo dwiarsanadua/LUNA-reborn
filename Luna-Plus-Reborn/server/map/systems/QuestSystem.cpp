@@ -15,6 +15,9 @@ QuestObjective::Type MapConditionType(const std::string& type) {
     if (type == "kill") return QuestObjective::KillMonster;
     if (type == "collect") return QuestObjective::CollectItem;
     if (type == "talk") return QuestObjective::TalkToNPC;
+    if (type == "use") return QuestObjective::UseItem;
+    if (type == "level") return QuestObjective::ReachLevel;
+    if (type == "dungeon") return QuestObjective::ClearDungeon;
     return QuestObjective::KillMonster;
 }
 
@@ -35,9 +38,19 @@ bool LoadQuestTemplatesFromFullJson(const std::string& path,
             qt.name = q.value("name", "Quest");
             qt.description = q.value("description", "");
             qt.min_level = q.value("level_required", 1);
+            qt.max_level = q.value("level_max", 0);
             qt.giver_npc_id = q.value("npc_start_id", 0u);
             qt.completer_npc_id = q.value("npc_complete_id", qt.giver_npc_id);
-            qt.is_repeatable = false;
+            qt.is_repeatable = q.value("repeatable", false);
+            qt.cooldown_seconds = q.value("cooldown", 0u);
+            qt.next_quest_id = q.value("next_quest_id", 0u);
+            qt.time_limit_seconds = q.value("time_limit", 0u);
+
+            if (q.contains("prerequisites") && q["prerequisites"].is_array()) {
+                for (const auto& pre : q["prerequisites"]) {
+                    qt.prerequisite_quest_ids.push_back(pre.get<uint32_t>());
+                }
+            }
 
             if (q.contains("conditions") && q["conditions"].is_array()) {
                 for (const auto& c : q["conditions"]) {
@@ -48,6 +61,8 @@ bool LoadQuestTemplatesFromFullJson(const std::string& path,
                     if (ctype == "kill")
                         obj.target_id = c.value("target_id", 0u);
                     else if (ctype == "collect")
+                        obj.target_id = c.value("item_id", 0u);
+                    else if (ctype == "use")
                         obj.target_id = c.value("item_id", 0u);
                     else
                         continue;
@@ -133,11 +148,18 @@ void QuestSystem::LoadQuestTemplates(const std::string& db_path) {
                     qt.name = obj.substr(name_p + 1, name_e - name_p - 1);
             }
             qt.min_level = num("min_level", 1);
+            qt.max_level = num("max_level", 0);
             qt.giver_npc_id = static_cast<uint32_t>(num("giver_npc_id"));
             qt.completer_npc_id = static_cast<uint32_t>(num("completer_npc_id", qt.giver_npc_id));
             qt.reward_exp = static_cast<uint64_t>(num("reward_exp"));
             qt.reward_gold = static_cast<uint32_t>(num("reward_gold"));
             qt.is_repeatable = num("repeatable") != 0;
+            qt.cooldown_seconds = static_cast<uint32_t>(num("cooldown"));
+            qt.next_quest_id = static_cast<uint32_t>(num("next_quest_id"));
+            qt.time_limit_seconds = static_cast<uint32_t>(num("time_limit"));
+
+            int prereq = num("prerequisite");
+            if (prereq > 0) qt.prerequisite_quest_ids.push_back(static_cast<uint32_t>(prereq));
 
             QuestObjective obj_kill;
             obj_kill.type = QuestObjective::KillMonster;
@@ -183,6 +205,7 @@ void QuestSystem::LoadQuestTemplates(const std::string& db_path) {
         qt1.reward_gold = 100;
         qt1.reward_items = {1001};
         qt1.reward_item_counts = {5};
+        qt1.next_quest_id = 2;
         QuestObjective obj1;
         obj1.type = QuestObjective::KillMonster;
         obj1.target_id = 101;
@@ -190,6 +213,24 @@ void QuestSystem::LoadQuestTemplates(const std::string& db_path) {
         obj1.description = "Kill wolves (0/10)";
         qt1.objectives.push_back(obj1);
         quest_templates_[1] = qt1;
+
+        QuestTemplate qt2;
+        qt2.quest_id = 2;
+        qt2.name = "Wolf Bounty";
+        qt2.description = "Collect 5 wolf pelts";
+        qt2.min_level = 2;
+        qt2.giver_npc_id = 100;
+        qt2.completer_npc_id = 100;
+        qt2.reward_exp = 1000;
+        qt2.reward_gold = 200;
+        qt2.prerequisite_quest_ids = {1};
+        QuestObjective obj2;
+        obj2.type = QuestObjective::CollectItem;
+        obj2.target_id = 2001;
+        obj2.required_count = 5;
+        obj2.description = "Collect wolf pelts (0/5)";
+        qt2.objectives.push_back(obj2);
+        quest_templates_[2] = qt2;
     }
 
     spdlog::info("QuestSystem: loaded {} quest templates", quest_templates_.size());
@@ -199,29 +240,46 @@ bool QuestSystem::LoadQuestTemplatesFromDatabase(Database& db) {
     if (!quest_templates_.empty()) return true;
 
     auto rows = db.Query(
-        "SELECT id,title,description,level_required,giver_npc_id,completer_npc_id,"
-        "reward_exp,reward_gold,reward_item_id,reward_item_count FROM quest_templates");
+        "SELECT id,title,description,level_required,level_max,giver_npc_id,completer_npc_id,"
+        "reward_exp,reward_gold,reward_item_id,reward_item_count,repeatable,cooldown,"
+        "next_quest_id,time_limit FROM quest_templates");
     if (rows.empty()) return false;
 
     quest_templates_.clear();
     for (const auto& row : rows) {
-        if (row.size() < 11) continue;
+        if (row.size() < 12) continue;
         QuestTemplate qt;
         qt.quest_id = static_cast<uint32_t>(std::atoi(row[0].c_str()));
         if (!qt.quest_id) continue;
         qt.name = row[1];
         qt.description = row[2];
         qt.min_level = std::atoi(row[3].c_str());
-        qt.giver_npc_id = static_cast<uint32_t>(std::atoi(row[4].c_str()));
-        qt.completer_npc_id = static_cast<uint32_t>(std::atoi(row[5].c_str()));
-        qt.reward_exp = static_cast<uint64_t>(std::strtoull(row[6].c_str(), nullptr, 10));
-        qt.reward_gold = static_cast<uint32_t>(std::atoi(row[7].c_str()));
-        uint32_t reward_item = static_cast<uint32_t>(std::atoi(row[8].c_str()));
+        qt.max_level = row.size() > 4 ? std::atoi(row[4].c_str()) : 0;
+        qt.giver_npc_id = static_cast<uint32_t>(std::atoi(row[5].c_str()));
+        qt.completer_npc_id = static_cast<uint32_t>(std::atoi(row[6].c_str()));
+        qt.reward_exp = static_cast<uint64_t>(std::strtoull(row[7].c_str(), nullptr, 10));
+        qt.reward_gold = static_cast<uint32_t>(std::atoi(row[8].c_str()));
+        uint32_t reward_item = static_cast<uint32_t>(std::atoi(row[9].c_str()));
         if (reward_item) {
             qt.reward_items.push_back(reward_item);
-            qt.reward_item_counts.push_back(static_cast<uint32_t>(std::atoi(row[9].c_str())));
+            qt.reward_item_counts.push_back(static_cast<uint32_t>(std::atoi(row[10].c_str())));
         }
+        qt.is_repeatable = row.size() > 11 && std::atoi(row[11].c_str()) != 0;
+        qt.cooldown_seconds = row.size() > 12 ? static_cast<uint32_t>(std::atoi(row[12].c_str())) : 0;
+        qt.next_quest_id = row.size() > 13 ? static_cast<uint32_t>(std::atoi(row[13].c_str())) : 0;
+        qt.time_limit_seconds = row.size() > 14 ? static_cast<uint32_t>(std::atoi(row[14].c_str())) : 0;
         quest_templates_[qt.quest_id] = std::move(qt);
+    }
+
+    auto prereq_rows = db.Query(
+        "SELECT quest_id,prerequisite_id FROM quest_prerequisites");
+    for (const auto& row : prereq_rows) {
+        if (row.size() < 2) continue;
+        uint32_t qid = static_cast<uint32_t>(std::atoi(row[0].c_str()));
+        auto it = quest_templates_.find(qid);
+        if (it == quest_templates_.end()) continue;
+        it->second.prerequisite_quest_ids.push_back(
+            static_cast<uint32_t>(std::atoi(row[1].c_str())));
     }
 
     auto cond_rows = db.Query(
@@ -252,6 +310,51 @@ bool QuestSystem::LoadQuestTemplatesFromDatabase(Database& db) {
     return !quest_templates_.empty();
 }
 
+bool QuestSystem::HasPrerequisites(entt::registry& registry, entt::entity entity,
+                                    const QuestTemplate& qt) {
+    if (qt.prerequisite_quest_ids.empty()) return true;
+    auto* quest_log = registry.try_get<QuestLog>(entity);
+    if (!quest_log) return false;
+    for (auto pre_id : qt.prerequisite_quest_ids) {
+        if (!quest_log->IsCompleted(pre_id)) {
+            spdlog::info("QuestSystem: prerequisite quest {} not completed for quest {}",
+                         pre_id, qt.quest_id);
+            return false;
+        }
+    }
+    return true;
+}
+
+bool QuestSystem::CheckTimeLimits(entt::registry& registry, entt::entity entity,
+                                   QuestEntry& entry, const QuestTemplate& qt) {
+    if (qt.time_limit_seconds == 0) return false;
+    uint32_t now = static_cast<uint32_t>(std::time(nullptr));
+    if (entry.accepted_at > 0 && (now - entry.accepted_at) > qt.time_limit_seconds) {
+        spdlog::info("QuestSystem: quest {} timed out for entity {}",
+                     qt.quest_id, static_cast<uint32_t>(entity));
+        return true;
+    }
+    return false;
+}
+
+QuestState QuestSystem::GetQuestState(entt::registry& registry, entt::entity entity,
+                                       uint32_t quest_id) {
+    auto* quest_log = registry.try_get<QuestLog>(entity);
+    if (!quest_log) return QuestState::Inactive;
+
+    for (auto& entry : quest_log->active_quests) {
+        if (entry.quest_id == quest_id) {
+            if (entry.is_reward_taken) return QuestState::RewardTaken;
+            if (entry.is_completed) return QuestState::Completed;
+            return QuestState::Active;
+        }
+    }
+
+    if (quest_log->IsCompleted(quest_id)) return QuestState::Completed;
+
+    return QuestState::Inactive;
+}
+
 bool QuestSystem::CanStartQuest(entt::registry& registry, entt::entity entity, uint32_t quest_id) {
     auto* quest_log = registry.try_get<QuestLog>(entity);
     if (!quest_log) return false;
@@ -269,8 +372,16 @@ bool QuestSystem::CanStartQuest(entt::registry& registry, entt::entity entity, u
         spdlog::info("QuestSystem: level too low for quest {} (need {})", quest_id, qt.min_level);
         return false;
     }
+    if (qt.max_level > 0 && stats->level > qt.max_level) {
+        spdlog::info("QuestSystem: level too high for quest {} (max {})", quest_id, qt.max_level);
+        return false;
+    }
     if (quest_log->IsCompleted(quest_id) && !qt.is_repeatable) {
         spdlog::info("QuestSystem: quest {} already completed", quest_id);
+        return false;
+    }
+    auto* entry = quest_log->GetActive(quest_id);
+    if (entry && entry->is_reward_taken && !qt.is_repeatable) {
         return false;
     }
     if (quest_log->GetActive(quest_id)) {
@@ -279,6 +390,9 @@ bool QuestSystem::CanStartQuest(entt::registry& registry, entt::entity entity, u
     }
     if (!quest_log->CanAcceptNew()) {
         spdlog::info("QuestSystem: quest log full");
+        return false;
+    }
+    if (!HasPrerequisites(registry, entity, qt)) {
         return false;
     }
     return true;
@@ -315,6 +429,11 @@ bool QuestSystem::CompleteQuest(entt::registry& registry, entt::entity entity, u
         return false;
     }
 
+    if (entry->is_completed || entry->is_reward_taken) {
+        spdlog::info("QuestSystem: quest {} already completed/rewarded", quest_id);
+        return false;
+    }
+
     if (!CheckConditions(entry->objectives)) {
         spdlog::info("QuestSystem: quest {} conditions not met", quest_id);
         return false;
@@ -323,6 +442,16 @@ bool QuestSystem::CompleteQuest(entt::registry& registry, entt::entity entity, u
     entry->is_completed = true;
     entry->completed_at = static_cast<uint32_t>(std::time(nullptr));
     spdlog::info("QuestSystem: entity {} completed quest {}", static_cast<uint32_t>(entity), quest_id);
+
+    // Auto-start next quest in chain if configured
+    auto it = quest_templates_.find(quest_id);
+    if (it != quest_templates_.end() && it->second.next_quest_id > 0) {
+        uint32_t next_id = it->second.next_quest_id;
+        if (CanStartQuest(registry, entity, next_id)) {
+            StartQuest(registry, entity, next_id);
+        }
+    }
+
     return true;
 }
 
@@ -340,7 +469,9 @@ bool QuestSystem::ClaimReward(entt::registry& registry, entt::entity entity, uin
     entry->is_reward_taken = true;
 
     // Move to completed list
-    quest_log->completed_quest_ids.push_back(quest_id);
+    if (!quest_log->IsCompleted(quest_id))
+        quest_log->completed_quest_ids.push_back(quest_id);
+
     quest_log->active_quests.erase(
         std::remove_if(quest_log->active_quests.begin(), quest_log->active_quests.end(),
             [quest_id](const QuestEntry& e) { return e.quest_id == quest_id && e.is_reward_taken; }),
@@ -350,11 +481,41 @@ bool QuestSystem::ClaimReward(entt::registry& registry, entt::entity entity, uin
     return true;
 }
 
+bool QuestSystem::AbandonQuest(entt::registry& registry, entt::entity entity, uint32_t quest_id) {
+    auto* quest_log = registry.try_get<QuestLog>(entity);
+    if (!quest_log) return false;
+
+    auto it = std::find_if(quest_log->active_quests.begin(), quest_log->active_quests.end(),
+        [quest_id](const QuestEntry& e) { return e.quest_id == quest_id && !e.is_reward_taken; });
+    if (it == quest_log->active_quests.end()) return false;
+
+    if (it->is_completed) return false;
+
+    quest_log->active_quests.erase(it);
+    spdlog::info("QuestSystem: entity {} abandoned quest {}", static_cast<uint32_t>(entity), quest_id);
+    return true;
+}
+
+bool QuestSystem::FailQuest(entt::registry& registry, entt::entity entity, uint32_t quest_id) {
+    auto* quest_log = registry.try_get<QuestLog>(entity);
+    if (!quest_log) return false;
+
+    auto* entry = quest_log->GetActive(quest_id);
+    if (!entry || entry->is_completed || entry->is_reward_taken) return false;
+
+    quest_log->active_quests.erase(
+        std::remove_if(quest_log->active_quests.begin(), quest_log->active_quests.end(),
+            [quest_id](const QuestEntry& e) { return e.quest_id == quest_id; }),
+        quest_log->active_quests.end());
+
+    spdlog::info("QuestSystem: entity {} failed quest {}", static_cast<uint32_t>(entity), quest_id);
+    return true;
+}
+
 void QuestSystem::GrantRewards(entt::registry& registry, entt::entity entity, const QuestTemplate& qt) {
     auto* stats = registry.try_get<CharacterStats>(entity);
     if (stats) {
         stats->exp += qt.reward_exp;
-        // Level-up check
         while (stats->exp >= stats->exp_next_level) {
             stats->exp -= stats->exp_next_level;
             stats->level++;
@@ -365,14 +526,12 @@ void QuestSystem::GrantRewards(entt::registry& registry, entt::entity entity, co
         }
     }
 
-    // Add items to inventory
     auto* inv = registry.try_get<Inventory>(entity);
     if (inv) {
         for (size_t i = 0; i < qt.reward_items.size(); i++) {
-            ItemSlot reward;
-            reward.item_id = qt.reward_items[i];
-            reward.count = (i < qt.reward_item_counts.size()) ? qt.reward_item_counts[i] : 1;
-            inv->AddItem(reward.item_id, reward.count);
+            uint32_t item_id = qt.reward_items[i];
+            uint32_t count = (i < qt.reward_item_counts.size()) ? qt.reward_item_counts[i] : 1;
+            inv->AddItem(item_id, count);
         }
         inv->gold += qt.reward_gold;
     }
@@ -384,7 +543,7 @@ void QuestSystem::UpdateCondition(entt::registry& registry, entt::entity entity,
     if (!quest_log) return;
 
     for (auto& entry : quest_log->active_quests) {
-        if (entry.is_completed) continue;
+        if (entry.is_completed || entry.is_reward_taken) continue;
         for (auto& obj : entry.objectives) {
             if (obj.type == type && obj.target_id == target_id) {
                 uint16_t new_count = obj.current_count + amount;
@@ -404,22 +563,40 @@ bool QuestSystem::CheckConditions(const std::vector<QuestObjective>& objectives)
 }
 
 void QuestSystem::Update(entt::registry& registry, float dt) {
-    // Check for auto-completable quests
     auto view = registry.view<QuestLog>();
     for (auto entity : view) {
         auto& quest_log = view.get<QuestLog>(entity);
-        for (auto& entry : quest_log.active_quests) {
-            if (entry.is_completed) continue;
-            if (CheckConditions(entry.objectives)) {
-                // Auto-complete if all objectives met
+
+        for (auto it = quest_log.active_quests.begin(); it != quest_log.active_quests.end();) {
+            auto& entry = *it;
+
+            if (entry.is_reward_taken) {
+                ++it;
+                continue;
+            }
+
+            auto tpl_it = quest_templates_.find(entry.quest_id);
+            if (tpl_it != quest_templates_.end()) {
+                if (CheckTimeLimits(registry, entity, entry, tpl_it->second)) {
+                    it = quest_log.active_quests.erase(it);
+                    continue;
+                }
+            }
+
+            // Auto-complete if all objectives met
+            if (!entry.is_completed && CheckConditions(entry.objectives)) {
                 entry.is_completed = true;
                 entry.completed_at = static_cast<uint32_t>(std::time(nullptr));
-                // For immediate-reward quests, grant directly
-                auto it = quest_templates_.find(entry.quest_id);
-                if (it != quest_templates_.end() && it->second.completer_npc_id == 0) {
+                spdlog::info("QuestSystem: auto-completed quest {} for entity {}",
+                             entry.quest_id, static_cast<uint32_t>(entity));
+
+                // Immediate-reward quests (no NPC completer)
+                if (tpl_it != quest_templates_.end() && tpl_it->second.completer_npc_id == 0) {
                     ClaimReward(registry, entity, entry.quest_id);
                 }
             }
+
+            ++it;
         }
     }
 }

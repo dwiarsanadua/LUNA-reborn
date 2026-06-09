@@ -13,6 +13,21 @@ table CharacterInfo {
     position: Vec3;
     hp: uint32;
     max_hp: uint32;
+    body_type: uint8;
+    face_id: uint8;
+    hair_id: uint8;
+    weapon_id: uint32;
+    dress_id: uint32;
+    shoes_id: uint32;
+    glove_id: uint32;
+    job_grade: uint8;
+    job1: uint8;
+    job2: uint8;
+    job3: uint8;
+    job4: uint8;
+    job5: uint8;
+    job6: uint8;
+    guild_name: string;
 }
 
 table CharacterListRequest {

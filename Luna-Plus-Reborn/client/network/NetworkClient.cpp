@@ -4,6 +4,9 @@
 #include <Login_generated.h>
 #include <PacketType_generated.h>
 #include <cstring>
+#include <atomic>
+#include <thread>
+#include <chrono>
 
 static uint32_t crc32_table[256];
 static bool crc32_ready = false;
@@ -31,6 +34,62 @@ static uint32_t PacketCrc32(const uint8_t* data, size_t size) {
 #include <arpa/inet.h>
 #include <netdb.h>
 
+// ── Reconnect system ──
+// Uses file-scope state since NetworkClient.hpp cannot be modified.
+static const int RECONNECT_MAX_RETRIES = 3;
+static const int RECONNECT_DELAY_SEC = 10;
+
+enum class ReconnectState {
+    Idle,
+    Waiting,
+    Connecting,
+    Failed,
+};
+
+static struct {
+    ReconnectState state = ReconnectState::Idle;
+    int retry_count = 0;
+    float countdown = 0.0f;
+    std::string host;
+    uint16_t port = 0;
+    std::thread timer_thread;
+    std::atomic<bool> abort_flag{false};
+    std::function<void(int, int)> notify_callback; // (retry_count, max_retries)
+} g_reconnect;
+
+static void ReconnectTimerThread(NetworkClient* client) {
+    while (!g_reconnect.abort_flag && g_reconnect.state == ReconnectState::Waiting) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        if (g_reconnect.abort_flag) return;
+        g_reconnect.countdown -= 0.1f;
+        if (g_reconnect.notify_callback) {
+            g_reconnect.notify_callback(g_reconnect.retry_count, RECONNECT_MAX_RETRIES);
+        }
+        if (g_reconnect.countdown <= 0.0f) {
+            g_reconnect.state = ReconnectState::Connecting;
+            if (!g_reconnect.host.empty()) {
+                bool ok = client->Connect(g_reconnect.host, g_reconnect.port);
+                if (ok) {
+                    g_reconnect.state = ReconnectState::Idle;
+                    g_reconnect.retry_count = 0;
+                    if (g_reconnect.notify_callback)
+                        g_reconnect.notify_callback(0, RECONNECT_MAX_RETRIES);
+                    return;
+                }
+            }
+            g_reconnect.retry_count++;
+            if (g_reconnect.retry_count >= RECONNECT_MAX_RETRIES) {
+                g_reconnect.state = ReconnectState::Failed;
+                if (g_reconnect.notify_callback)
+                    g_reconnect.notify_callback(RECONNECT_MAX_RETRIES, RECONNECT_MAX_RETRIES);
+                return;
+            }
+            g_reconnect.countdown = static_cast<float>(RECONNECT_DELAY_SEC);
+            g_reconnect.state = ReconnectState::Waiting;
+        }
+    }
+}
+
 NetworkClient::NetworkClient() = default;
 NetworkClient::~NetworkClient() { Disconnect(); }
 
@@ -57,6 +116,13 @@ bool NetworkClient::Connect(const std::string& host, uint16_t port) {
 }
 
 void NetworkClient::Disconnect() {
+    g_reconnect.abort_flag = true;
+    if (g_reconnect.timer_thread.joinable()) g_reconnect.timer_thread.join();
+    g_reconnect.state = ReconnectState::Idle;
+    g_reconnect.retry_count = 0;
+    g_reconnect.countdown = 0.0f;
+    g_reconnect.abort_flag = false;
+
     connected_ = false;
     if (sock_ >= 0) { close(sock_); sock_ = -1; }
     if (read_thread_ && read_thread_->joinable()) read_thread_->join();
@@ -100,10 +166,16 @@ void NetworkClient::ProcessEvents() {
 }
 
 void NetworkClient::ReadThread() {
+    g_reconnect.host = "127.0.0.1";
+    g_reconnect.port = 8100;
+
     std::vector<uint8_t> buf(4096);
     while (connected_) {
         ssize_t n = ::recv(sock_, buf.data(), buf.size(), 0);
-        if (n <= 0) { connected_ = false; break; }
+        if (n <= 0) {
+            connected_ = false;
+            break;
+        }
         read_buf_.insert(read_buf_.end(), buf.data(), buf.data() + n);
         while (read_buf_.size() >= LUNA_PACKET_HEADER_SIZE) {
             LunaPacketHeader hdr;
@@ -118,11 +190,53 @@ void NetworkClient::ReadThread() {
             }
             std::vector<uint8_t> payload(body, body + hdr.length);
             read_buf_.erase(read_buf_.begin(), read_buf_.begin() + total);
-            // Push to thread-safe queue instead of calling handler directly
             {
                 std::lock_guard<std::mutex> lock(queue_mutex_);
                 event_queue_.push({hdr.type, std::move(payload)});
             }
         }
     }
+
+    // Start reconnect sequence on disconnect
+    if (g_reconnect.state == ReconnectState::Idle && !g_reconnect.abort_flag) {
+        g_reconnect.state = ReconnectState::Waiting;
+        g_reconnect.retry_count = 0;
+        g_reconnect.countdown = static_cast<float>(RECONNECT_DELAY_SEC);
+        g_reconnect.abort_flag = false;
+        g_reconnect.host = "127.0.0.1";
+        g_reconnect.port = 8100;
+
+        if (g_reconnect.timer_thread.joinable()) g_reconnect.timer_thread.join();
+        g_reconnect.timer_thread = std::thread(ReconnectTimerThread, this);
+    }
+}
+
+// ── Public reconnect query API (free functions, called from main thread) ──
+
+std::string NetworkClient_GetReconnectStatus() {
+    switch (g_reconnect.state) {
+        case ReconnectState::Idle: return "";
+        case ReconnectState::Waiting: {
+            char buf[64];
+            snprintf(buf, sizeof(buf), "Reconnecting in %.0fs... (%d/%d)",
+                     g_reconnect.countdown, g_reconnect.retry_count + 1, RECONNECT_MAX_RETRIES);
+            return buf;
+        }
+        case ReconnectState::Connecting: return "Connecting...";
+        case ReconnectState::Failed: return "Reconnect failed. Returning to login.";
+    }
+    return "";
+}
+
+void NetworkClient_SetReconnectCallback(std::function<void(int, int)> cb) {
+    g_reconnect.notify_callback = std::move(cb);
+}
+
+void NetworkClient_CancelReconnect() {
+    g_reconnect.abort_flag = true;
+    if (g_reconnect.timer_thread.joinable()) g_reconnect.timer_thread.join();
+    g_reconnect.state = ReconnectState::Idle;
+    g_reconnect.retry_count = 0;
+    g_reconnect.countdown = 0.0f;
+    g_reconnect.abort_flag = false;
 }

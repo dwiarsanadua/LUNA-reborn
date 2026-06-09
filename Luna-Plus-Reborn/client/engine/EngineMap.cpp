@@ -2,6 +2,8 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <cmath>
+#include <cfloat>
 #include <spdlog/spdlog.h>
 #include <engine/gx_render/VFS.h>
 #include <audio/AudioManager.hpp>
@@ -10,10 +12,125 @@
 #include <game/ecs/components/Tag.hpp>
 #include <game/ecs/components/Transform.hpp>
 #include <entt/entt.hpp>
+#include <rendering/TerrainRenderer.hpp>
+
+// ── CollisionLine ──
+// DDA ray-march across terrain height grid. Returns TRUE if collision detected.
+// pTarget receives the first collision point.
+static const float COLLISION_CELL_SIZE = 2.0f;
+static const float MAX_CLIMB_HEIGHT = 1.5f;
+
+static bool CollisionLine(const TerrainRenderer* terrain,
+                           const glm::vec3& start, const glm::vec3& end,
+                           glm::vec3* out_target)
+{
+    if (!terrain) return false;
+
+    int x1 = static_cast<int>(start.x / COLLISION_CELL_SIZE);
+    int z1 = static_cast<int>(start.z / COLLISION_CELL_SIZE);
+    int x2 = static_cast<int>(end.x / COLLISION_CELL_SIZE);
+    int z2 = static_cast<int>(end.z / COLLISION_CELL_SIZE);
+
+    int dx = x2 - x1;
+    int dz = z2 - z1;
+    int abs_dx = std::abs(dx);
+    int abs_dz = std::abs(dz);
+    int max_delta = std::max(abs_dx, abs_dz);
+    if (max_delta == 0) {
+        if (out_target) *out_target = end;
+        return false;
+    }
+
+    int cell_x = x1, cell_z = z1;
+    int x_err = 0, z_err = 0;
+    int sx = (dx > 0) ? 1 : (dx < 0) ? -1 : 0;
+    int sz = (dz > 0) ? 1 : (dz < 0) ? -1 : 0;
+    int prev_x = cell_x, prev_z = cell_z;
+    float prev_height = terrain->GetHeight(start.x, start.z);
+
+    for (int i = 0; i <= max_delta; ++i) {
+        prev_x = cell_x; prev_z = cell_z;
+
+        x_err += abs_dx;
+        z_err += abs_dz;
+
+        if (x_err > max_delta) { x_err -= max_delta; cell_x += sx; }
+        if (z_err > max_delta) { z_err -= max_delta; cell_z += sz; }
+
+        float cx = cell_x * COLLISION_CELL_SIZE;
+        float cz = cell_z * COLLISION_CELL_SIZE;
+        float h = terrain->GetHeight(cx, cz);
+
+        // Check slope (height difference between consecutive cells)
+        if (std::abs(h - prev_height) > MAX_CLIMB_HEIGHT) {
+            if (out_target) {
+                out_target->x = prev_x * COLLISION_CELL_SIZE;
+                out_target->y = prev_height;
+                out_target->z = prev_z * COLLISION_CELL_SIZE;
+            }
+            return true;
+        }
+
+        // Check under-map (below terrain surface)
+        float start_h = terrain->GetHeight(
+            start.x + (end.x - start.x) * (i / static_cast<float>(max_delta)),
+            start.z + (end.z - start.z) * (i / static_cast<float>(max_delta)));
+        if (std::abs(h - start_h) > MAX_CLIMB_HEIGHT * 3.0f) {
+            if (out_target) {
+                out_target->x = prev_x * COLLISION_CELL_SIZE;
+                out_target->y = h;
+                out_target->z = prev_z * COLLISION_CELL_SIZE;
+            }
+            return true;
+        }
+
+        prev_height = h;
+    }
+
+    if (out_target) *out_target = end;
+    return false;
+}
+
+// ── Map change rollback state ──
+struct RollbackPoint {
+    std::string map_id;
+    glm::vec3 position;
+    bool valid = false;
+};
+static RollbackPoint g_rollback;
+
+static void SaveRollbackPoint(const std::string& map_id, const glm::vec3& pos) {
+    g_rollback.map_id = map_id;
+    g_rollback.position = pos;
+    g_rollback.valid = true;
+    spdlog::info("EngineMap: saved rollback point {} at ({:.1f}, {:.1f}, {:.1f})",
+                 map_id, pos.x, pos.y, pos.z);
+}
+
+static bool GetRollbackPoint(std::string& out_map, glm::vec3& out_pos) {
+    if (!g_rollback.valid) return false;
+    out_map = g_rollback.map_id;
+    out_pos = g_rollback.position;
+    g_rollback.valid = false;
+    return true;
+}
 
 bool EngineMap::Load(const std::string& map_id) {
-    current_map_ = map_id;
-    if (!terrain_ || !props_) { spdlog::error("EngineMap: terrain/props not set"); return false; }
+    // Save rollback point before attempting map change
+    std::string prev_map = current_map_;
+    glm::vec3 prev_pos(0);
+    if (!prev_map.empty()) {
+        SaveRollbackPoint(prev_map, prev_pos);
+    }
+
+    if (!terrain_ || !props_) {
+        spdlog::error("EngineMap: terrain/props not set");
+        if (!prev_map.empty()) {
+            current_map_ = prev_map;
+            spdlog::info("EngineMap: rolled back to previous map {}", prev_map);
+        }
+        return false;
+    }
     InitBGMMap();
     
     std::string hgt_path = VFS::Find("assets/maps/" + map_id + ".hgt");

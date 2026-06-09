@@ -198,6 +198,15 @@ void CSoundLib::SetSFXVolume(int id, float volume) {
     }
 }
 
+void CSoundLib::SetSFXPan(int id, float pan) {
+    for (auto& slot : sfx_slots_) {
+        if (slot.in_use && slot.id == id && slot.sound) {
+            ma_sound_set_pan(slot.sound, pan);
+            return;
+        }
+    }
+}
+
 bool CSoundLib::IsSFXPlaying(int id) const {
     for (const auto& slot : sfx_slots_) {
         if (slot.in_use && slot.id == id && slot.sound) {

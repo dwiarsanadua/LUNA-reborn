@@ -1,14 +1,49 @@
 #include "CombatSystem.hpp"
+#include "ComboSystem.hpp"
 #include "../components/Transform.hpp"
 #include "../components/Tag.hpp"
 #include "../components/CombatState.hpp"
+#include "../components/AIComponent.hpp"
+#include "../components/ComboComponent.hpp"
 #include <glm/glm.hpp>
 #include <random>
 #include <cmath>
 #include <algorithm>
+#include <unordered_map>
 #include <spdlog/spdlog.h>
 
 static std::mt19937 rng(std::random_device{}());
+
+// ---- ThreatTable implementation ----
+
+void ThreatTable::AddThreat(uint32_t entity_id, int32_t amount) {
+    for (auto& entry : entries) {
+        if (entry.entity_id == entity_id) {
+            entry.hate_amount += amount;
+            return;
+        }
+    }
+    entries.push_back({entity_id, amount});
+}
+
+uint32_t ThreatTable::GetTopThreat() const {
+    if (entries.empty()) return 0;
+    uint32_t top_id = 0;
+    int32_t top_amount = -1;
+    for (auto& entry : entries) {
+        if (entry.hate_amount > top_amount) {
+            top_amount = entry.hate_amount;
+            top_id = entry.entity_id;
+        }
+    }
+    return top_id;
+}
+
+void ThreatTable::Clear() {
+    entries.clear();
+}
+
+// ---- Element system ----
 
 Element CombatSystem::GetAttackElement(const CharacterStats& stats) {
     float attrs[7] = { stats.attr_none, stats.attr_earth, stats.attr_water,
@@ -38,30 +73,33 @@ float CombatSystem::GetElementAdvantage(Element atk_elem, Element def_elem) {
     return 1.0f;
 }
 
+// ---- CalculateDamage (refactored with Old formulas) ----
+
 DamageResult CombatSystem::CalculateDamage(const CharacterStats& attacker,
                                            const CharacterStats& defender,
                                            float skill_add_damage,
                                            uint8_t add_type,
                                            float rate_add_value,
-                                           float plus_add_value) {
+                                           float plus_add_value,
+                                           float combo_multiplier) {
     DamageResult result{};
 
-    // 1. Miss Check: 5% - DEX/500, minimum 1%
-    float miss_chance = std::max(0.01f, 0.05f - attacker.dexterity / 500.0f);
+    // 1. Miss Check: 1% base (Old: 1% base miss rate)
+    float miss_chance = 0.01f;
     if (std::uniform_real_distribution<float>(0, 1)(rng) < miss_chance) {
         result.is_miss = true;
-        spdlog::debug("DAMAGE: MISS (miss_chance={:.2f}%)", miss_chance * 100.0f);
+        spdlog::debug("DAMAGE: MISS (miss_chance=1%)");
         return result;
     }
 
-    // 2. Base Damage: (ATK * 2) - DEF
+    // 2. Base Damage: ATK - DEF/2 (Old formula: ATK * skill_power - DEF * 0.5)
     float attack = attacker.physic_attack;
     float defense = defender.physic_defense;
-    float damage = (attack * 2.0f) - defense;
+    float damage = attack - defense * 0.5f;
     damage = std::max(1.0f, damage);
     spdlog::debug("DAMAGE: base atk={:.1f} def={:.1f} raw={:.1f}", attack, defense, damage);
 
-    // 3. Skill modifiers
+    // 3. Skill modifiers (Old: add_type 1 = STR based, add_type 2 = ATK based)
     if (add_type == 1) {
         damage = damage * ((1000.0f + skill_add_damage + attacker.strength) / 1000.0f);
     } else if (add_type == 2) {
@@ -79,27 +117,29 @@ DamageResult CombatSystem::CalculateDamage(const CharacterStats& attacker,
     spdlog::debug("DAMAGE: element atk={} def={} mult={:.2f} -> {:.1f}",
                   static_cast<int>(atk_elem), static_cast<int>(def_elem), elem_mult, damage);
 
-    // 5. Level Difference Penalty: ±5% per level, cap 50%
+    // 5. Level Difference Penalty: ±5% per level, cap 50% (Old: same)
     int32_t level_diff = static_cast<int32_t>(attacker.level) - static_cast<int32_t>(defender.level);
     float level_mod = 1.0f + std::clamp(static_cast<float>(level_diff) * 0.05f, -0.50f, 0.50f);
     damage *= level_mod;
     spdlog::debug("DAMAGE: level diff={} mult={:.2f} -> {:.1f}", level_diff, level_mod, damage);
 
-    // 6. Block Check
-    if (defender.shield_defense > 0 && defender.block_rate > std::uniform_int_distribution<int>(0, 99)(rng)) {
+    // 6. Block Check: CON/2000 (Old formula)
+    float block_chance = defender.constitution / 2000.0f;
+    if (defender.shield_defense > 0 &&
+        block_chance > std::uniform_real_distribution<float>(0, 1)(rng)) {
         result.is_block = true;
         damage = (damage * (0.6f - (defender.constitution / 4000.0f))) - defender.shield_defense;
-        spdlog::debug("DAMAGE: BLOCKED -> {:.1f}", damage);
+        spdlog::debug("DAMAGE: BLOCKED block_chance={:.4f} -> {:.1f}", block_chance, damage);
     }
 
-    // 7. Critical: base 5% + (DEX/100), capped at 50%
-    float crit_rate = std::min(50.0f, 5.0f + attacker.dexterity / 100.0f);
+    // 7. Critical: DEX/1000 (Old formula)
+    float crit_rate = attacker.dexterity / 1000.0f;
     float crit_dmg = 1.50f + attacker.strength / 200.0f;
     if (!result.is_block && (attacker.critical_rate >= 100.0f ||
-                             crit_rate >= std::uniform_real_distribution<float>(0, 100)(rng))) {
+                             crit_rate >= std::uniform_real_distribution<float>(0, 1)(rng))) {
         result.is_critical = true;
         damage *= crit_dmg;
-        spdlog::debug("DAMAGE: CRITICAL rate={:.1f}% mult={:.2f} -> {:.1f}", crit_rate, crit_dmg, damage);
+        spdlog::debug("DAMAGE: CRITICAL rate={:.4f} mult={:.2f} -> {:.1f}", crit_rate, crit_dmg, damage);
     }
 
     // 8. Damage Variance: ±10%
@@ -107,11 +147,16 @@ DamageResult CombatSystem::CalculateDamage(const CharacterStats& attacker,
     damage *= variance;
     spdlog::debug("DAMAGE: variance={:.4f} -> {:.1f}", variance, damage);
 
-    // 9. Minimum Damage clamp
+    // 9. Combo Multiplier (Old: Hero combo chain bonus)
+    damage *= combo_multiplier;
+    spdlog::debug("DAMAGE: combo_mult={:.2f} -> {:.1f}", combo_multiplier, damage);
+
+    // 10. Minimum Damage clamp
     damage = std::max(1.0f, damage);
 
     result.damage = static_cast<int32_t>(damage);
-    spdlog::debug("DAMAGE: FINAL={}", result.damage);
+    result.threat_generated = result.damage;
+    spdlog::debug("DAMAGE: FINAL={} threat={}", result.damage, result.threat_generated);
     return result;
 }
 
@@ -121,12 +166,31 @@ void CombatSystem::HandleAttack(entt::registry& registry,
     if (!registry.valid(attacker) || !registry.valid(target)) return;
     auto& atk_stats = registry.get<CharacterStats>(attacker);
     auto& def_stats = registry.get<CharacterStats>(target);
-    
+
+    float combo_mult = 1.0f;
+    if (combo_system_) {
+        combo_mult = combo_system_->GetComboMultiplier(registry, attacker);
+    }
+
     // In a full implementation, we'd query skill_id from DB to get add_damage, type, etc.
-    auto result = CalculateDamage(atk_stats, def_stats, 0, 1, 0, 0);
-    
+    auto result = CalculateDamage(atk_stats, def_stats, 0, 1, 0, 0, combo_mult);
+
     if (!result.is_miss) {
         ApplyDamage(registry, target, result.damage);
+
+        if (combo_system_) {
+            combo_system_->RegisterHit(registry, attacker, target);
+        }
+
+        // Generate threat from damage dealt
+        auto* ai = registry.try_get<AIComponent>(target);
+        if (ai) {
+            HandleThreatOnDamage(registry, target, attacker, result.threat_generated);
+        }
+    } else {
+        if (combo_system_) {
+            combo_system_->ResetCombo(registry, attacker);
+        }
     }
 }
 
@@ -149,31 +213,181 @@ MonsterBaseStats CombatSystem::ScaleMonsterStats(const MonsterBaseStats& base, u
 
 void CombatSystem::ApplyDamage(entt::registry& registry,
                                 entt::entity target, int32_t damage) {
-    auto& stats = registry.get<CharacterStats>(target);
-    stats.hp = std::max(0, stats.hp - damage);
+    auto* stats = registry.try_get<CharacterStats>(target);
+    if (!stats) return;
+
+    // Apply reflect damage
+    if (stats->reflect_damage > 0) {
+        // Reflected back to attacker — handled externally
+    }
+
+    // Apply absorb
+    if (stats->absorb_damage > 0) {
+        int32_t absorbed = static_cast<int32_t>(damage * stats->absorb_damage / 100.0f);
+        damage -= absorbed;
+    }
+
+    // Apply damage reduction
+    if (stats->reduce_damage > 0) {
+        damage = static_cast<int32_t>(damage * (1.0f - stats->reduce_damage / 100.0f));
+    }
+
+    // Apply add damage modifier
+    damage += static_cast<int32_t>(stats->add_damage);
+
+    stats->hp = std::max(0, stats->hp - damage);
 }
 
 bool CombatSystem::IsInRange(const Transform& a, const Transform& b, float range) {
     return glm::distance(a.position, b.position) <= range;
 }
 
+// ---- Threat system (Old: CHero hate/threat from Hero.cpp) ----
+
+void CombatSystem::AddThreat(entt::registry& registry, entt::entity monster, entt::entity attacker, int32_t amount) {
+    auto* ai = registry.try_get<AIComponent>(monster);
+    if (!ai || !registry.valid(attacker)) return;
+
+    uint32_t attacker_id = static_cast<uint32_t>(attacker);
+    ai->AddThreat(attacker_id, amount);
+    spdlog::debug("THREAT: monster={} attacker={} +{} total={}",
+                  static_cast<uint32_t>(monster), attacker_id, amount, ai->threat);
+}
+
+uint32_t CombatSystem::GetTopThreat(entt::registry& registry, entt::entity monster) {
+    auto* ai = registry.try_get<AIComponent>(monster);
+    if (!ai) return 0;
+    return ai->GetHighestThreat();
+}
+
+void CombatSystem::ResetThreat(entt::registry& registry, entt::entity monster) {
+    auto* ai = registry.try_get<AIComponent>(monster);
+    if (!ai) return;
+    ai->ClearAggro();
+    spdlog::debug("THREAT: monster={} aggro cleared", static_cast<uint32_t>(monster));
+}
+
+void CombatSystem::HandleThreatOnDamage(entt::registry& registry, entt::entity monster, entt::entity attacker, int32_t damage) {
+    // 1:1 threat from damage (Old behavior)
+    AddThreat(registry, monster, attacker, damage);
+}
+
+void CombatSystem::HandleThreatOnHeal(entt::registry& registry, entt::entity monster, entt::entity healer, int32_t heal_amount) {
+    // 50% threat from healing (Old behavior)
+    int32_t threat = heal_amount / 2;
+    AddThreat(registry, monster, healer, threat);
+}
+
+// ---- Combat input system (Old: GameIn.cpp) ----
+
+void CombatSystem::HandleCombatInput(entt::registry& registry, entt::entity player, const CombatInput& input) {
+    if (!registry.valid(player)) return;
+
+    auto* combat = registry.try_get<CombatState>(player);
+    if (!combat) {
+        combat = &registry.emplace<CombatState>(player);
+    }
+
+    if (combat->is_casting || combat->is_animation_locked) return;
+
+    if (input.target_self) {
+        // Self-target skill or heal
+        if (input.skill_pressed && input.pending_skill_id > 0) {
+            combat->StartCast(input.pending_skill_id, 0.4f, player);
+        }
+        return;
+    }
+
+    if (input.attack_pressed && registry.valid(input.target_entity)) {
+        // Basic attack
+        combat->StartCast(0, 0.5f, input.target_entity);
+        spdlog::debug("COMBAT_INPUT: player {} basic attack on target {}",
+                      static_cast<uint32_t>(player), static_cast<uint32_t>(input.target_entity));
+    }
+
+    if (input.skill_pressed && input.pending_skill_id > 0 && registry.valid(input.target_entity)) {
+        // Skill attack
+        combat->StartCast(input.pending_skill_id, 0.4f, input.target_entity);
+        spdlog::debug("COMBAT_INPUT: player {} skill {} on target {}",
+                      static_cast<uint32_t>(player), input.pending_skill_id,
+                      static_cast<uint32_t>(input.target_entity));
+    }
+}
+
+void CombatSystem::HandleAutoAttack(entt::registry& registry, entt::entity player, entt::entity target, float dt) {
+    if (!registry.valid(player) || !registry.valid(target)) return;
+
+    auto* combat = registry.try_get<CombatState>(player);
+    if (!combat) {
+        combat = &registry.emplace<CombatState>(player);
+    }
+
+    if (combat->is_casting || combat->is_animation_locked) return;
+
+    // Auto-attack every 1.2s (Old behavior)
+    static std::unordered_map<uint32_t, float> auto_attack_timers;
+    uint32_t player_id = static_cast<uint32_t>(player);
+    auto& timer = auto_attack_timers[player_id];
+    timer += dt;
+    if (timer >= 1.2f) {
+        timer = 0.0f;
+        combat->StartCast(0, 0.5f, target);
+        spdlog::debug("AUTO_ATTACK: player {} auto-attacks target {}",
+                      player_id, static_cast<uint32_t>(target));
+    }
+}
+
 void CombatSystem::Update(entt::registry& registry, float dt) {
     auto view = registry.view<CombatState>();
     for (auto entity : view) {
         auto& combat = view.get<CombatState>(entity);
-        
+
         if (combat.is_casting) {
             combat.current_cast_time += dt;
             if (combat.current_cast_time >= combat.cast_time) {
                 // Cast finished, trigger effect and start animation lock
-                HandleAttack(registry, entity, combat.target, combat.casting_skill_id);
+                auto* stats = registry.try_get<CharacterStats>(entity);
+                auto* target_stats = registry.try_get<CharacterStats>(combat.target);
+
+                if (stats && target_stats) {
+                    float combo_mult = 1.0f;
+                    if (combo_system_) {
+                        combo_mult = combo_system_->GetComboMultiplier(registry, entity);
+                    }
+
+                    // Check auto-attack (skill_id == 0) vs skill
+                    float add_damage = 0.0f;
+                    if (combat.casting_skill_id > 0) {
+                        // In full implementation, query skill book for params
+                        add_damage = 10.0f;
+                    }
+                    auto result = CalculateDamage(*stats, *target_stats, add_damage, 1, 0, 0, combo_mult);
+
+                    if (!result.is_miss) {
+                        ApplyDamage(registry, combat.target, result.damage);
+
+                        if (combo_system_) {
+                            combo_system_->RegisterHit(registry, entity, combat.target);
+                        }
+
+                        // Generate threat
+                        auto* ai = registry.try_get<AIComponent>(combat.target);
+                        if (ai) {
+                            HandleThreatOnDamage(registry, combat.target, entity, result.threat_generated);
+                        }
+                    } else {
+                        if (combo_system_) {
+                            combo_system_->ResetCombo(registry, entity);
+                        }
+                    }
+                }
+
                 combat.is_casting = false;
                 combat.current_cast_time = 0.0f;
-                // E.g., 0.5s animation lock after casting completes
                 combat.StartAnimationLock(0.5f);
             }
         }
-        
+
         if (combat.is_animation_locked) {
             combat.current_lock_time += dt;
             if (combat.current_lock_time >= combat.lock_duration) {

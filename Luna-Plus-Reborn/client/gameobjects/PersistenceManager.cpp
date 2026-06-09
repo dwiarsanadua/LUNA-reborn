@@ -8,10 +8,12 @@ bool PersistenceManager::Init(const std::string& db_path) {
     if (sqlite3_open(db_path.c_str(), &db_) != SQLITE_OK) {
         spdlog::error("Persistence: failed to open {}", db_path);
         db_ = nullptr;
+        SetLoadError(LoadErrorType::DbLoadFailed, "Failed to open save database: " + db_path);
         return false;
     }
     if (!CreateTables()) {
         spdlog::error("Persistence: failed to create tables");
+        SetLoadError(LoadErrorType::DbLoadFailed, "Failed to initialize save database tables");
         return false;
     }
     spdlog::info("PersistenceManager: initialized ({})", db_path);
@@ -89,7 +91,6 @@ bool PersistenceManager::CreateTables() {
 }
 
 bool PersistenceManager::EnsureCharacterRow(GameState& state) {
-    // Check if slot 0 exists
     sqlite3_stmt* stmt;
     const char* check = "SELECT COUNT(*) FROM save_slot WHERE slot = 0";
     if (sqlite3_prepare_v2(db_, check, -1, &stmt, nullptr) != SQLITE_OK) return false;
@@ -142,7 +143,6 @@ bool PersistenceManager::SaveGameState(const GameState& state) {
     sqlite3_finalize(stmt);
     if (!ok) return false;
 
-    // Save inventory
     sqlite3_exec(db_, "DELETE FROM inventory", nullptr, nullptr, nullptr);
     for (size_t i = 0; i < state.inventory.size(); i++) {
         auto& item = state.inventory[i];
@@ -155,7 +155,6 @@ bool PersistenceManager::SaveGameState(const GameState& state) {
         sqlite3_finalize(stmt);
     }
 
-    // Save quests
     sqlite3_exec(db_, "DELETE FROM quests", nullptr, nullptr, nullptr);
     for (auto& q : state.quest_list) {
         const char* ins = "INSERT INTO quests (name, status) VALUES (?, 'active')";
@@ -165,7 +164,6 @@ bool PersistenceManager::SaveGameState(const GameState& state) {
         sqlite3_finalize(stmt);
     }
 
-    // Save learned skills
     sqlite3_exec(db_, "DELETE FROM learned_skills", nullptr, nullptr, nullptr);
     for (auto& s : state.learned_skills) {
         const char* ins = "INSERT INTO learned_skills (skill_id) VALUES (?)";
@@ -180,18 +178,25 @@ bool PersistenceManager::SaveGameState(const GameState& state) {
 }
 
 bool PersistenceManager::LoadGameState(GameState& state) {
-    if (!db_) return false;
-    
+    if (!db_) {
+        SetLoadError(LoadErrorType::DbLoadFailed, "Database not initialized");
+        return false;
+    }
+
     const char* sql = "SELECT name, level, class_id, map_id, pos_x, pos_y, pos_z, "
                        "hp, max_hp, mp, max_mp, exp, exp_next, gold, "
                        "attack, defense, stat_str, stat_dex, stat_int, stat_con, "
                        "skill_points, monster_kills, pk_kills "
                        "FROM save_slot WHERE slot=0";
     sqlite3_stmt* stmt;
-    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) return false;
+    if (sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        SetLoadError(LoadErrorType::DbLoadFailed, "Failed to prepare load query");
+        return false;
+    }
 
     if (sqlite3_step(stmt) != SQLITE_ROW) {
         sqlite3_finalize(stmt);
+        SetLoadError(LoadErrorType::DbLoadFailed, "No saved character found");
         return false;
     }
 
@@ -212,7 +217,6 @@ bool PersistenceManager::LoadGameState(GameState& state) {
     state.skill_points = get(20); state.monster_kills = get(21); state.pk_kills = get(22);
     sqlite3_finalize(stmt);
 
-    // Load inventory
     state.inventory.clear();
     const char* inv_sql = "SELECT item_id, name, count, enchant FROM inventory ORDER BY slot";
     if (sqlite3_prepare_v2(db_, inv_sql, -1, &stmt, nullptr) == SQLITE_OK) {
@@ -227,7 +231,6 @@ bool PersistenceManager::LoadGameState(GameState& state) {
         sqlite3_finalize(stmt);
     }
 
-    // Load quests
     state.quest_list.clear();
     const char* q_sql = "SELECT name FROM quests WHERE status='active'";
     if (sqlite3_prepare_v2(db_, q_sql, -1, &stmt, nullptr) == SQLITE_OK) {
@@ -238,7 +241,6 @@ bool PersistenceManager::LoadGameState(GameState& state) {
         sqlite3_finalize(stmt);
     }
 
-    // Load learned skills
     state.learned_skills.clear();
     const char* sk_sql = "SELECT skill_id FROM learned_skills";
     if (sqlite3_prepare_v2(db_, sk_sql, -1, &stmt, nullptr) == SQLITE_OK) {
@@ -248,6 +250,7 @@ bool PersistenceManager::LoadGameState(GameState& state) {
         sqlite3_finalize(stmt);
     }
 
+    ClearLoadError();
     spdlog::info("Persistence: loaded character '{}' (Lv.{})", state.name, state.level);
     return true;
 }
@@ -265,5 +268,51 @@ void PersistenceManager::Update(float dt) {
             spdlog::info("Persistence: auto-save triggered");
             dirty_ = false;
         }
+    }
+}
+
+void PersistenceManager::SetLoadError(LoadErrorType type, const std::string& message) {
+    load_error_type_ = type;
+    load_error_message_ = message;
+    spdlog::error("Persistence: load error [{}] {}", static_cast<int>(type), message);
+
+    if (show_error_dialog_ && type != LoadErrorType::None) {
+        auto retry_fn = [this]() { TriggerRetry(); };
+        show_error_dialog_(message, retry_fn);
+    }
+}
+
+void PersistenceManager::ClearLoadError() {
+    load_error_type_ = LoadErrorType::None;
+    load_error_message_.clear();
+}
+
+void PersistenceManager::SetRetryCallback(std::function<void()> callback) {
+    retry_callback_ = std::move(callback);
+}
+
+void PersistenceManager::TriggerRetry() {
+    ClearLoadError();
+    if (retry_callback_) {
+        spdlog::info("Persistence: retrying load");
+        retry_callback_();
+    }
+}
+
+void PersistenceManager::SetOnShowErrorDialog(
+    std::function<void(const std::string&, std::function<void()>)> callback) {
+    show_error_dialog_ = std::move(callback);
+}
+
+const char* PersistenceManager::GetLoadErrorDescription(LoadErrorType type) const {
+    switch (type) {
+    case LoadErrorType::None:                return "No error";
+    case LoadErrorType::CharacterListFailed:  return "Failed to receive character list. The server may be busy.";
+    case LoadErrorType::CharacterSelectFailed: return "The selected character is invalid.";
+    case LoadErrorType::GameEnterFailed:      return "Failed to enter the game world. Please try again.";
+    case LoadErrorType::DbLoadFailed:         return "Failed to load save data from local database.";
+    case LoadErrorType::NetworkTimeout:        return "Connection timed out. Please check your network.";
+    case LoadErrorType::ServerRejected:        return "Server rejected the request. Please try again later.";
+    default:                                  return "Unknown error occurred.";
     }
 }

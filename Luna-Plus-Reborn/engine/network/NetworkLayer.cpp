@@ -6,10 +6,47 @@
 #define LUNA_NETWORK_PLAINTEXT 1
 #endif
 #include <asio/steady_timer.hpp>
+#include <asio/thread_pool.hpp>
 #include <spdlog/spdlog.h>
 #include <cstring>
 #include <deque>
 #include <chrono>
+#include <future>
+
+// ── JobSystem (Old: custom thread pool) ──
+// ASIO-based thread pool for CPU-intensive background tasks.
+// Mirrors the ADAPTASI_SPEC.md section 9.1 JobSystem design.
+static const int JOBSYSTEM_THREAD_COUNT = 4;
+
+class JobSystem {
+public:
+    JobSystem() : pool_(JOBSYSTEM_THREAD_COUNT) {}
+
+    ~JobSystem() {
+        pool_.join();
+    }
+
+    template<typename F>
+    auto Enqueue(F&& task) -> std::future<decltype(task())> {
+        auto pkg = std::make_shared<std::packaged_task<decltype(task())()>>(std::forward<F>(task));
+        auto fut = pkg->get_future();
+        asio::post(pool_, [pkg]() { (*pkg)(); });
+        return fut;
+    }
+
+    void Stop() {
+        pool_.join();
+    }
+
+private:
+    asio::thread_pool pool_;
+};
+
+JobSystem g_job_system;
+
+// Extern declaration for other translation units:
+// extern JobSystem g_job_system;
+// Usage: g_job_system.Enqueue([...] { ... });
 
 // CRC32 lookup table
 static uint32_t crc32_table[256];
@@ -517,4 +554,14 @@ void NetworkLayer::Update() {
 
 bool NetworkLayer::IsConnected() const {
     return impl_->connected_;
+}
+
+// ── JobSystem public API (declared here; use `extern` to access from other TUs) ──
+
+void JobSystem_Enqueue(std::function<void()> task) {
+    g_job_system.Enqueue(std::move(task));
+}
+
+void JobSystem_Stop() {
+    g_job_system.Stop();
 }

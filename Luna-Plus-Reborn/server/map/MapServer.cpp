@@ -1525,6 +1525,8 @@ void MapServer::SendGuildInfo(uint8_t result, uint16_t ack_type) {
         has_guild_ ? fbb.CreateString(guild_.name) : 0,
         has_guild_ ? guild_.level : 0,
         has_guild_ ? guild_.gp : 0,
+        0, // guild_point — TODO: read from DB
+        0, // guild_mark — TODO: read from DB
         has_guild_ ? guild_.master_id : 0,
         fbb.CreateVector(members));
     auto resp = CreateGuildResponse(fbb, result, guild);
