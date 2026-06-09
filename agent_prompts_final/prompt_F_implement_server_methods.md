@@ -5,7 +5,10 @@ Build: cmake --build build/macos-debug -j$(sysctl -n hw.ncpu)
 
 ## Tugas
 
-Implementasi method-method server yang masih missing. Dari analisa, Old Map server punya 1.938 methods, Reborn punya 902. Target: tambah method yang paling kritis.
+Implementasi method-method server yang masih missing. Dari verifikasi agents A-D:
+- Old Map server: 1.938 methods (116 files)
+- Reborn Map server: ~723 methods (18 files) — corrected dari klaim 902
+Gap: ~1.215 methods. Target: tambah method yang paling kritis (P1-P5).
 
 ## Aturan Ketat (WAJIB)
 

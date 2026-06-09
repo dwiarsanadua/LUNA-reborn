@@ -5,7 +5,10 @@ Build: cmake --build build/macos-debug -j$(sysctl -n hw.ncpu)
 
 ## Tugas
 
-Implementasi NACK response codes untuk server packet handlers. Saat ini banyak handler yang return void tanpa mengirim NACK saat operasi gagal.
+Implementasi NACK response codes untuk server packet handlers. Dari verifikasi agents A-D:
+- 20+ error cases teridentifikasi dari Old source (Item, Skill, Party, Guild, Quest, Trade)
+- Reborn sudah punya beberapa NACK (NPC handler pattern), tapi banyak yang belum
+- Gap: error codes Old spesifik per operasi — Reborn perlu NACK per subsystem
 
 ## Aturan Ketat (WAJIB)
 
