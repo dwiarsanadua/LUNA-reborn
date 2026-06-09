@@ -50,15 +50,33 @@ void Window::Render(UIRenderer& ui) {
     if (custom_bg_cb_) {
         custom_bg_cb_(ui, x_, y_, w_, h_);
     } else if (draw_chrome_) {
-        ui.DrawRect(x_, y_, w_, GetTitleBarH(), title_color_);
-        ui.DrawRect(x_, y_ + GetTitleBarH(), w_, h_ - GetTitleBarH(), body_color_);
-        ui.DrawBorder(x_, y_, w_, h_, border_color_);
-        if (!title_.empty())
-            ui.DrawText(x_ + 6, y_ + 3, 0xffffffff, "%s", title_.c_str());
+        float th = GetTitleBarH();
+        // Title bar gradient: top half lighter, bottom half darker
+        ui.DrawRect(x_, y_, w_, th / 2, title_color_);
+        ui.DrawRect(x_, y_ + th / 2, w_, th - th / 2,
+                    {uint8_t(title_color_.r * 2 / 3),
+                     uint8_t(title_color_.g * 2 / 3),
+                     uint8_t(title_color_.b * 2 / 3),
+                     title_color_.a});
+
+        // Window body fill
+        ui.DrawRect(x_, y_ + th, w_, h_ - th, body_color_);
+
+        // 3D border (raised style)
+        ui.DrawBorder(x_, y_, w_, h_, {150, 200, 255, 200}, 1);
+        ui.DrawBorder(x_, y_, w_, h_, {50, 80, 120, 200}, 2);
+
+        // Title text with shadow
+        if (!title_.empty()) {
+            ui.DrawText(x_ + 6, y_ + 4, 0xFF000000, "%s", title_.c_str());
+            ui.DrawText(x_ + 5, y_ + 3, 0xffffffff, "%s", title_.c_str());
+        }
+
+        // Close button (pojok kanan atas)
         if (closable_) {
-            float cx = x_ + w_ - 18, cy = y_ + 3;
-            ui.DrawRect(cx, cy, 14, 14, {180, 40, 40, 200});
-            ui.DrawText(cx + 3, cy + 1, 0xffffffff, "X");
+            float cb_x = x_ + w_ - 20, cb_y = y_ + 2, cb_s = 16;
+            ui.DrawRect(cb_x, cb_y, cb_s, cb_s, {180, 20, 20, 220});
+            ui.DrawText(cb_x + 4, cb_y + 1, 0xFFFFFFFF, "X");
         }
     }
     

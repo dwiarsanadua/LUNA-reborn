@@ -65,6 +65,17 @@ bool RenderDevice::Init(const RenderDeviceConfig& config) {
     bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,     0xFF6688AA, 1.0f, 0);
     bgfx::setViewRect(0, 0, 0, (uint16_t)width_, (uint16_t)height_);
 
+    // Create DX9-style fixed-function uniforms
+    u_ambient_ = bgfx::createUniform("u_ambient", bgfx::UniformType::Vec4);
+    u_light_dir_ = bgfx::createUniform("u_light_dir", bgfx::UniformType::Vec4);
+    u_light_diffuse_ = bgfx::createUniform("u_light_diffuse", bgfx::UniformType::Vec4);
+    u_light_specular_ = bgfx::createUniform("u_light_specular", bgfx::UniformType::Vec4);
+    u_fog_ = bgfx::createUniform("u_fog", bgfx::UniformType::Vec4);
+    u_fog_end_ = bgfx::createUniform("u_fog_end", bgfx::UniformType::Vec4);
+
+    // Set initial lighting values
+    SetLightingUniforms();
+
     spdlog::info("RenderDevice: initialized. FB Size: {}x{}", width_, height_);
     spdlog::info("RenderDevice: bgfx renderer = {}", bgfx::getRendererName(bgfx::getRendererType()));
     return true;
@@ -90,7 +101,24 @@ void RenderDevice::BeginFrame() {
     bgfx::dbgTextPrintf(1, 1, 0x0f, "LUNA Plus Reborn - BGFX ACTIVE");
     bgfx::dbgTextPrintf(1, 2, 0x0f, "Resolution: %dx%d", width_, height_);
     
+    SetLightingUniforms();
+
     bgfx::touch(debugView);
+}
+
+void RenderDevice::SetLightingUniforms() {
+    float ambient[4]   = {0.2f, 0.2f, 0.3f, 1.0f};
+    float light_dir[4] = {0.5f, -0.8f, 0.3f, 0.0f};
+    float light_diff[4]= {0.8f, 0.8f, 0.8f, 1.0f};
+    float light_spec[4]= {0.6f, 0.6f, 0.6f, 16.0f};
+    float fog[4]       = {0.0f, 0.0f, 0.0f, 50.0f};
+    float fog_end[4]   = {1.0f/150.0f, 0, 0, 0};
+    if (bgfx::isValid(u_ambient_))  bgfx::setUniform(u_ambient_, ambient);
+    if (bgfx::isValid(u_light_dir_)) bgfx::setUniform(u_light_dir_, light_dir);
+    if (bgfx::isValid(u_light_diffuse_)) bgfx::setUniform(u_light_diffuse_, light_diff);
+    if (bgfx::isValid(u_light_specular_)) bgfx::setUniform(u_light_specular_, light_spec);
+    if (bgfx::isValid(u_fog_)) bgfx::setUniform(u_fog_, fog);
+    if (bgfx::isValid(u_fog_end_)) bgfx::setUniform(u_fog_end_, fog_end);
 }
 
 void RenderDevice::EndFrame() {

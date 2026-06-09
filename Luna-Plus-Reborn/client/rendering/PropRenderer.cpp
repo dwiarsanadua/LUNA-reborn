@@ -56,14 +56,20 @@ bgfx::TextureHandle PropRenderer::LoadNormalMap(const std::string& base_name) {
 }
 
 bool PropRenderer::Init() {
-    program_ = ShaderUtils::LoadProgram("shaders/vs_default.bin", "shaders/fs_lit.bin");
+    program_ = ShaderUtils::LoadProgram("shaders/vs_main.bin", "shaders/fs_main.bin");
     if (!bgfx::isValid(program_)) { spdlog::error("PropRenderer: shader load failed"); return false; }
-    shadow_program_ = ShaderUtils::LoadProgram("shaders/vs_default.bin", "shaders/fs_unlit.bin");
+    shadow_program_ = ShaderUtils::LoadProgram("shaders/vs_main.bin", "shaders/fs_unlit.bin");
+    // DX9 fixed-function uniforms (matching vs_main.sc)
+    u_ambient_ = bgfx::createUniform("u_ambient", bgfx::UniformType::Vec4);
+    u_light_dir_ = bgfx::createUniform("u_light_dir", bgfx::UniformType::Vec4);
+    u_light_diffuse_ = bgfx::createUniform("u_light_diffuse", bgfx::UniformType::Vec4);
+    u_light_specular_ = bgfx::createUniform("u_light_specular", bgfx::UniformType::Vec4);
+    u_fog_ = bgfx::createUniform("u_fog", bgfx::UniformType::Vec4);
+    u_fog_end_ = bgfx::createUniform("u_fog_end", bgfx::UniformType::Vec4);
     u_color_ = bgfx::createUniform("u_color", bgfx::UniformType::Vec4);
-    u_light_dir_ = bgfx::createUniform("u_lightDir", bgfx::UniformType::Vec4);
-    u_shadow_mvp_ = bgfx::createUniform("u_shadowMVP", bgfx::UniformType::Mat4);
     s_tex_color_ = bgfx::createUniform("s_texColor", bgfx::UniformType::Sampler);
     s_tex_normal_ = bgfx::createUniform("s_texNormal", bgfx::UniformType::Sampler);
+    u_shadow_mvp_ = bgfx::createUniform("u_shadowMVP", bgfx::UniformType::Mat4);
     uint32_t white = 0xffffffff;
     white_tex_ = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::makeRef(&white, 4));
 
@@ -193,9 +199,19 @@ void PropRenderer::Render(const glm::mat4& view, const glm::mat4& proj, const En
     bgfx::setViewClear(view_id_, BGFX_CLEAR_NONE, 0, 1.0f, 0);
     bgfx::setViewRect(view_id_, 0, 0, (uint16_t)width, (uint16_t)height);
 
-    if (bgfx::isValid(u_light_dir_)) {
-        bgfx::setUniform(u_light_dir_, glm::value_ptr(env.light_dir));
-    }
+    // DX9 fixed-function lighting uniforms
+    float ambient[4]   = {0.2f, 0.2f, 0.3f, 1.0f};
+    float light_dir[4] = {0.5f, -0.8f, 0.3f, 0.0f};
+    float diff[4]      = {0.8f, 0.8f, 0.8f, 1.0f};
+    float spec[4]      = {0.6f, 0.6f, 0.6f, 16.0f};
+    float fog[4]       = {0.0f, 0.0f, 0.0f, 50.0f};
+    float fog_end[4]   = {1.0f/150.0f, 0, 0, 0};
+    if (bgfx::isValid(u_ambient_)) bgfx::setUniform(u_ambient_, ambient);
+    if (bgfx::isValid(u_light_dir_)) bgfx::setUniform(u_light_dir_, light_dir);
+    if (bgfx::isValid(u_light_diffuse_)) bgfx::setUniform(u_light_diffuse_, diff);
+    if (bgfx::isValid(u_light_specular_)) bgfx::setUniform(u_light_specular_, spec);
+    if (bgfx::isValid(u_fog_)) bgfx::setUniform(u_fog_, fog);
+    if (bgfx::isValid(u_fog_end_)) bgfx::setUniform(u_fog_end_, fog_end);
 
     last_draw_calls_ = 0;
 

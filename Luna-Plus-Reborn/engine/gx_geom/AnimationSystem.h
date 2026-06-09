@@ -1,6 +1,7 @@
 // AGENT Titan — DO NOT MODIFY WITHOUT COORDINATION
 #pragma once
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -29,6 +30,18 @@ struct AnimClip {
     void SampleAllAtTime(float time, glm::mat4* out_matrices, size_t count) const;
 };
 
+struct AnimTransitionConfig {
+    float idle_to_walk = 0.10f;     // 100ms
+    float walk_to_run = 0.20f;      // 200ms
+    float to_attack = 0.05f;       // 50ms (near-instant)
+    float attack_to_idle = 0.15f;   // 150ms
+    float run_to_idle = 0.10f;       // 100ms
+    float any_to_die = 0.30f;       // 300ms
+    float default_blend = 0.20f;    // 200ms
+
+    float GetBlendTime(const std::string& from, const std::string& to) const;
+};
+
 class AnimationSystem {
 public:
     AnimationSystem() = default;
@@ -51,6 +64,9 @@ public:
     void GetBlendedPose(const std::vector<glm::mat4>& bind_pose,
                         glm::mat4* out_pose, size_t count);
 
+    void SetTransitionConfig(const AnimTransitionConfig& cfg) { transition_config_ = cfg; }
+    const AnimTransitionConfig& GetTransitionConfig() const { return transition_config_; }
+
 private:
     void InterpolatePose(const AnimClip& clip, float time,
                          glm::mat4* out_pose, size_t count);
@@ -63,4 +79,7 @@ private:
     float speed_multiplier_ = 1.0f;
     bool is_playing_ = false;
     bool looping_ = true;
+
+    std::string last_anim_name_;
+    AnimTransitionConfig transition_config_;
 };

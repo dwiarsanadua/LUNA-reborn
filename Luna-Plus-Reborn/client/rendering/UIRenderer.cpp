@@ -745,6 +745,7 @@ TextureInfo UIRenderer::LoadTexture(const std::string& name, const std::string& 
 
 void UIRenderer::Render() {
     bgfx::setViewRect(view_id_, 0, 0, (uint16_t)width, (uint16_t)height);
+    FlushBatch();
 }
 
 void UIRenderer::Shutdown() {

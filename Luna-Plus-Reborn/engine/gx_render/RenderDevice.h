@@ -68,10 +68,19 @@ public:
     void SetTexture(uint8_t stage, bgfx::UniformHandle sampler,
                     bgfx::TextureHandle texture, uint32_t flags = 0);
 
+    void SetLightingUniforms();
+
 private:
     GLFWwindow* window_ = nullptr;
     int width_ = 800, height_ = 600;
     int logical_width_ = 800, logical_height_ = 600;
     bgfx::ViewId main_view_ = static_cast<bgfx::ViewId>(ViewId::Debug);
     uint32_t clear_color_ = 0x000000FF;
+
+    bgfx::UniformHandle u_ambient_ = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle u_light_dir_ = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle u_light_diffuse_ = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle u_light_specular_ = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle u_fog_ = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle u_fog_end_ = BGFX_INVALID_HANDLE;
 };

@@ -24,7 +24,7 @@ bool Font::Load(const std::string& font_path, int size) {
     FT_Set_Pixel_Sizes(face_, 0, size);
     line_height_ = (int)(face_->size->metrics.height >> 6);
 
-    atlas_data_.resize(atlas_width_ * atlas_height_, 0);
+    atlas_data_.resize(atlas_width_ * atlas_height_ * 3, 0);
     EnsureAtlas();
 
     spdlog::info("Font: loaded '{}' (size={})", font_path, size);
@@ -40,7 +40,7 @@ void Font::SetSize(int size) {
         atlas_cursor_x_ = 0;
         atlas_cursor_y_ = 0;
         atlas_row_height_ = 0;
-        std::fill(atlas_data_.begin(), atlas_data_.end(), 0);
+        atlas_data_.assign(atlas_width_ * atlas_height_ * 3, 0);
         EnsureAtlas();
     }
 }
@@ -49,9 +49,9 @@ void Font::EnsureAtlas() {
     if (bgfx::isValid(atlas_)) bgfx::destroy(atlas_);
 
     const bgfx::Memory* mem = bgfx::copy(atlas_data_.data(),
-        (uint32_t)(atlas_width_ * atlas_height_));
+        (uint32_t)(atlas_width_ * atlas_height_ * 3));
     atlas_ = bgfx::createTexture2D((uint16_t)atlas_width_, (uint16_t)atlas_height_,
-        false, 1, bgfx::TextureFormat::R8, 0, mem);
+        false, 1, bgfx::TextureFormat::RGB8, 0, mem);
 }
 
 void Font::LoadGlyphs(const std::string& text) {
@@ -59,9 +59,11 @@ void Font::LoadGlyphs(const std::string& text) {
         uint32_t glyph_idx = FT_Get_Char_Index(face_, c);
         if (glyphs_.count(glyph_idx) > 0) continue;
 
-        if (FT_Load_Glyph(face_, glyph_idx, FT_LOAD_RENDER)) continue;
+            if (FT_Load_Glyph(face_, glyph_idx, FT_LOAD_TARGET_LCD)) continue;
+        if (FT_Render_Glyph(face_->glyph, FT_RENDER_MODE_LCD)) continue;
 
         FT_Bitmap& bitmap = face_->glyph->bitmap;
+        int pitch = bitmap.pitch;
 
         if (atlas_cursor_x_ + bitmap.width > (uint32_t)atlas_width_) {
             atlas_cursor_x_ = 0;
@@ -75,18 +77,20 @@ void Font::LoadGlyphs(const std::string& text) {
         }
 
         for (uint32_t y = 0; y < bitmap.rows; ++y) {
-            for (uint32_t x = 0; x < bitmap.width; ++x) {
+            for (uint32_t x = 0; x < (uint32_t)bitmap.width; ++x) {
                 int dest_y = atlas_cursor_y_ + y;
-                int dest_x = atlas_cursor_x_ + x;
-                atlas_data_[dest_y * atlas_width_ + dest_x] =
-                    bitmap.buffer[y * bitmap.width + x];
+                int dest_x = (atlas_cursor_x_ + x) * 3;
+                int src = y * pitch + x * 3;
+                atlas_data_[dest_y * atlas_width_ * 3 + dest_x + 0] = bitmap.buffer[src + 0];
+                atlas_data_[dest_y * atlas_width_ * 3 + dest_x + 1] = bitmap.buffer[src + 1];
+                atlas_data_[dest_y * atlas_width_ * 3 + dest_x + 2] = bitmap.buffer[src + 2];
             }
         }
 
         GlyphInfo info;
-        info.x = (uint16_t)atlas_cursor_x_;
+        info.x = (uint16_t)(atlas_cursor_x_ * 3);
         info.y = (uint16_t)atlas_cursor_y_;
-        info.width = (uint16_t)bitmap.width;
+        info.width = (uint16_t)(bitmap.width * 3);
         info.height = (uint16_t)bitmap.rows;
         info.bearing_x = (int16_t)face_->glyph->bitmap_left;
         info.bearing_y = (int16_t)face_->glyph->bitmap_top;

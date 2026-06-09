@@ -4,6 +4,7 @@
 #include <fstream>
 #include <sstream>
 #include <cstring>
+#include <algorithm>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
@@ -11,6 +12,48 @@
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
+
+float AnimTransitionConfig::GetBlendTime(const std::string& from, const std::string& to) const {
+    auto to_lower = [](std::string s) {
+        std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+        return s;
+    };
+    std::string f = to_lower(from);
+    std::string t = to_lower(to);
+
+    auto contains = [](const std::string& s, const std::string& sub) {
+        return s.find(sub) != std::string::npos;
+    };
+
+    // any → die
+    if (contains(t, "die") || contains(t, "dead") || contains(t, "death") || contains(t, "faint"))
+        return any_to_die;
+
+    // idle ↔ walk
+    if ((contains(f, "idle") && contains(t, "walk")) ||
+        (contains(f, "stand") && contains(t, "walk")))
+        return idle_to_walk;
+
+    // walk → run
+    if (contains(f, "walk") && contains(t, "run"))
+        return walk_to_run;
+
+    // x → attack
+    if (contains(t, "attack") || contains(t, "atk") || contains(t, "hit") ||
+        contains(t, "swing") || contains(t, "strike") || contains(t, "shoot"))
+        return to_attack;
+
+    // attack → idle
+    if ((contains(f, "attack") || contains(f, "atk")) &&
+        (contains(t, "idle") || contains(t, "stand")))
+        return attack_to_idle;
+
+    // run → idle
+    if (contains(f, "run") && (contains(t, "idle") || contains(t, "stand")))
+        return run_to_idle;
+
+    return default_blend;
+}
 
 // ── JSON loading ────────────────────────────────────────────────
 bool AnimationSystem::LoadFromJson(const std::string& path, AnimClip& out_clip) {
@@ -294,16 +337,28 @@ void AnimClip::SampleAllAtTime(float time, glm::mat4* out_matrices, size_t count
 // ── Animation system runtime ────────────────────────────────────
 void AnimationSystem::Play(AnimClip* clip, bool loop, float blend_time) {
     if (!clip) return;
+
+    // Determine blend time from transition config if default was passed
     if (current_clip_ && current_clip_ != clip) {
-        BlendTo(clip, blend_time);
+        float actual_blend = blend_time;
+        if (blend_time == 0.2f) { // using default → let config decide
+            actual_blend = transition_config_.GetBlendTime(current_clip_->name, clip->name);
+        }
+        BlendTo(clip, actual_blend);
+        last_anim_name_ = current_clip_->name;
         return;
     }
+
     current_clip_ = clip;
     current_time_ = 0.0f;
     looping_ = loop;
     is_playing_ = true;
     blend_timer_ = blend_duration_ = 0.0f;
     next_clip_ = nullptr;
+
+    if (last_anim_name_.empty()) {
+        last_anim_name_ = clip->name;
+    }
 }
 
 void AnimationSystem::BlendTo(AnimClip* clip, float blend_time) {

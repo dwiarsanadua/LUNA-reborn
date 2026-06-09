@@ -139,6 +139,7 @@ add_executable(LunaPlusClient
     engine/GraphicEngine.cpp
     engine/EngineCamera.cpp
     engine/EngineMap.cpp
+    engine/SceneLoader.cpp
     input/InputSystem.cpp
     input/Keyboard.cpp
     input/Mouse.cpp

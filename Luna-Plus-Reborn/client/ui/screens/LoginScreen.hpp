@@ -1,9 +1,10 @@
 #pragma once
 #include <ui/Screen.hpp>
-#include <ui/WindowManager.hpp>
 #include <rendering/SceneRenderer.hpp>
+#include <rendering/UIRenderer.hpp>
 #include <bgfx/bgfx.h>
 #include <string>
+#include <functional>
 
 class LoginScreen : public Screen {
 public:
@@ -18,33 +19,16 @@ public:
     void SetSceneClearer(std::function<void(uint32_t)> f) { set_clear_color_ = f; }
     void SetSceneRenderer(SceneRenderer* sr) { scene_renderer_ = sr; }
 
-    struct InputField {
-        char buffer[64] = {0};
-        int cursor_pos = 0;
-        bool active = false;
-        bool masked = false;
-        std::string label;
-        float x = 0, y = 0, w = 200, h = 28;
-    };
-
 private:
-    void LoadTexture(bgfx::TextureHandle& cache, const std::string& name);
-    void TexturesLoadOnce();
-    void DrawField(UIRenderer& ui, const InputField& field, bool focus);
+    struct Field { char buffer[64] = {0}; int cursor_pos = 0; bool active = false; bool masked = false; char label[16] = {0}; };
     bool DoLogin();
 
-    WindowManager wm_;
+    bgfx::TextureHandle tex_bg_ = BGFX_INVALID_HANDLE;
+    Field fields_[2] = {};
+    bool save_id_ = false;
+    bool sent_ = false;
     std::function<void(uint32_t)> set_clear_color_;
     SceneRenderer* scene_renderer_ = nullptr;
-    bool sent_ = false;
-    bool textures_loaded_ = false;
-    bool bg_ok_ = false;
-    bgfx::TextureHandle tex_bg_ = BGFX_INVALID_HANDLE;
-    bgfx::TextureHandle tex_bar_ = BGFX_INVALID_HANDLE;
-    bgfx::TextureHandle tex_btn_ = BGFX_INVALID_HANDLE;
-    InputField id_field_;
-    InputField pw_field_;
-    bool save_id_ = false;
-    std::string error_message_;
-    float error_timer_ = 0;
+    GameState* state_ = nullptr;
+    NetworkClient* network_ = nullptr;
 };

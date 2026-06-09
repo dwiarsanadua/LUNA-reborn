@@ -231,7 +231,7 @@ int main(int argc, char** argv) {
     ClientFlow::Init(&screenManager, nullptr);
 
     // 12. Enter Launcher Screen (Prompt A)
-    screenManager.SwitchTo("launcher");
+    screenManager.SwitchTo("login");
 
     static Luna::PacketDispatcher client_dispatcher;
 

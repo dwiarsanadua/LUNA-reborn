@@ -10,3 +10,5 @@ vec2 v_texcoordSplat : TEXCOORD1;
 vec3 v_normal    : NORMAL;
 vec4 v_color0    : COLOR0;
 vec3 v_worldPos  : TEXCOORD3;
+vec4 v_color     : COLOR1;
+vec4 v_fog       : FOG;

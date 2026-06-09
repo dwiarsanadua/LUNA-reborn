@@ -1,4 +1,5 @@
 #include "EngineMap.hpp"
+#include "SceneLoader.hpp"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -142,6 +143,10 @@ bool EngineMap::Load(const std::string& map_id) {
     
     std::string json_path = VFS::Find("assets/maps/" + map_id + ".json");
     LoadSceneObjects(json_path);
+    
+    // SceneLoader: additional scene object loading with proper JSON parsing
+    auto scene = SceneLoader::Load(json_path);
+    SceneLoader::Instantiate(scene);
     
     // Parse environment data from JSON
     std::ifstream jf(json_path);

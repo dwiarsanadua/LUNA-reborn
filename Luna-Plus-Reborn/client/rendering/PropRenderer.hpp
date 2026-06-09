@@ -52,8 +52,13 @@ private:
     std::unordered_map<std::string, bgfx::TextureHandle> tex_cache_;
     bgfx::ProgramHandle program_ = BGFX_INVALID_HANDLE;
     bgfx::ProgramHandle shadow_program_ = BGFX_INVALID_HANDLE;
-    bgfx::UniformHandle u_color_ = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle u_ambient_ = BGFX_INVALID_HANDLE;
     bgfx::UniformHandle u_light_dir_ = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle u_light_diffuse_ = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle u_light_specular_ = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle u_fog_ = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle u_fog_end_ = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle u_color_ = BGFX_INVALID_HANDLE;
     bgfx::UniformHandle s_tex_color_ = BGFX_INVALID_HANDLE;
     bgfx::UniformHandle s_tex_normal_ = BGFX_INVALID_HANDLE;
     bgfx::UniformHandle u_shadow_mvp_ = BGFX_INVALID_HANDLE;

@@ -137,6 +137,7 @@ bool ShaderManager::Init(const std::string& shader_dir) {
     load("default", dir + "vs_default.bin", dir + "fs_default.bin");
     load("unlit", dir + "vs_unlit.bin", dir + "fs_unlit.bin");
     load("lit", dir + "vs_default.bin", dir + "fs_lit.bin");
+    load("main", dir + "vs_main.bin", dir + "fs_main.bin");
 
     spdlog::info("ShaderManager: initialized ({} programs)", programs_.size());
     return !programs_.empty();
@@ -161,4 +162,8 @@ Shader* ShaderManager::GetUnlitShader() {
 
 Shader* ShaderManager::GetLitShader() {
     return GetProgram("lit");
+}
+
+Shader* ShaderManager::GetMainShader() {
+    return GetProgram("main");
 }
