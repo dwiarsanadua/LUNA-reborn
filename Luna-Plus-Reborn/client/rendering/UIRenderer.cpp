@@ -1,4 +1,5 @@
 #include "UIRenderer.hpp"
+#include "FontManager.hpp"
 #include <spdlog/spdlog.h>
 #include <fstream>
 #include <cstdio>
@@ -330,6 +331,13 @@ void UIRenderer::SetFontFallback(const std::string& primary, const std::string& 
 }
 
 void UIRenderer::DrawText(float x, float y, uint32_t color, const char* fmt, ...) {
+    {
+        Language fb_lang = FontManager::Instance().GetLanguage();
+        const char* lang_str = FontManager::LanguageToString(fb_lang);
+        if (active_language_ != lang_str) {
+            SetLanguage(lang_str);
+        }
+    }
     FontAtlas& atlas = font_atlases_[current_font_size_];
     if (!atlas.ready) return;
     char buf[1024]; va_list args; va_start(args, fmt); vsnprintf(buf, 1024, fmt, args); va_end(args);

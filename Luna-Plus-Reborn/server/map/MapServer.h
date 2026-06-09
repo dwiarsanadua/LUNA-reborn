@@ -14,6 +14,7 @@
 #include "systems/SecondarySystem.hpp"
 #include <ecs/systems/SkillSystem.hpp>
 #include <ecs/components/QuestLog.hpp>
+#include "server/shared/RateLimiter.h"
 
 // entt::entity used for connected player tracking
 
@@ -126,6 +127,8 @@ private:
     SecondarySystem secondary_;
     SkillSystem skill_sys_;
 
+    RateLimiter rate_limiter_{200, 1000};
+    std::unordered_map<uint32_t, glm::vec3> previous_positions_;
     float auto_save_timer_ = 0.0f;
     float respawn_timer_ = 0.0f;
 
@@ -175,6 +178,16 @@ private:
     void HandleGuildLeave(const uint8_t* payload, size_t len);
     void SendGuildInfo(uint8_t result, uint16_t ack_type);
     void HandleGuildChat(const uint8_t* payload, size_t len);
+    void HandleNpcSpeech(const uint8_t* payload, size_t len);
+    void HandleMoveStop(const uint8_t* payload, size_t len);
+    void HandleMoveTeleport(const uint8_t* payload, size_t len);
+    void HandleVehicleSummon(const uint8_t* payload, size_t len);
+    void HandleVehicleUnsummon(const uint8_t* payload, size_t len);
+    void HandleVehicleMountRequest(const uint8_t* payload, size_t len);
+    void HandleVehicleMountAllow(const uint8_t* payload, size_t len);
+    void HandleVehicleDismount(const uint8_t* payload, size_t len);
+    void HandleVehicleGetOption(const uint8_t* payload, size_t len);
+    void HandleItemAppearanceRemove(const uint8_t* payload, size_t len);
     void SendTradeState(uint8_t result, uint16_t ack_type, bool completed = false);
     void HandleTradeApply(const uint8_t* payload, size_t len);
     void HandleTradeCancel(const uint8_t* payload, size_t len);

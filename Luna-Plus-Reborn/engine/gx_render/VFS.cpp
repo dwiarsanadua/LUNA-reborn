@@ -128,8 +128,8 @@ std::string VFS::Find(const std::string& relative_path) {
     // File not found — check cache to avoid log spam
     if (s_missing_file_cache.find(relative_path) == s_missing_file_cache.end()) {
         s_missing_file_cache.insert(relative_path);
-        spdlog::warn("VFS: file not found '{}' — searched {} roots, returning fallback path",
-                     relative_path, search_roots_.size());
+        spdlog::debug("VFS: file not found '{}' — searched {} roots, returning fallback path",
+                      relative_path, search_roots_.size());
     }
 
     // Return the base path + relative path as fallback (caller should handle missing)

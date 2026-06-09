@@ -33,7 +33,7 @@ AgentServer::AgentServer()
     , db_(std::make_unique<Database>())
     , packet_limiter_(500, 1000)
     , login_limiter_(10, 1000)
-    , brute_force_(5, 900)
+    , brute_force_(5, 60, 900)
 {}
 
 AgentServer::~AgentServer() { Shutdown(); }

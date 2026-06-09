@@ -1,4 +1,6 @@
 #include "GridSystem.hpp"
+#include <ecs/components/Tag.hpp>
+#include <ecs/components/Transform.hpp>
 #include <algorithm>
 
 int64_t GridSystem::CellKey(int cx, int cz) {
@@ -64,6 +66,45 @@ std::vector<uint32_t> GridSystem::QueryRadius(float x, float z, float radius) co
             }
         }
     }
-    (void)r2;
+    return out;
+}
+
+std::vector<entt::entity> GridSystem::GetTargetsInRange(
+    const glm::vec3& center, float radius,
+    entt::registry& registry,
+    const std::unordered_set<ObjectKind>& kinds)
+{
+    std::vector<entt::entity> out;
+    auto candidates = QueryRadius(center.x, center.z, radius);
+    if (out.capacity() < candidates.size()) out.reserve(candidates.size());
+
+    float r2 = radius * radius;
+    bool all_kinds = kinds.find(ObjectKind::ALL) != kinds.end();
+
+    for (uint32_t id : candidates) {
+        entt::entity e = static_cast<entt::entity>(id);
+        if (!registry.valid(e)) continue;
+
+        // Distance check
+        auto* xform = registry.try_get<Transform>(e);
+        if (!xform) continue;
+        glm::vec3 diff = xform->position - center;
+        if (glm::dot(diff, diff) > r2) continue;
+
+        // Kind filter
+        if (!all_kinds) {
+            bool match = false;
+            if (kinds.find(ObjectKind::PLAYER) != kinds.end() && registry.all_of<TagPlayer>(e)) match = true;
+            else if (kinds.find(ObjectKind::MONSTER) != kinds.end() && registry.all_of<TagMonster>(e)) match = true;
+            else if (kinds.find(ObjectKind::NPC) != kinds.end() && registry.all_of<TagNPC>(e)) match = true;
+            else if (kinds.find(ObjectKind::PET) != kinds.end() && registry.all_of<TagPet>(e)) match = true;
+            else if (kinds.find(ObjectKind::DROPPED_ITEM) != kinds.end() && registry.all_of<TagDroppedItem>(e)) match = true;
+            else if (kinds.find(ObjectKind::SUMMON) != kinds.end() && registry.all_of<TagSummon>(e)) match = true;
+            if (!match) continue;
+        }
+
+        out.push_back(e);
+    }
+
     return out;
 }

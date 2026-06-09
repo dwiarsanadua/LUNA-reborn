@@ -82,6 +82,12 @@ struct EntityInterp {
 #include <ui/dialogs/AvatarDialog.hpp>
 #include <ui/dialogs/UpgradeDialog.hpp>
 #include <ui/dialogs/MacroDialog.hpp>
+#include <ui/dialogs/NPCShopDialog.hpp>
+#include <ui/dialogs/ItemMallWarehouseDialog.hpp>
+#include <ui/dialogs/IdentificationDialog.hpp>
+#include <ui/dialogs/EnchantDialog.hpp>
+#include <ui/dialogs/SiegeWarFlagDialog.hpp>
+#include <ui/dialogs/ProgressDialog.hpp>
 #include <ui/dialogs/WeatherDialog.hpp>
 #include <gameobjects/Pet.hpp>
 #include <gameobjects/TradingSystem.hpp>
@@ -114,6 +120,14 @@ struct EntityInterp {
 #include <ui/dialogs/FadeDlg.hpp>
 #include <ui/dialogs/FarmGetDialog.hpp>
 #include <ui/dialogs/PKManagerDlg.hpp>
+#include <ui/dialogs/ChannelDialog.hpp>
+#include <ui/dialogs/CharDelDialog.hpp>
+#include <ui/dialogs/PartyMatchingDialog.hpp>
+#include <ui/dialogs/FriendInviteDialog.hpp>
+#include <ui/dialogs/GuildCreateDialog.hpp>
+#include <ui/dialogs/GuildInviteDialog.hpp>
+#include <ui/dialogs/QuestQuickViewDialog.hpp>
+#include <ui/dialogs/MonsterKillDialog.hpp>
 #include <engine/EngineMap.hpp>
 #include <engine/EngineSky.hpp>
 #include <effects/WeatherSystem.hpp>
@@ -349,7 +363,21 @@ private:
     AvatarDialog avatar_dlg_;
     UpgradeDialog upgrade_dlg_;
     MacroDialog macro_dlg_;
+    NPCShopDialog npc_shop_dlg_;
+    ItemMallWarehouseDialog mall_warehouse_dlg_;
+    IdentificationDialog identification_dlg_;
+    EnchantDialog enchant_dlg_;
+    SiegeWarFlagDialog siege_flag_dlg_;
+    ProgressDialog progress_dlg_;
     WeatherDialog weather_dlg_;
+    ChannelDialog channel_dlg_;
+    CharDelDialog chardel_dlg_;
+    PartyMatchingDialog party_matching_dlg_;
+    FriendInviteDialog friend_invite_dlg_;
+    GuildCreateDialog guild_create_dlg_;
+    GuildInviteDialog guild_invite_dlg_;
+    QuestQuickViewDialog quest_quickview_dlg_;
+    MonsterKillDialog monster_kill_dlg_;
     float farm_poll_timer_ = 0.0f;
     float farm_local_tick_ = 0.0f;
     float pet_poll_timer_ = 0.0f;

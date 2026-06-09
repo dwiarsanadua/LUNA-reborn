@@ -8,6 +8,7 @@
 #include <game/data/ItemModelTable.hpp>
 #include <game/ecs/components/Equipment.hpp>
 #include <engine/physics/PhysicsWorld.h>
+#include <engine/EngineMap.hpp>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -353,6 +354,14 @@ void Hero::Update(float dt) {
             } else {
                 dx = (dx / dist) * speed;
                 dz = (dz / dist) * speed;
+            }
+            if (engine_map_ && engine_map_->IsLoaded()) {
+                glm::vec3 from(x_, y_, z_);
+                glm::vec3 to(x_ + dx, y_, z_ + dz);
+                if (!engine_map_->TryMove(from, to, 0.5f, entt::null)) {
+                    dx = 0.0f;
+                    dz = 0.0f;
+                }
             }
             Move(dx, dz, dt);
         }

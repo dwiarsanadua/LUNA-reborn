@@ -8,6 +8,7 @@ class UIRenderer;
 struct GameState;
 class AudioManager;
 class PhysicsWorld;
+class EngineMap;
 class PKManagerDlg;
 
 enum class HeroState {
@@ -72,6 +73,7 @@ public:
     bool IsInAttackRange() const;
 
     void SetNavMesh(class NavMeshSystem* nav) { navmesh_ = nav; }
+    void SetEngineMap(EngineMap* map) { engine_map_ = map; }
 
     // PK Integration
     void SetPKManager(PKManagerDlg* mgr) { pk_mgr_ = mgr; }
@@ -130,6 +132,7 @@ private:
     GameState* game_state_ = nullptr;
     AudioManager* audio_ = nullptr;
     PhysicsWorld* physics_world_ = nullptr;
+    EngineMap* engine_map_ = nullptr;
     int physics_char_id_ = -1;
     
     // PK state

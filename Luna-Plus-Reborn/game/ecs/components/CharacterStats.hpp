@@ -24,9 +24,11 @@ struct CharacterStats {
     float critical_rate = 5.0f;
     float critical_damage_rate = 0.0f; // percentage boost (Legacy: CriticalDamageRate)
     float critical_damage_plus = 0.0f; // flat boost (Legacy: CriticalDamagePlus)
+    float crit_rate_buff = 0.0f;       // Percent buffs untuk crit
     float attack_range = 3.0f;
     float move_speed = 5.0f;
     float block_rate = 0.0f;
+    float block_rate_buff = 0.0f;
     float shield_defense = 0.0f;
     float cool_time_reduction = 0.0f;
     float casting_protect = 0.0f;
@@ -81,4 +83,27 @@ struct CharacterStats {
     float normal_speed_rate = 1.0f;
     float physic_skill_speed_rate = 1.0f;
     float magic_skill_speed_rate = 1.0f;
+
+    // Old formula fields
+    int32_t weapon_attack = 0;       // Senjata equip attack
+    int32_t armor_defense = 0;       // Armor equip defense
+    int32_t base_strength = 0;       // Base STR sebelum buff/item
+    int32_t base_dexterity = 0;
+    uint8_t class_id = 0;          // 1=Fighter, 2=Rogue, 3=Ranger, 4=Mage
+    float accuracy_pct = 0.0f;     // Percent accuracy buffs
+    float accuracy_plus = 0.0f;    // Flat accuracy buffs
+    float evasion_pct = 0.0f;      // Percent evasion buffs
+    float evasion_plus = 0.0f;     // Flat evasion buffs
+    int32_t base_vitality = 0;
+    int32_t base_intelligence = 0;
+    int32_t base_wisdom = 0;
+    uint16_t enchant_level = 0;      // Enchant level senjata/baju
+    float physic_attack_pct = 0.0f;  // Percent buffs (+%)
+    float physic_attack_plus = 0.0f; // Flat buffs (+val)
+    float physic_defense_pct = 0.0f;
+    float physic_defense_plus = 0.0f;
+    float magic_attack_pct = 0.0f;
+    float magic_attack_plus = 0.0f;
+    float magic_defense_pct = 0.0f;
+    float magic_defense_plus = 0.0f;
 };

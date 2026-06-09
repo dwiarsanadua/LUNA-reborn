@@ -45,7 +45,10 @@
 #include <Fishing_generated.h>
 #include <Secondary_generated.h>
 #include <Farm_generated.h>
+#include <NPC_generated.h>
+#include <Vehicle_generated.h>
 #include <ecs/components/AIComponent.hpp>
+#include "server/shared/ValidationSystem.hpp"
 #include <PacketType_generated.h>
 #include <spdlog/spdlog.h>
 #include <glm/glm.hpp>
@@ -814,12 +817,33 @@ void MapServer::HandlePacket(uint16_t type, const uint8_t* payload, size_t len) 
 
     if (!player_joined_) return;
 
+    if (!rate_limiter_.Allow(std::to_string(connected_player_.id))) {
+        spdlog::warn("MapServer: rate limit exceeded for player {}", connected_player_.id);
+        return;
+    }
+
     if (type == PacketType_MP_MOVE_WALK || type == PacketType_MP_MOVE_RUN) {
         auto req = flatbuffers::GetRoot<MoveRequest>(payload);
         if (req->target_position()) {
-            connected_player_.pos_x = req->target_position()->x();
-            connected_player_.pos_y = req->target_position()->y();
-            connected_player_.pos_z = req->target_position()->z();
+            float new_x = req->target_position()->x();
+            float new_y = req->target_position()->y();
+            float new_z = req->target_position()->z();
+
+            glm::vec3 from(connected_player_.pos_x, connected_player_.pos_y, connected_player_.pos_z);
+            glm::vec3 to(new_x, new_y, new_z);
+
+            float max_speed = (type == PacketType_MP_MOVE_RUN) ? 15.0f : 8.0f;
+            if (!ValidationSystem::ValidateMovement(from, to, 0.1f, max_speed,
+                static_cast<uint32_t>(connected_player_.id))) {
+                spdlog::warn("MapServer: movement validation failed for player {}", connected_player_.id);
+                SendEntityTransform(static_cast<uint32_t>(connected_player_.id),
+                    connected_player_.pos_x, connected_player_.pos_y, connected_player_.pos_z);
+                return;
+            }
+
+            connected_player_.pos_x = new_x;
+            connected_player_.pos_y = new_y;
+            connected_player_.pos_z = new_z;
             if (registry_->valid(player_entity_)) {
                 auto& px = registry_->get<Transform>(player_entity_);
                 px.position = glm::vec3(connected_player_.pos_x, connected_player_.pos_y, connected_player_.pos_z);
@@ -831,6 +855,16 @@ void MapServer::HandlePacket(uint16_t type, const uint8_t* payload, size_t len) 
             SendEntityTransform(static_cast<uint32_t>(connected_player_.id),
                 connected_player_.pos_x, connected_player_.pos_y, connected_player_.pos_z);
         }
+        return;
+    }
+
+    if (type == PacketType_MP_MOVE_STOP) {
+        HandleMoveStop(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_MOVE_TELEPORT) {
+        HandleMoveTeleport(payload, len);
         return;
     }
 
@@ -1021,6 +1055,46 @@ void MapServer::HandlePacket(uint16_t type, const uint8_t* payload, size_t len) 
         return;
     }
 
+    if (type == PacketType_MP_NPC_SPEECH_SYN) {
+        HandleNpcSpeech(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_VEHICLE_SUMMON_SYN) {
+        HandleVehicleSummon(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_VEHICLE_UNSUMMON_SYN) {
+        HandleVehicleUnsummon(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_VEHICLE_MOUNT_REQUEST_SYN) {
+        HandleVehicleMountRequest(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_VEHICLE_MOUNT_ALLOW_SYN) {
+        HandleVehicleMountAllow(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_VEHICLE_DISMOUNT_SYN) {
+        HandleVehicleDismount(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_VEHICLE_GET_OPTION_SYN) {
+        HandleVehicleGetOption(payload, len);
+        return;
+    }
+
+    if (type == PacketType_MP_ITEM_APPEARANCE_REMOVE) {
+        HandleItemAppearanceRemove(payload, len);
+        return;
+    }
+
     if (type >= PacketType_MP_FAMILY_INFO_SYN && type <= PacketType_MP_FAMILY_ACTION_NACK) {
         MapPlayerContext ctx;
         ctx.character_id = static_cast<uint32_t>(connected_player_.id);
@@ -1150,6 +1224,14 @@ void MapServer::HandleCombatAttack(uint16_t ack_type, const uint8_t* payload, si
         combat_->HandleAttack(*registry_, player_entity_, target, skill_id);
     }
     int32_t damage_dealt = std::max(0, hp_before - def.hp);
+
+    auto& att_stats = registry_->get<CharacterStats>(player_entity_);
+    if (!ValidationSystem::ValidateDamage(damage_dealt, att_stats, def, skill_id)) {
+        spdlog::warn("MapServer: damage validation failed for player {} (dmg={})",
+                     connected_player_.id, damage_dealt);
+        def.hp = hp_before;
+        damage_dealt = 0;
+    }
 
     auto& xform = registry_->get<Transform>(target);
     flatbuffers::FlatBufferBuilder fbb;
@@ -2332,6 +2414,229 @@ void MapServer::HandleQuestList(const uint8_t* payload, size_t len) {
     (void)payload;
     (void)len;
     SendQuestList(player_joined_ ? 0 : 1);
+}
+
+void MapServer::HandleNpcSpeech(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+
+    auto req = flatbuffers::GetRoot<NpcRequest>(payload);
+    uint32_t npc_id = req->npc_id();
+    NpcAction action = req->action();
+
+    std::string npc_name;
+    std::string dialog_text;
+    sqlite3* gamedb = nullptr;
+    if (sqlite3_open("assets/data/game_data.db", &gamedb) == SQLITE_OK) {
+        const char* sql = "SELECT col_0000, col_0001, col_0006 FROM game_npc WHERE col_0000=?";
+        sqlite3_stmt* stmt = nullptr;
+        if (sqlite3_prepare_v2(gamedb, sql, -1, &stmt, nullptr) == SQLITE_OK) {
+            sqlite3_bind_int(stmt, 1, static_cast<int>(npc_id));
+            if (sqlite3_step(stmt) == SQLITE_ROW) {
+                const char* name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+                const char* dialog = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+                if (name) npc_name = name;
+                if (dialog) dialog_text = dialog;
+            }
+        }
+        sqlite3_finalize(stmt);
+        sqlite3_close(gamedb);
+    }
+
+    if (npc_name.empty()) {
+        spdlog::warn("MapServer: NPC {} not found, sending NACK", npc_id);
+        flatbuffers::FlatBufferBuilder fbb;
+        auto resp = CreateNpcResponse(fbb, 1, npc_id, action, 0, 0, 0, 0, 0);
+        fbb.Finish(resp);
+        network_->SendPacket(PacketType_MP_NPC_SPEECH_NACK, fbb.GetBufferPointer(), fbb.GetSize());
+        return;
+    }
+
+    std::string display = "[" + npc_name + "] ";
+    display += dialog_text.empty() ? "\"Hello, traveler.\"" : dialog_text;
+
+    flatbuffers::FlatBufferBuilder fbb;
+    auto dialog = fbb.CreateString(display);
+    auto resp = CreateNpcResponse(fbb, 0, npc_id, action, dialog, 0, 0, 0, 0);
+    fbb.Finish(resp);
+    network_->SendPacket(PacketType_MP_NPC_SPEECH_ACK, fbb.GetBufferPointer(), fbb.GetSize());
+    spdlog::info("MapServer: NPC {} speech response sent (action={})", npc_id, static_cast<int>(action));
+}
+
+void MapServer::HandleMoveStop(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+
+    auto req = flatbuffers::GetRoot<MoveRequest>(payload);
+    if (req->target_position()) {
+        connected_player_.pos_x = req->target_position()->x();
+        connected_player_.pos_y = req->target_position()->y();
+        connected_player_.pos_z = req->target_position()->z();
+        if (registry_->valid(player_entity_)) {
+            auto& xform = registry_->get<Transform>(player_entity_);
+            xform.position = glm::vec3(connected_player_.pos_x, connected_player_.pos_y, connected_player_.pos_z);
+            grid_.Update(static_cast<uint32_t>(connected_player_.id), connected_player_.pos_x, connected_player_.pos_z);
+            UpdatePlayerVisibility();
+        }
+        SavePlayerPosition(connected_player_.id,
+            connected_player_.pos_x, connected_player_.pos_y, connected_player_.pos_z);
+        uint32_t eid = static_cast<uint32_t>(connected_player_.id);
+        flatbuffers::FlatBufferBuilder fbb;
+        Vec3 pos{connected_player_.pos_x, connected_player_.pos_y, connected_player_.pos_z};
+        Vec3 vel{0.0f, 0.0f, 0.0f};
+        auto resp = CreateMoveResponse(fbb, eid, &pos, &vel, 0);
+        fbb.Finish(resp);
+        network_->SendPacket(PacketType_MP_MOVE_STOP, fbb.GetBufferPointer(), fbb.GetSize());
+        SendEntityTransform(eid, connected_player_.pos_x, connected_player_.pos_y, connected_player_.pos_z, "idle");
+    }
+    spdlog::debug("MapServer: player {} stopped", connected_player_.id);
+}
+
+void MapServer::HandleMoveTeleport(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+
+    auto req = flatbuffers::GetRoot<MoveRequest>(payload);
+    if (!req->target_position()) return;
+
+    float x = req->target_position()->x();
+    float y = req->target_position()->y();
+    float z = req->target_position()->z();
+
+    if (std::isnan(x) || std::isnan(y) || std::isnan(z) ||
+        std::abs(x) > 10000.0f || std::abs(y) > 10000.0f || std::abs(z) > 10000.0f) {
+        spdlog::warn("MapServer: invalid teleport position ({},{},{})", x, y, z);
+        return;
+    }
+
+    connected_player_.pos_x = x;
+    connected_player_.pos_y = y;
+    connected_player_.pos_z = z;
+    if (registry_->valid(player_entity_)) {
+        auto& xform = registry_->get<Transform>(player_entity_);
+        xform.position = glm::vec3(x, y, z);
+        grid_.Update(static_cast<uint32_t>(connected_player_.id), x, z);
+        UpdatePlayerVisibility();
+    }
+    SavePlayerPosition(connected_player_.id, x, y, z);
+    SendEntityTransform(static_cast<uint32_t>(connected_player_.id), x, y, z, "teleport");
+    spdlog::info("MapServer: player {} teleported to ({},{},{})", connected_player_.id, x, y, z);
+}
+
+void MapServer::HandleVehicleSummon(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+
+    auto req = flatbuffers::GetRoot<VehicleSummonRequest>(payload);
+    uint8_t item_slot = req->item_slot();
+    uint32_t vehicle_id = static_cast<uint32_t>(connected_player_.id) + 10000;
+
+    flatbuffers::FlatBufferBuilder fbb;
+    auto vname = fbb.CreateString("Mount");
+    Vec3 pos{connected_player_.pos_x, connected_player_.pos_y + 1.0f, connected_player_.pos_z};
+    auto vinfo = CreateVehicleInfo(fbb, vehicle_id,
+        static_cast<uint32_t>(connected_player_.id), vname, 0, 1, 0, 5.0f, &pos);
+    auto resp = CreateVehicleSummonResponse(fbb, vehicle_id,
+        static_cast<uint32_t>(connected_player_.id), item_slot, true, vinfo);
+    fbb.Finish(resp);
+    network_->SendPacket(PacketType_MP_VEHICLE_SUMMON_ACK, fbb.GetBufferPointer(), fbb.GetSize());
+    spdlog::info("MapServer: vehicle {} summoned by player {}", vehicle_id, connected_player_.id);
+}
+
+void MapServer::HandleVehicleUnsummon(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+
+    auto req = flatbuffers::GetRoot<VehicleUnsummonRequest>(payload);
+    uint32_t vehicle_id = req->vehicle_id();
+
+    flatbuffers::FlatBufferBuilder fbb;
+    auto resp = CreateVehicleUnsummonResponse(fbb,
+        static_cast<uint32_t>(connected_player_.id), vehicle_id);
+    fbb.Finish(resp);
+    network_->SendPacket(PacketType_MP_VEHICLE_UNSUMMON_ACK, fbb.GetBufferPointer(), fbb.GetSize());
+    spdlog::info("MapServer: vehicle {} unsummoned by player {}", vehicle_id, connected_player_.id);
+}
+
+void MapServer::HandleVehicleMountRequest(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+
+    auto req = flatbuffers::GetRoot<VehicleMountRequest>(payload);
+    uint32_t vehicle_id = req->vehicle_id();
+    uint8_t seat_index = req->seat_index();
+
+    flatbuffers::FlatBufferBuilder fbb;
+    auto resp = CreateVehicleMountAllowResponse(fbb,
+        static_cast<uint32_t>(connected_player_.id), vehicle_id, seat_index,
+        static_cast<uint32_t>(connected_player_.id), 0,
+        fbb.CreateString("Mount"), fbb.CreateString(connected_player_.name));
+    fbb.Finish(resp);
+    network_->SendPacket(PacketType_MP_VEHICLE_MOUNT_REQUEST_ACK, fbb.GetBufferPointer(), fbb.GetSize());
+    spdlog::info("MapServer: player {} mount request on vehicle {} seat {}",
+                 connected_player_.id, vehicle_id, seat_index);
+}
+
+void MapServer::HandleVehicleMountAllow(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+
+    flatbuffers::FlatBufferBuilder fbb;
+    auto resp = CreateVehicleMountAllowResponse(fbb,
+        static_cast<uint32_t>(connected_player_.id), 0, 0,
+        static_cast<uint32_t>(connected_player_.id), 0,
+        fbb.CreateString("Mount"), fbb.CreateString(connected_player_.name));
+    fbb.Finish(resp);
+    network_->SendPacket(PacketType_MP_VEHICLE_MOUNT_ALLOW_ACK, fbb.GetBufferPointer(), fbb.GetSize());
+    spdlog::info("MapServer: player {} mount allowed", connected_player_.id);
+}
+
+void MapServer::HandleVehicleDismount(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+
+    auto req = flatbuffers::GetRoot<VehicleDismountRequest>(payload);
+    uint32_t vehicle_id = req->vehicle_id();
+
+    flatbuffers::FlatBufferBuilder fbb;
+    auto resp = CreateVehicleDismountResponse(fbb,
+        static_cast<uint32_t>(connected_player_.id), vehicle_id, 0);
+    fbb.Finish(resp);
+    network_->SendPacket(PacketType_MP_VEHICLE_DISMOUNT_ACK, fbb.GetBufferPointer(), fbb.GetSize());
+    spdlog::info("MapServer: player {} dismounted vehicle {}", connected_player_.id, vehicle_id);
+}
+
+void MapServer::HandleVehicleGetOption(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)len;
+    if (!player_joined_) return;
+
+    flatbuffers::FlatBufferBuilder fbb;
+    auto resp = CreateVehicleGetOptionResponse(fbb, 0, 0, 0);
+    fbb.Finish(resp);
+    network_->SendPacket(PacketType_MP_VEHICLE_GET_OPTION_ACK, fbb.GetBufferPointer(), fbb.GetSize());
+    spdlog::debug("MapServer: vehicle option request by player {}", connected_player_.id);
+}
+
+void MapServer::HandleItemAppearanceRemove(const uint8_t* payload, size_t len) {
+    using namespace luna::protocol;
+    (void)payload;
+    (void)len;
+    if (!player_joined_) return;
+
+    flatbuffers::FlatBufferBuilder fbb;
+    auto upd = CreateInventoryUpdate(fbb, 0, 0, 0);
+    fbb.Finish(upd);
+    network_->SendPacket(PacketType_MP_ITEM_APPEARANCE_REMOVE, fbb.GetBufferPointer(), fbb.GetSize());
+    spdlog::debug("MapServer: item appearance remove handled");
 }
 
 void MapServer::HandleDungeonEntrance(const uint8_t* payload, size_t len) {

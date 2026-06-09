@@ -7,6 +7,7 @@
 #include <flatbuffers/flatbuffers.h>
 #include <Login_generated.h>
 #include <PacketType_generated.h>
+#include <config/ConfigManager.hpp>
 #include <spdlog/spdlog.h>
 #include <bgfx/bgfx.h>
 #include <stb_image.h>
@@ -129,20 +130,7 @@ namespace {
         return hash;
     }
 
-    static const char* SAVE_ID_FILE = "luna_save_id.txt";
-
-    static void save_id_to_file(const std::string& id) {
-        std::ofstream f(SAVE_ID_FILE);
-        if (f.is_open()) { f << id; }
-    }
-
-    static std::string load_id_from_file() {
-        std::ifstream f(SAVE_ID_FILE);
-        if (!f.is_open()) return {};
-        std::string id;
-        std::getline(f, id);
-        return id;
-    }
+    static constexpr const char* SAVE_ID_KEY = "login.saved_id";
 }
 
 void LoginScreen::Init(GameState* state, NetworkClient* network) {
@@ -191,9 +179,10 @@ void LoginScreen::Enter() {
     save_id_ = false;
     error_message_.clear();
     error_timer_ = 0;
-    std::string saved = load_id_from_file();
+    std::string saved = ConfigManager::GetString(SAVE_ID_KEY, "");
     if (!saved.empty()) {
         strncpy(id_field_.buffer, saved.c_str(), sizeof(id_field_.buffer) - 1);
+        id_field_.buffer[sizeof(id_field_.buffer) - 1] = '\0';
         id_field_.cursor_pos = (int)saved.size();
         save_id_ = true;
     }
@@ -244,8 +233,12 @@ bool LoginScreen::DoLogin() {
             state_->current_state = ClientState::Connect;
         }
 
-        if (save_id_) save_id_to_file(id_field_.buffer);
-        else save_id_to_file("");
+        if (save_id_) {
+            ConfigManager::SetString(SAVE_ID_KEY, id_field_.buffer);
+        } else {
+            ConfigManager::SetString(SAVE_ID_KEY, "");
+        }
+        ConfigManager::Save();
 
         flatbuffers::FlatBufferBuilder fbb;
         auto pw_hash_vec = fbb.CreateVector(sha256_digest(pw_field_.buffer));
@@ -344,7 +337,7 @@ void LoginScreen::Render(UIRenderer& ui) {
     if (bgfx::isValid(tex_bar_))
         ui.DrawImage(0, lh - 120, lw, 120, tex_bar_);
 
-    ui.DrawTextCentered(lh * 0.82f, 0xFF888888, "Tab=Switch Field  Enter=Login  Esc=Back  S=Save ID");
+    ui.DrawTextCentered(lh * 0.82f, 0xFF888888, "Tab=Switch Field  Enter=Login  Esc=Back");
 }
 
 void LoginScreen::TexturesLoadOnce() {

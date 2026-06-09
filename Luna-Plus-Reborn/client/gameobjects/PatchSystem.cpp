@@ -256,17 +256,12 @@ static std::string sha256_hex(const uint8_t* digest) {
 
 void PatchSystem::Init() {
     current_ = {1, 1, 0};
-    latest_ = {1, 2, 0};
-    update_available_ = current_ < latest_;
-    patch_notes_ = "v1.2.0 Changelog:\n"
-                   "- New dungeons: Shadow Realm, Dragon's Lair\n"
-                   "- Cash Shop with Luna Points\n"
-                   "- Battle Pass Season 1\n"
-                   "- Family & Couple system improvements\n"
-                   "- Bug fixes and performance optimizations";
-    patch_server_url_ = "http://patch.lunaplus-reborn.com/";
-    spdlog::info("PatchSystem: v{} (latest: v{}, update: {})",
-                 current_.ToString(), latest_.ToString(), update_available_);
+    latest_ = {1, 1, 0};
+    update_available_ = false;
+    patch_notes_ = "v1.1.0 — Luna Plus Reborn";
+    patch_server_url_ = "";
+    spdlog::info("PatchSystem: v{} (latest: v{})",
+                 current_.ToString(), latest_.ToString());
 }
 
 void PatchSystem::SetCurrentVersion(int major, int minor, int patch) {

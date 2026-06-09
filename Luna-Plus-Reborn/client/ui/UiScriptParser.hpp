@@ -59,6 +59,7 @@ struct UiElement {
     bool line_upward = true;
     bool show_scroll = false;
     bool moveable = false;
+    bool always_top = false;
     bool active = true;
     bool auto_close = false;
     bool save_position = false;

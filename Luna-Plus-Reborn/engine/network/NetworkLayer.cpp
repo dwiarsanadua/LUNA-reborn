@@ -360,16 +360,21 @@ public:
     }
 
     void DoAccept() {
-        acceptor_.async_accept(socket_, [this](std::error_code ec) {
+        auto* new_socket = new asio::ip::tcp::socket(io_context_);
+        acceptor_.async_accept(*new_socket, [this, new_socket](std::error_code ec) {
             if (!ec) {
+                std::swap(socket_, *new_socket);
+                delete new_socket;
                 connected_ = true;
                 connect_time_ = std::chrono::steady_clock::now();
                 spdlog::info("NetworkLayer: client accepted");
-                DoRead();
+                if (socket_.is_open()) DoRead();
+                DoAccept();
             } else {
+                delete new_socket;
                 spdlog::error("NetworkLayer: accept error - {}", ec.message());
+                if (is_server_) DoAccept();
             }
-            if (is_server_) DoAccept();
         });
     }
 

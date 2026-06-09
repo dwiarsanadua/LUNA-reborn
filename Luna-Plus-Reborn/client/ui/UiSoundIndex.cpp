@@ -14,7 +14,6 @@ namespace fs = std::filesystem;
 static std::unordered_map<int, std::string> s_sounds;
 static std::unordered_map<int, std::string> s_sound_names;
 static std::unordered_map<std::string, std::vector<int>> s_sounds_by_category;
-static std::unordered_set<std::string> s_verified_paths;
 bool UiSoundIndex::ready_ = false;
 
 static std::string NormalizeSoundPath(const std::string& raw) {
@@ -146,8 +145,6 @@ void UiSoundIndex::Init(const std::string& path) {
     s_sounds.clear();
     s_sound_names.clear();
     s_sounds_by_category.clear();
-    s_verified_paths.clear();
-
     // 1. Load from SoundList file (primary source)
     std::string resolved = VFS::Find(path);
     if (resolved.empty()) resolved = path;
@@ -207,53 +204,8 @@ void UiSoundIndex::Init(const std::string& path) {
         TryLoadFromDirectory(dir, dir);
     }
 
-    // 3. Verify existence of all loaded sound files (warn if missing)
-    int missing = 0;
-    for (auto& [id, norm_path] : s_sounds) {
-        // Reconstruct possible paths to verify
-        bool found = false;
-        const char* folders[] = {"audio/Interface/", "audio/Effect/", "audio/Character/",
-                                  "audio/Monster/", "audio/Weapon/", "audio/Vehicle/",
-                                  "audio/Ambient/", "audio/NPC/", "audio/BGM/", "audio/SFX/"};
-        for (auto& folder : folders) {
-            std::string test_path = folder + norm_path + ".wav";
-            if (s_verified_paths.find(test_path) != s_verified_paths.end()) {
-                found = true;
-                break;
-            }
-            std::string full = VFS::Find(test_path);
-            if (!full.empty() && fs::exists(full)) {
-                s_verified_paths.insert(test_path);
-                found = true;
-                break;
-            }
-            // Try other extensions
-            test_path = folder + norm_path + ".ogg";
-            full = VFS::Find(test_path);
-            if (!full.empty() && fs::exists(full)) {
-                s_verified_paths.insert(test_path);
-                found = true;
-                break;
-            }
-            test_path = folder + norm_path + ".mp3";
-            full = VFS::Find(test_path);
-            if (!full.empty() && fs::exists(full)) {
-                s_verified_paths.insert(test_path);
-                found = true;
-                break;
-            }
-        }
-        if (!found && missing < 20) {
-            spdlog::warn("UiSoundIndex: sound file not found for ID {} ('{}')", id, norm_path);
-            missing++;
-        }
-    }
-    if (missing >= 20) {
-        spdlog::warn("UiSoundIndex: ... and {} more missing sound files", missing - 20);
-    }
-
-    spdlog::info("UiSoundIndex: loaded {} total sounds across {} categories, {} missing",
-                 s_sounds.size(), s_sounds_by_category.size(), missing);
+    spdlog::info("UiSoundIndex: loaded {} total sounds across {} categories",
+                 s_sounds.size(), s_sounds_by_category.size());
     ready_ = true;
 }
 
@@ -261,7 +213,6 @@ void UiSoundIndex::Shutdown() {
     s_sounds.clear();
     s_sound_names.clear();
     s_sounds_by_category.clear();
-    s_verified_paths.clear();
     ready_ = false;
 }
 

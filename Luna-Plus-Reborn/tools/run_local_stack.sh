@@ -11,6 +11,13 @@ BIN="${BUILD}/bin"
 LOG_DIR="${ROOT}/logs"
 mkdir -p "$LOG_DIR"
 
+# Must run from project root (servers use relative paths)
+cd "$ROOT"
+
+# Clean stale SQLite WAL/SHM locks
+rm -f assets/data/*.db-shm assets/data/*.db-wal
+echo "Cleaned stale SQLite locks"
+
 if [[ ! -x "${BIN}/AgentServer" ]]; then
   echo "Building servers..."
   cmake --build "$BUILD" --target AgentServer DistributeServer MapServer -j"$(sysctl -n hw.ncpu 2>/dev/null || echo 4)"

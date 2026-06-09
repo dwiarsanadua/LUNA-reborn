@@ -16,6 +16,7 @@
 #include <Entity_generated.h>
 #include <Movement_generated.h>
 #include <Combat_generated.h>
+#include <NPC_generated.h>
 #include <CharLife_generated.h>
 #include <MapChange_generated.h>
 #include <Party_generated.h>
@@ -501,6 +502,18 @@ bool GameScreen::HandlePacket(uint16_t type, const std::vector<uint8_t>& payload
         auto resp = flatbuffers::GetRoot<luna::protocol::VehiclePassengerInfo>(payload.data());
         (void)resp;
         state_->chat_messages.push_back("Passenger info received");
+        return true;
+    }
+    case luna::protocol::PacketType_MP_NPC_SPEECH_ACK: {
+        auto resp = flatbuffers::GetRoot<luna::protocol::NpcResponse>(payload.data());
+        std::string dialog = resp->dialog_text() ? resp->dialog_text()->str() : "\"Hello.\"";
+        state_->npc_text = dialog;
+        state_->npc_id = static_cast<int>(resp->npc_id());
+        npc_dlg_.Open(state_, state_->npc_id, "NPC");
+        return true;
+    }
+    case luna::protocol::PacketType_MP_NPC_SPEECH_NACK: {
+        state_->chat_messages.push_back("NPC interaction failed");
         return true;
     }
     default: return false;
@@ -2586,7 +2599,7 @@ void GameScreen::RenderUI(UIRenderer& ui) {
     std::string mapIdStr = std::to_string(state_->map_id);
     std::string mmName = "mini_" + mapIdStr + "_ful";
     TextureInfo mmTex = ui.LoadTexture("mm_" + mapIdStr,
-        mmName + ".tif");
+        mmName + ".png");
     
     if (bgfx::isValid(mmTex.handle)) {
         ui.DrawImage(mm_x, mm_y, mm_size, mm_size, mmTex.handle);

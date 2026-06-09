@@ -6,6 +6,7 @@
 #include <cfloat>
 #include <spdlog/spdlog.h>
 #include <engine/gx_render/VFS.h>
+#include <engine/physics/PhysicsWorld.h>
 #include <audio/AudioManager.hpp>
 #include <game/ecs/systems/GameDataDB.hpp>
 #include <game/ecs/systems/SpawnSystem.hpp>
@@ -14,15 +15,15 @@
 #include <entt/entt.hpp>
 #include <rendering/TerrainRenderer.hpp>
 
-// ── CollisionLine ──
-// DDA ray-march across terrain height grid. Returns TRUE if collision detected.
-// pTarget receives the first collision point.
 static const float COLLISION_CELL_SIZE = 2.0f;
 static const float MAX_CLIMB_HEIGHT = 1.5f;
 
-static bool CollisionLine(const TerrainRenderer* terrain,
-                           const glm::vec3& start, const glm::vec3& end,
-                           glm::vec3* out_target)
+// ── CollisionLine ──
+// DDA ray-march across terrain height grid. Returns TRUE if collision detected.
+// pTarget receives the first collision point.
+bool EngineMap::CollisionLine(const TerrainRenderer* terrain,
+                               const glm::vec3& start, const glm::vec3& end,
+                               glm::vec3* out_target)
 {
     if (!terrain) return false;
 
@@ -404,4 +405,94 @@ void EngineMap::LoadFarmProps(const std::string& farm_dir) {
         }
     }
     spdlog::info("EngineMap: loaded {} farm props", (int)(sizeof(props)/sizeof(props[0])));
+}
+
+bool EngineMap::TryMove(glm::vec3 from, glm::vec3 to, float radius, entt::entity entity) {
+    if (CollisionLine(terrain_, from, to, nullptr)) {
+        glm::vec3 slide = CalculateSlide(from, to);
+        if (!CollisionLine(terrain_, from, slide, nullptr)) {
+            if (physics_) {
+                glm::vec3 dir = glm::normalize(slide - from);
+                float dist = glm::distance(from, slide);
+                glm::vec3 vel = dir * dist;
+                MovingEllipsoid ellipsoid;
+                ellipsoid.from = from;
+                ellipsoid.width = radius;
+                ellipsoid.height = radius * 2.0f;
+                ellipsoid.velocity = vel;
+                glm::vec3 tri[3] = {
+                    {to.x - radius, -10.0f, to.z - radius},
+                    {to.x + radius, -10.0f, to.z - radius},
+                    {to.x, 200.0f, to.z + radius},
+                };
+                CollisionResult result;
+                if (physics_->CollisionTestMovingEllipsoidMeetTriangle(result, ellipsoid, tri)) {
+                    return false;
+                }
+            }
+            SetEntityPosition(entity, slide);
+            return true;
+        }
+        return false;
+    }
+
+    if (physics_ && radius > 0.0f) {
+        glm::vec3 dir = glm::normalize(to - from);
+        float dist = glm::distance(from, to);
+        glm::vec3 vel = dir * dist;
+        MovingEllipsoid ellipsoid;
+        ellipsoid.from = from;
+        ellipsoid.width = radius;
+        ellipsoid.height = radius * 2.0f;
+        ellipsoid.velocity = vel;
+        glm::vec3 tri[3] = {
+            {to.x - radius, -10.0f, to.z - radius},
+            {to.x + radius, -10.0f, to.z - radius},
+            {to.x, 200.0f, to.z + radius},
+        };
+        CollisionResult result;
+        if (physics_->CollisionTestMovingEllipsoidMeetTriangle(result, ellipsoid, tri)) {
+            return false;
+        }
+    }
+
+    MapBounds bounds = GetMapBounds();
+    if (to.x < bounds.min_x || to.x > bounds.max_x ||
+        to.z < bounds.min_z || to.z > bounds.max_z) {
+        return false;
+    }
+
+    SetEntityPosition(entity, to);
+    return true;
+}
+
+glm::vec3 EngineMap::CalculateSlide(const glm::vec3& from, const glm::vec3& to) const {
+    glm::vec3 dir = glm::normalize(to - from);
+    float dist = glm::distance(from, to);
+    if (dist < 0.001f) return from;
+    return from + dir * dist * 0.5f;
+}
+
+MapBounds EngineMap::GetMapBounds() const {
+    MapBounds bounds;
+    if (current_map_ == "13") {
+        bounds = {-50.0f, 50.0f, -50.0f, 50.0f};
+    } else if (current_map_ == "20") {
+        bounds = {-60.0f, 60.0f, -60.0f, 60.0f};
+    } else if (current_map_ == "51") {
+        bounds = {-80.0f, 80.0f, -80.0f, 80.0f};
+    } else {
+        bounds = {-500.0f, 500.0f, -500.0f, 500.0f};
+    }
+    return bounds;
+}
+
+void EngineMap::SetEntityPosition(entt::entity entity, const glm::vec3& pos) {
+    if (!registry_ || !registry_->valid(entity)) return;
+    if (auto* xform = registry_->try_get<Transform>(entity)) {
+        xform->position = pos;
+    }
+    if (physics_) {
+        physics_->SetCharacterPosition(static_cast<int>(entt::to_entity(entity)), pos);
+    }
 }

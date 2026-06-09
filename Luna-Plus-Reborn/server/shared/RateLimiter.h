@@ -20,7 +20,7 @@ private:
 
 class BruteForceProtection {
 public:
-    BruteForceProtection(uint32_t max_attempts = 5, uint32_t lockout_seconds = 900);
+    BruteForceProtection(uint32_t max_attempts = 5, uint32_t window_seconds = 60, uint32_t lockout_seconds = 900);
 
     bool IsLocked(const std::string& key);
     void RecordFailure(const std::string& key);
@@ -29,11 +29,14 @@ public:
 
 private:
     struct Entry {
-        uint32_t failures = 0;
+        std::vector<uint64_t> failure_timestamps;
         uint64_t lockout_until = 0;
     };
 
+    void Prune(const std::string& key);
+
     uint32_t max_attempts_;
+    uint32_t window_seconds_;
     uint32_t lockout_seconds_;
     std::unordered_map<std::string, Entry> entries_;
 };

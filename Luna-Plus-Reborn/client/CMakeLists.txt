@@ -7,6 +7,7 @@ add_executable(LunaPlusClient
     rendering/CharacterRenderer.cpp
     rendering/CameraSystem.cpp
     rendering/UIRenderer.cpp
+    rendering/FontManager.cpp
     rendering/ParticleRenderer.cpp
     rendering/PostProcessor.cpp
     rendering/RenderQueue.cpp

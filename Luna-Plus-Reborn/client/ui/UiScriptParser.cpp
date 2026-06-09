@@ -212,7 +212,7 @@ UiElement UiScriptParser::ParseBlock(ParseContext& ctx, const std::string& name)
             else if (cmd == "#OPEN_SOUND") elem.open_sound = std::atoi(rest.c_str());
             else if (cmd == "#CLOSE_SOUND") elem.close_sound = std::atoi(rest.c_str());
             else if (cmd == "#BTNCLICKSOUND") elem.btn_click_sound = std::atoi(rest.c_str());
-            else if (cmd == "#SCALE") {
+            else if (cmd == "#SCALE" || cmd == "#scale" || cmd == "#Scale") {
                 float sx = 1.0f, sy = 1.0f;
                 if (sscanf(rest.c_str(), "%f %f", &sx, &sy) >= 1) {
                     elem.scale_x = sx;
@@ -417,9 +417,35 @@ UiElement UiScriptParser::ParseBlock(ParseContext& ctx, const std::string& name)
                     elem.valid_xy.x = vx; elem.valid_xy.y = vy;
                 }
             }
+            else if (cmd == "#ALWAYSTOP") {
+                elem.always_top = (std::atoi(rest.c_str()) != 0);
+            }
+            else if (cmd == "#FGCOLOER") {
+                elem.fg_color = ParseColor(rest);
+            }
+            else if (cmd == "#TEXTALGIN") {
+                elem.text_align = std::atoi(rest.c_str());
+            }
+            else if (cmd == "#APHA") {
+                elem.alpha = std::atoi(rest.c_str());
+            }
+            else if (cmd == "#TEXTINDEX") {
+                elem.text_align = std::atoi(rest.c_str());
+            }
+            else if (cmd == "#FONTINX") {
+                elem.font_idx = std::atoi(rest.c_str());
+            }
+            else if (cmd == "#MOVABLE") {
+                elem.moveable = (std::atoi(rest.c_str()) != 0);
+            }
             else if (cmd == "#SELECTOPTION") {
-                // select option stored in spin_min
                 elem.spin_min = std::atoi(rest.c_str());
+            }
+            else if (cmd == "#CREATE" || cmd == "#ADD_BTN_ANIIMG" ||
+                     cmd == "#ACTIVE_BTN_ANIIMG" || cmd == "#BTN_ANIIMG_FRAMETIME" ||
+                     cmd == "#SCALE_WITH_COMPONENT" ||
+                     cmd == "#AddList" || cmd == "#MOVEINFO") {
+                // legacy directives silently ignored
             }
             else {
                 spdlog::debug("UiScriptParser: unknown directive '{}'", cmd);

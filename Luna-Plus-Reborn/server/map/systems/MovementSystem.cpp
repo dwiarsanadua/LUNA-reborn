@@ -34,11 +34,19 @@ void MovementSystem::Update(entt::registry& registry, float dt) {
             spdlog::warn("Movement: speed limit exceeded for entity {}",
                          static_cast<uint32_t>(entity));
             xform.position = prev;
+            continue;
         }
         if (DetectTeleport(xform.position, prev, teleport_threshold_)) {
             spdlog::warn("Movement: teleport detected for entity {}",
                          static_cast<uint32_t>(entity));
             xform.position = prev;
+            continue;
+        }
+        if (!IsWithinMapBounds(xform.position)) {
+            spdlog::warn("Movement: out of map bounds for entity {}",
+                         static_cast<uint32_t>(entity));
+            xform.position = prev;
+            continue;
         }
 
         // Broadcast timer (10 Hz)
@@ -83,4 +91,11 @@ glm::vec3 MovementSystem::InterpolatePosition(const std::vector<PositionHistory>
     idx = std::min(idx, history.size() - 2);
     float local_t = (history.size() - 1) * t - static_cast<float>(idx);
     return glm::mix(history[idx].position, history[idx + 1].position, local_t);
+}
+
+bool MovementSystem::IsWithinMapBounds(const glm::vec3& pos) const {
+    if (pos.x < map_bounds_.min_x || pos.x > map_bounds_.max_x) return false;
+    if (pos.z < map_bounds_.min_z || pos.z > map_bounds_.max_z) return false;
+    if (pos.y < -50.0f || pos.y > 200.0f) return false;
+    return true;
 }

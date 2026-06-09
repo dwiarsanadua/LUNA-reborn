@@ -43,8 +43,8 @@ void ThreatTable::Clear() {
     entries.clear();
 }
 
-// ---- Element system ----
-
+// ---- Element system (DISABLED for Old accuracy) ----
+/*
 Element CombatSystem::GetAttackElement(const CharacterStats& stats) {
     float attrs[7] = { stats.attr_none, stats.attr_earth, stats.attr_water,
                        stats.attr_divine, stats.attr_wind, stats.attr_fire, stats.attr_dark };
@@ -72,6 +72,124 @@ float CombatSystem::GetElementAdvantage(Element atk_elem, Element def_elem) {
     if (advantage[d][a]) return 0.70f;
     return 1.0f;
 }
+*/
+
+// ---- Accuracy / Evasion system (Agent C) ----
+
+float CombatSystem::GetClassAccuracyFactor(uint8_t class_id) {
+    // OLD: Fighter=14, Rogue=18, Ranger=11, Mage=15
+    static const float FACTOR[] = {0, 14, 18, 11, 15};
+    if (class_id >= 1 && class_id <= 4) return FACTOR[class_id];
+    return 14;
+}
+
+float CombatSystem::CalcAccuracy(const CharacterStats& s) {
+    float dex_rate = CalcDexRate(s);
+    float acc = (dex_rate * 0.6f
+                + (s.base_dexterity - 30.0f) / 1000.0f
+                + s.level * GetClassAccuracyFactor(s.class_id) / 15000.0f) * 100.0f;
+    acc = acc * (1.0f + s.accuracy_pct / 100.0f) + s.accuracy_plus;
+    return acc;
+}
+
+float CombatSystem::CalcEvasion(const CharacterStats& s) {
+    float dex_rate = CalcDexRate(s);
+    float eva = (dex_rate * 0.6f
+                + (s.base_dexterity - 30.0f) / 1000.0f
+                + s.level * GetClassAccuracyFactor(s.class_id) / 15000.0f) * 100.0f;
+    eva = eva * (1.0f + s.evasion_pct / 100.0f) + s.evasion_plus;
+    return eva;
+}
+
+bool CombatSystem::IsHit(const CharacterStats& attacker, const CharacterStats& defender) {
+    float accuracy = CalcAccuracy(attacker);
+    float evasion = CalcEvasion(defender);
+    float hit_chance = 85.0f + accuracy - evasion;
+    hit_chance = std::clamp(hit_chance, 10.0f, 99.0f);
+    float roll = std::uniform_real_distribution<float>(0, 100)(rng);
+    return roll < hit_chance;
+}
+
+// ---- Crit & Block helper formulas (Agent B) ----
+
+float CombatSystem::CalcDexRate(const CharacterStats& s) {
+    float dex_gain = std::max(0.0f, static_cast<float>(s.dexterity - s.base_dexterity));
+    float level_factor = std::max(1.0f, static_cast<float>(s.level - 1) * 5.0f);
+    return dex_gain / level_factor;
+}
+
+float CombatSystem::CalcIntRate(const CharacterStats& s) {
+    float int_gain = std::max(0.0f, static_cast<float>(s.intelligence - s.base_intelligence));
+    float level_factor = std::max(1.0f, static_cast<float>(s.level - 1) * 5.0f);
+    return int_gain / level_factor;
+}
+
+float CombatSystem::CalcWisRate(const CharacterStats& s) {
+    float wis_gain = std::max(0.0f, static_cast<float>(s.wisdom - s.base_wisdom));
+    float level_factor = std::max(1.0f, static_cast<float>(s.level - 1) * 5.0f);
+    return wis_gain / level_factor;
+}
+
+float CombatSystem::CalcCritRate(const CharacterStats& s) {
+    float dex_rate = CalcDexRate(s);
+    float base_contrib = (s.base_dexterity - 25.0f) / 5.0f;
+    float buff_contrib = s.crit_rate_buff + s.critical_damage_plus / 45.0f;
+    return 45.0f * dex_rate + base_contrib + buff_contrib;
+}
+
+float CombatSystem::CalcMagicCritRate(const CharacterStats& s) {
+    float int_rate = CalcIntRate(s);
+    float wis_rate = CalcWisRate(s);
+    return 10.0f * int_rate + 20.0f * wis_rate + (s.base_intelligence - 25.0f) / 5.0f
+           + s.crit_rate_buff + s.critical_damage_plus / 45.0f;
+}
+
+float CombatSystem::GetClassBlockBonus(uint8_t class_id) {
+    static const float BONUS[] = {0, 15, 10, 5, 9};
+    if (class_id >= 1 && class_id <= 4) return BONUS[class_id];
+    return 0;
+}
+
+float CombatSystem::CalcBlockRate(const CharacterStats& s) {
+    return s.dexterity / 27.0f + GetClassBlockBonus(s.class_id) + s.block_rate_buff;
+}
+
+// ---- Old-accurate stat calculations ----
+
+float CombatSystem::CalcPhysicAttack(const CharacterStats& s) {
+    float base = (s.weapon_attack + s.level) * (1.0f + s.strength * 0.001f)
+                 + (s.strength - s.base_strength);
+    float enchant = 1.0f + (s.enchant_level * s.enchant_level) / 400.0f;
+    return base * enchant * (1.0f + s.physic_attack_pct / 100.0f) + s.physic_attack_plus;
+}
+
+float CombatSystem::CalcPhysicDefense(const CharacterStats& s) {
+    float base = (s.armor_defense + s.level) * (1.0f + s.constitution / 3000.0f)
+                 + (s.constitution - 40.0f) / 5.0f;
+    float enchant = 1.0f + s.enchant_level / 200.0f;
+    return base * enchant * (1.0f + s.physic_defense_pct / 100.0f) + s.physic_defense_plus;
+}
+
+float CombatSystem::CalcMagicAttack(const CharacterStats& s) {
+    float base = (s.weapon_attack + s.level) * (1.0f + s.intelligence * 0.001f)
+                 + (s.intelligence - s.base_intelligence);
+    float enchant = 1.0f + (s.enchant_level * s.enchant_level) / 400.0f;
+    return base * enchant * (1.0f + s.magic_attack_pct / 100.0f) + s.magic_attack_plus;
+}
+
+float CombatSystem::CalcMagicDefense(const CharacterStats& s) {
+    float base = (s.armor_defense + s.level) * (1.0f + s.wisdom / 3000.0f)
+                 + (s.base_wisdom > 0 ? (s.wisdom - s.base_wisdom) : s.wisdom) / 5.0f;
+    float enchant = 1.0f + s.enchant_level / 200.0f;
+    return base * enchant * (1.0f + s.magic_defense_pct / 100.0f) + s.magic_defense_plus;
+}
+
+float CombatSystem::CalcHealAmount(const CharacterStats& healer, float skill_factor) {
+    // Old: heal = ((Wisdom × 11 + Int × 4 + Level × 20) × SkillFactor) / 800 + 100
+    float heal = (healer.wisdom * 11.0f + healer.intelligence * 4.0f + healer.level * 20.0f)
+                 * skill_factor / 800.0f + 100.0f;
+    return std::max(1.0f, heal);
+}
 
 // ---- CalculateDamage (refactored with Old formulas) ----
 
@@ -81,68 +199,103 @@ DamageResult CombatSystem::CalculateDamage(const CharacterStats& attacker,
                                            uint8_t add_type,
                                            float rate_add_value,
                                            float plus_add_value,
-                                           float combo_multiplier) {
+                                           float combo_multiplier,
+                                           CombatContext context) {
     DamageResult result{};
 
-    // 1. Miss Check: 1% base (Old: 1% base miss rate)
-    float miss_chance = 0.01f;
-    if (std::uniform_real_distribution<float>(0, 1)(rng) < miss_chance) {
+    // 1. Miss Check: Accuracy/Evasion system (Agent C)
+    if (!IsHit(attacker, defender)) {
         result.is_miss = true;
-        spdlog::debug("DAMAGE: MISS (miss_chance=1%)");
+        spdlog::debug("DAMAGE: MISS (acc={:.1f} eva={:.1f} hit_chance={:.1f}%)",
+                      CalcAccuracy(attacker), CalcEvasion(defender),
+                      85.0f + CalcAccuracy(attacker) - CalcEvasion(defender));
         return result;
     }
 
-    // 2. Base Damage: ATK - DEF/2 (Old formula: ATK * skill_power - DEF * 0.5)
-    float attack = attacker.physic_attack;
-    float defense = defender.physic_defense;
-    float damage = attack - defense * 0.5f;
+    // 2. Base Damage — Old formula
+    float atk, def;
+    if (add_type == 1) { // STR-based
+        atk = (attacker.weapon_attack + attacker.level)
+            * (1.0f + attacker.strength * 0.001f)
+            + (attacker.strength - attacker.base_strength);
+        atk *= 1.0f + (attacker.enchant_level * attacker.enchant_level) / 400.0f;
+    } else { // Weapon-based
+        atk = (attacker.weapon_attack + attacker.level)
+            * (1.0f + attacker.weapon_attack * 0.001f)
+            + (attacker.strength - attacker.base_strength);
+        atk *= 1.0f + (attacker.enchant_level * attacker.enchant_level) / 400.0f;
+    }
+    atk *= 1.0f + attacker.physic_attack_pct / 100.0f;
+    atk += attacker.physic_attack_plus;
+
+    def = (defender.armor_defense + defender.level)
+        * (1.0f + defender.constitution / 3000.0f)
+        + (defender.constitution - 40.0f) / 5.0f;
+    def *= 1.0f + defender.enchant_level / 200.0f;
+
+    float damage = atk - def;
     damage = std::max(1.0f, damage);
-    spdlog::debug("DAMAGE: base atk={:.1f} def={:.1f} raw={:.1f}", attack, defense, damage);
+    spdlog::debug("DAMAGE: base atk={:.1f} def={:.1f} raw={:.1f}", atk, def, damage);
 
     // 3. Skill modifiers (Old: add_type 1 = STR based, add_type 2 = ATK based)
     if (add_type == 1) {
         damage = damage * ((1000.0f + skill_add_damage + attacker.strength) / 1000.0f);
     } else if (add_type == 2) {
-        damage = damage * ((1000.0f + skill_add_damage + attacker.physic_attack) / 1000.0f);
+        damage = damage * ((1000.0f + skill_add_damage + attacker.weapon_attack) / 1000.0f);
     }
     damage = (damage * (1.0f + (rate_add_value / 100.0f))) + plus_add_value;
     spdlog::debug("DAMAGE: after skill add_type={} rate={:.1f} plus={:.1f} -> {:.1f}",
                   add_type, rate_add_value, plus_add_value, damage);
 
-    // 4. Element Advantage (all 7 elements: None/Earth/Water/Divine/Wind/Fire/Dark)
-    Element atk_elem = GetAttackElement(attacker);
-    Element def_elem = GetAttackElement(defender);
-    float elem_mult = GetElementAdvantage(atk_elem, def_elem);
-    damage *= elem_mult;
-    spdlog::debug("DAMAGE: element atk={} def={} mult={:.2f} -> {:.1f}",
-                  static_cast<int>(atk_elem), static_cast<int>(def_elem), elem_mult, damage);
+    // 4. Element Advantage — DISABLED (Old tidak punya elemental system)
+    // Element atk_elem = GetAttackElement(attacker);
+    // Element def_elem = GetAttackElement(defender);
+    // float elem_mult = GetElementAdvantage(atk_elem, def_elem);
+    // damage *= elem_mult;
+    // spdlog::debug("DAMAGE: element atk={} def={} mult={:.2f} -> {:.1f}",
+    //               static_cast<int>(atk_elem), static_cast<int>(def_elem), elem_mult, damage);
 
-    // 5. Level Difference Penalty: ±5% per level, cap 50% (Old: same)
-    int32_t level_diff = static_cast<int32_t>(attacker.level) - static_cast<int32_t>(defender.level);
-    float level_mod = 1.0f + std::clamp(static_cast<float>(level_diff) * 0.05f, -0.50f, 0.50f);
-    damage *= level_mod;
-    spdlog::debug("DAMAGE: level diff={} mult={:.2f} -> {:.1f}", level_diff, level_mod, damage);
+    // 5. Level Difference Penalty (Old: -1.5% per level ONLY if attacker < defender)
+    if (attacker.level < defender.level) {
+        int32_t level_diff = defender.level - attacker.level;
+        float penalty = 1.0f - level_diff * 0.015f;
+        penalty = std::max(penalty, 0.5f);
+        damage *= penalty;
+        spdlog::debug("DAMAGE: level penalty diff={} mult={:.2f} -> {:.1f}", level_diff, penalty, damage);
+    }
+    // If attacker.level >= defender.level: NO MODIFICATION
 
-    // 6. Block Check: CON/2000 (Old formula)
-    float block_chance = defender.constitution / 2000.0f;
+    // 6. Block Check: Old formula
+    float block_chance = CalcBlockRate(defender);
+    block_chance = std::clamp(block_chance, 0.0f, 100.0f);
     if (defender.shield_defense > 0 &&
-        block_chance > std::uniform_real_distribution<float>(0, 1)(rng)) {
-        result.is_block = true;
+        block_chance / 100.0f > std::uniform_real_distribution<float>(0, 1)(rng)) {
+        result.is_blocked = true;
         damage = (damage * (0.6f - (defender.constitution / 4000.0f))) - defender.shield_defense;
         spdlog::debug("DAMAGE: BLOCKED block_chance={:.4f} -> {:.1f}", block_chance, damage);
     }
 
-    // 7. Critical: DEX/1000 (Old formula)
-    float crit_rate = attacker.dexterity / 1000.0f;
-    float crit_dmg = 1.50f + attacker.strength / 200.0f;
-    if (!result.is_block && (attacker.critical_rate >= 100.0f ||
-                             crit_rate >= std::uniform_real_distribution<float>(0, 1)(rng))) {
+    // 7. Critical: Old formula
+    float crit_rate = CalcCritRate(attacker);
+    crit_rate = std::clamp(crit_rate, 0.0f, 100.0f);
+    float crit_dmg = 1.50f * (1.0f + attacker.critical_damage_rate / 100.0f) + attacker.critical_damage_plus;
+    if (!result.is_blocked && (attacker.critical_rate >= 100.0f ||
+                             crit_rate / 100.0f >= std::uniform_real_distribution<float>(0, 1)(rng))) {
         result.is_critical = true;
         damage *= crit_dmg;
         spdlog::debug("DAMAGE: CRITICAL rate={:.4f} mult={:.2f} -> {:.1f}", crit_rate, crit_dmg, damage);
     }
 
-    // 8. Damage Variance: ±10%
+    // 8. PvP / GT / Siege damage reduction (Old: PvP 35%, GT 10%)
+    if (context == CombatContext::PvP) {
+        damage *= 0.35f;
+    } else if (context == CombatContext::GuildTournament) {
+        damage *= 0.10f;
+    } else if (context == CombatContext::Siege) {
+        damage *= 0.50f;
+    }
+
+    // 9. Damage Variance: ±10%
     float variance = 1.0f + std::uniform_real_distribution<float>(-0.10f, 0.10f)(rng);
     damage *= variance;
     spdlog::debug("DAMAGE: variance={:.4f} -> {:.1f}", variance, damage);
@@ -162,7 +315,8 @@ DamageResult CombatSystem::CalculateDamage(const CharacterStats& attacker,
 
 void CombatSystem::HandleAttack(entt::registry& registry,
                                 entt::entity attacker, entt::entity target,
-                                uint16_t skill_id) {
+                                uint16_t skill_id,
+                                CombatContext context) {
     if (!registry.valid(attacker) || !registry.valid(target)) return;
     auto& atk_stats = registry.get<CharacterStats>(attacker);
     auto& def_stats = registry.get<CharacterStats>(target);
@@ -173,7 +327,7 @@ void CombatSystem::HandleAttack(entt::registry& registry,
     }
 
     // In a full implementation, we'd query skill_id from DB to get add_damage, type, etc.
-    auto result = CalculateDamage(atk_stats, def_stats, 0, 1, 0, 0, combo_mult);
+    auto result = CalculateDamage(atk_stats, def_stats, 0, 1, 0, 0, combo_mult, context);
 
     if (!result.is_miss) {
         ApplyDamage(registry, target, result.damage);

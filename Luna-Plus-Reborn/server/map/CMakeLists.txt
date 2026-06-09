@@ -1,16 +1,20 @@
 add_executable(MapServer
     main.cpp
     MapServer.cpp
-    systems/CombatSystem.cpp
     systems/AISystem.cpp
-    systems/MovementSystem.cpp
-    systems/ItemSystem.cpp
-    systems/QuestSystem.cpp
-    systems/StallSystem.cpp
+    systems/CombatSystem.cpp
+    systems/FieldBossSystem.cpp
     systems/GridSystem.cpp
-    systems/TriggerSystem.cpp
+    systems/ItemSystem.cpp
+    systems/LootingSystem.cpp
     systems/MapScriptRuntime.cpp
+    systems/MovementSystem.cpp
+    systems/QuestSystem.cpp
+    systems/RecallSystem.cpp
     systems/SecondarySystem.cpp
+    systems/StallSystem.cpp
+    systems/TradingSystem.cpp
+    systems/TriggerSystem.cpp
 )
 
 target_include_directories(MapServer PRIVATE
