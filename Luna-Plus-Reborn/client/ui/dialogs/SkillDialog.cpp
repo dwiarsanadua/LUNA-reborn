@@ -10,14 +10,15 @@
 void SkillDialog::Open(GameState* state, WindowManager* wm) {
     if (window_) return;
 
-    if (wm) {
-        window_ = wm->LoadFromScriptOrOpen("assets/interface/Windows/Skill.bin.txt",
-            "Skills", 300, 40, 520, 420);
+    if (wm) window_ = wm->LoadFromScript("assets/interface/Windows/Skill.bin.txt");
+
+    if (!window_) {
+        spdlog::warn("SkillDialog: failed to load UI script, using C++ fallback");
+        window_ = new Window("Skills", 300, 40, 520, 420);
         window_->SetClosable(true);
         window_->SetMovable(true);
         window_->SetTitleBarH(30);
     }
-    if (!window_) return;
 
     UiTabSheetController::WireWindow(window_);
 

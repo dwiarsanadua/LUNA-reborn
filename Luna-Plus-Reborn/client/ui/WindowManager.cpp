@@ -107,7 +107,6 @@ void WindowManager::PreloadUI(const std::string& interface_path) {
         return;
     }
 
-    std::unordered_set<int> all_atlases;
     int files = 0;
     for (const auto& entry : fs::directory_iterator(dir)) {
         if (!entry.is_regular_file()) continue;
@@ -115,18 +114,22 @@ void WindowManager::PreloadUI(const std::string& interface_path) {
         if (name.size() <= 8 || name.substr(name.size() - 8) != ".bin.txt") continue;
         ++files;
 
+        std::unordered_set<int> atlases;
         const UiElement* cached = UiSkinManager::GetLayout(name.substr(0, name.size() - 8));
-        if (cached) CollectAtlasIDs(*cached, all_atlases);
-        else CollectAtlasIDs(UiScriptParser::ParseFile(entry.path().string()), all_atlases);
+        if (cached) CollectAtlasIDs(*cached, atlases);
+        else CollectAtlasIDs(UiScriptParser::ParseFile(entry.path().string()), atlases);
+
+        if (g_ui) {
+            for (int atlas_id : atlases) {
+                if (preloaded_atlases_.count(atlas_id)) continue;
+                preloaded_atlases_.insert(atlas_id);
+                UiAtlasRegistry::LoadAtlasTexture(*g_ui, atlas_id);
+            }
+        }
     }
 
-    if (g_ui) {
-        for (int atlas_id : all_atlases)
-            UiAtlasRegistry::LoadAtlasTexture(*g_ui, atlas_id);
-    }
-
-    spdlog::info("PreloadUI: {} layout files, {} atlas textures preloaded",
-        files, all_atlases.size());
+    spdlog::info("PreloadUI: {} layout files, {} unique atlas textures preloaded",
+        files, preloaded_atlases_.size());
 }
 
 void WindowManager::Close(const std::string& title) {

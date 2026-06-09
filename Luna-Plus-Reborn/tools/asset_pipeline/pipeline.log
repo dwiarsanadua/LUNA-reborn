@@ -9706,3 +9706,167 @@ File types: 11
 2026-06-08 07:36:02,412 [INFO] ============================================================
 2026-06-08 07:36:02,413 [INFO] Pipeline dry-run completed in 0.0s
 2026-06-08 07:36:02,413 [INFO] ============================================================
+2026-06-09 01:58:52,627 [INFO] ============================================================
+2026-06-09 01:58:52,627 [INFO] PHOENIX Asset Pipeline v2.0 — Starting
+2026-06-09 01:58:52,627 [INFO] ============================================================
+2026-06-09 01:58:52,628 [INFO] *** DRY RUN MODE — no files will be modified ***
+2026-06-09 01:58:52,628 [INFO] 
+--- Step: textures ---
+2026-06-09 01:58:52,628 [INFO] === Texture Conversion (.dds/.tif/.tga -> .png) ===
+2026-06-09 01:58:52,628 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/convert_textures.py --all --workers=4
+2026-06-09 01:58:52,628 [INFO] 
+--- Step: models ---
+2026-06-09 01:58:52,628 [INFO] === Model Conversion (.mod -> .obj) ===
+2026-06-09 01:58:52,628 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/convert_models.py --all --workers=4
+2026-06-09 01:58:52,628 [INFO] 
+--- Step: heightmaps ---
+2026-06-09 01:58:52,628 [INFO] === Heightmap Conversion (.hfl -> .hgt) ===
+2026-06-09 01:58:52,628 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/convert_heightmaps.py --all
+2026-06-09 01:58:52,628 [INFO] 
+--- Step: chardefs ---
+2026-06-09 01:58:52,628 [INFO] === Character Definition Conversion (.chx -> .json) ===
+2026-06-09 01:58:52,628 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/convert_chardefs.py --all
+2026-06-09 01:58:52,628 [INFO] 
+--- Step: animations ---
+2026-06-09 01:58:52,628 [INFO] === Animation Conversion (.anm -> .anm.json) ===
+2026-06-09 01:58:52,628 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/convert_anm.py --all
+2026-06-09 01:58:52,628 [INFO] 
+--- Step: audio ---
+2026-06-09 01:58:52,628 [INFO] === Audio Conversion (.wav/.mp3 -> copy/ogg) ===
+2026-06-09 01:58:52,628 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/convert_audio.py --format=copy --workers=4
+2026-06-09 01:58:52,628 [INFO] 
+--- Step: inventory ---
+2026-06-09 01:58:52,628 [INFO] === Generate Asset Inventory ===
+2026-06-09 01:58:52,628 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/generate_inventory.py
+2026-06-09 01:58:52,628 [INFO] 
+--- Step: validate ---
+2026-06-09 01:58:52,628 [INFO] === Validate Asset Completeness ===
+2026-06-09 01:58:52,628 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/validate_assets.py --report
+2026-06-09 01:58:52,628 [INFO] ============================================================
+2026-06-09 01:58:52,628 [INFO] Pipeline dry-run completed in 0.0s
+2026-06-09 01:58:52,628 [INFO] ============================================================
+2026-06-09 02:01:03,396 [INFO] ============================================================
+2026-06-09 02:01:03,397 [INFO] PHOENIX Asset Pipeline v2.0 — Starting
+2026-06-09 02:01:03,397 [INFO] ============================================================
+2026-06-09 02:01:03,397 [INFO] 
+--- Step: animations ---
+2026-06-09 02:01:03,397 [INFO] === Animation Conversion (.anm -> .anm.json) ===
+2026-06-09 02:01:03,397 [INFO] Animation Conversion (.anm -> .anm.json) already completed. Use --force to re-run.
+2026-06-09 02:01:03,397 [INFO] ============================================================
+2026-06-09 02:01:03,397 [INFO] Pipeline completed successfully in 0.0s
+2026-06-09 02:01:03,397 [INFO] ============================================================
+2026-06-09 02:01:12,211 [INFO] ============================================================
+2026-06-09 02:01:12,211 [INFO] PHOENIX Asset Pipeline v2.0 — Starting
+2026-06-09 02:01:12,212 [INFO] ============================================================
+2026-06-09 02:01:12,212 [INFO] 
+--- Step: animations ---
+2026-06-09 02:01:12,212 [INFO] === Animation Conversion (.anm -> .anm.json) ===
+2026-06-09 02:01:12,212 [INFO] Running: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/convert_anm.py --all
+2026-06-09 02:01:12,795 [INFO] ============================================================
+2026-06-09 02:01:12,795 [INFO] PHOENIX Asset Pipeline v2.0 — Starting
+2026-06-09 02:01:12,796 [INFO] ============================================================
+2026-06-09 02:01:12,796 [INFO] 
+--- Step: audio ---
+2026-06-09 02:01:12,796 [INFO] === Audio Conversion (.wav/.mp3 -> copy/ogg) ===
+2026-06-09 02:01:12,796 [INFO] Running: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/convert_audio.py --format=copy --workers=4
+2026-06-09 02:01:12,868 [INFO] [audio] stdout:
+Source directory not found: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/unpacked/sound
+
+2026-06-09 02:01:12,868 [ERROR] Step 'audio' FAILED with code 1
+2026-06-09 02:01:12,869 [INFO] ============================================================
+2026-06-09 02:01:12,869 [WARNING] Pipeline finished with errors in 0.1s
+2026-06-09 02:01:12,869 [WARNING] Failed steps: audio
+2026-06-09 02:01:12,869 [INFO] ============================================================
+2026-06-09 02:01:13,417 [INFO] [animations] stdout:
+Found 7105 animation files
+Output: /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/assets/animations
+
+
+=== Animation Conversion Complete ===
+  Converted: 0
+  Failed:    0
+  Skipped:   7105
+  Total:     7105
+
+2026-06-09 02:01:13,418 [INFO] Step 'animations' completed successfully
+2026-06-09 02:01:13,418 [INFO] ============================================================
+2026-06-09 02:01:13,418 [INFO] Pipeline completed successfully in 1.2s
+2026-06-09 02:01:13,418 [INFO] ============================================================
+2026-06-09 02:21:35,794 [INFO] ============================================================
+2026-06-09 02:21:35,794 [INFO] PHOENIX Asset Pipeline v2.0 — Starting
+2026-06-09 02:21:35,794 [INFO] ============================================================
+2026-06-09 02:21:35,794 [INFO] *** DRY RUN MODE — no files will be modified ***
+2026-06-09 02:21:35,794 [INFO] 
+--- Step: textures ---
+2026-06-09 02:21:35,794 [INFO] === Texture Conversion (.dds/.tif/.tga -> .png) ===
+2026-06-09 02:21:35,794 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/convert_textures.py --all --workers=4
+2026-06-09 02:21:35,794 [INFO] 
+--- Step: models ---
+2026-06-09 02:21:35,794 [INFO] === Model Conversion (.mod -> .obj) ===
+2026-06-09 02:21:35,794 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/convert_models.py --all --workers=4
+2026-06-09 02:21:35,794 [INFO] 
+--- Step: heightmaps ---
+2026-06-09 02:21:35,794 [INFO] === Heightmap Conversion (.hfl -> .hgt) ===
+2026-06-09 02:21:35,794 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/convert_heightmaps.py --all
+2026-06-09 02:21:35,794 [INFO] 
+--- Step: chardefs ---
+2026-06-09 02:21:35,795 [INFO] === Character Definition Conversion (.chx -> .json) ===
+2026-06-09 02:21:35,795 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/convert_chardefs.py --all
+2026-06-09 02:21:35,795 [INFO] 
+--- Step: animations ---
+2026-06-09 02:21:35,795 [INFO] === Animation Conversion (.anm -> .anm.json) ===
+2026-06-09 02:21:35,795 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/convert_anm.py --all
+2026-06-09 02:21:35,795 [INFO] 
+--- Step: audio ---
+2026-06-09 02:21:35,795 [INFO] === Audio Conversion (.wav/.mp3 -> copy/ogg) ===
+2026-06-09 02:21:35,795 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/convert_audio.py --format=copy --workers=4
+2026-06-09 02:21:35,795 [INFO] 
+--- Step: inventory ---
+2026-06-09 02:21:35,795 [INFO] === Generate Asset Inventory ===
+2026-06-09 02:21:35,795 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/generate_inventory.py
+2026-06-09 02:21:35,795 [INFO] 
+--- Step: validate ---
+2026-06-09 02:21:35,795 [INFO] === Validate Asset Completeness ===
+2026-06-09 02:21:35,795 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/validate_assets.py --report
+2026-06-09 02:21:35,795 [INFO] ============================================================
+2026-06-09 02:21:35,795 [INFO] Pipeline dry-run completed in 0.0s
+2026-06-09 02:21:35,795 [INFO] ============================================================
+2026-06-09 02:21:35,844 [INFO] ============================================================
+2026-06-09 02:21:35,844 [INFO] PHOENIX Asset Pipeline v2.0 — Starting
+2026-06-09 02:21:35,844 [INFO] ============================================================
+2026-06-09 02:21:35,845 [INFO] *** DRY RUN MODE — no files will be modified ***
+2026-06-09 02:21:35,845 [INFO] 
+--- Step: textures ---
+2026-06-09 02:21:35,845 [INFO] === Texture Conversion (.dds/.tif/.tga -> .png) ===
+2026-06-09 02:21:35,845 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/convert_textures.py --all --workers=4
+2026-06-09 02:21:35,845 [INFO] 
+--- Step: models ---
+2026-06-09 02:21:35,845 [INFO] === Model Conversion (.mod -> .obj) ===
+2026-06-09 02:21:35,845 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/convert_models.py --all --workers=4
+2026-06-09 02:21:35,845 [INFO] 
+--- Step: heightmaps ---
+2026-06-09 02:21:35,845 [INFO] === Heightmap Conversion (.hfl -> .hgt) ===
+2026-06-09 02:21:35,845 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/convert_heightmaps.py --all
+2026-06-09 02:21:35,845 [INFO] 
+--- Step: chardefs ---
+2026-06-09 02:21:35,845 [INFO] === Character Definition Conversion (.chx -> .json) ===
+2026-06-09 02:21:35,845 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/convert_chardefs.py --all
+2026-06-09 02:21:35,845 [INFO] 
+--- Step: animations ---
+2026-06-09 02:21:35,845 [INFO] === Animation Conversion (.anm -> .anm.json) ===
+2026-06-09 02:21:35,845 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/convert_anm.py --all
+2026-06-09 02:21:35,845 [INFO] 
+--- Step: audio ---
+2026-06-09 02:21:35,845 [INFO] === Audio Conversion (.wav/.mp3 -> copy/ogg) ===
+2026-06-09 02:21:35,845 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/convert_audio.py --format=copy --workers=4
+2026-06-09 02:21:35,845 [INFO] 
+--- Step: inventory ---
+2026-06-09 02:21:35,845 [INFO] === Generate Asset Inventory ===
+2026-06-09 02:21:35,845 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/generate_inventory.py
+2026-06-09 02:21:35,845 [INFO] 
+--- Step: validate ---
+2026-06-09 02:21:35,845 [INFO] === Validate Asset Completeness ===
+2026-06-09 02:21:35,845 [INFO] [DRY-RUN] Would execute: /opt/homebrew/opt/python@3.14/bin/python3.14 /Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/tools/asset_pipeline/validate_assets.py --report
+2026-06-09 02:21:35,845 [INFO] ============================================================
+2026-06-09 02:21:35,845 [INFO] Pipeline dry-run completed in 0.0s
+2026-06-09 02:21:35,845 [INFO] ============================================================

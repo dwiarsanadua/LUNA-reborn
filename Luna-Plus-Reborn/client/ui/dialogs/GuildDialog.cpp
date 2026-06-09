@@ -1,5 +1,6 @@
 #include "GuildDialog.hpp"
 #include <ui/UiScriptParser.hpp>
+#include <ui/ColorPalette.hpp>
 #include <ui/widgets/Label.hpp>
 #include <ui/widgets/ListBox.hpp>
 #include <ui/widgets/TabPanel.hpp>
@@ -46,12 +47,12 @@ void GuildDialog::Open(WindowManager* wm, SiegeSystem* siege) {
     siege_list_->AddItem("Loading siege data...");
     tabs->AddTab("Siege/War", siege_list_);
 
-    window_->AddWidget<Label>("Territory ID:", 10, 340, 0xffcccccc);
+    window_->AddWidget<Label>("Territory ID:", 10, 340, ColorPalette::BTN_NORMAL);
     territory_input_ = window_->AddWidget<InputField>(90, 338, 50, 22);
     territory_input_->SetPlaceholder("1");
     territory_input_->SetValidation(InputValidation::PositiveInteger);
 
-    window_->AddWidget<Label>("Tax %:", 150, 340, 0xffcccccc);
+    window_->AddWidget<Label>("Tax %:", 150, 340, ColorPalette::BTN_NORMAL);
     tax_input_ = window_->AddWidget<InputField>(195, 338, 40, 22);
     tax_input_->SetPlaceholder("10");
     tax_input_->SetValidation(InputValidation::PositiveInteger);

@@ -16,9 +16,11 @@
 #include <memory>
 
 // Provide AssertFailed stub required by Jolt when asserts are enabled
+#ifdef JPH_ENABLE_ASSERTS
 namespace JPH {
     AssertFailedFunction AssertFailed = [](const char*, const char*, const char*, uint) -> bool { return true; };
 }
+#endif
 
 JPH_SUPPRESS_WARNINGS
 

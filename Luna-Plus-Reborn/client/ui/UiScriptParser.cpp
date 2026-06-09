@@ -12,17 +12,15 @@ std::string UiScriptParser::WidgetTypeName(const std::string& raw_type) {
 
 UiElement UiScriptParser::ParseFile(const std::string& path) {
     ParseContext ctx;
-    std::string resolved = VFS::Find(path);
-    if (resolved.empty()) resolved = path;
-    ctx.file.open(resolved);
+    ctx.file.open(path);
     if (!ctx.file.is_open()) {
-        std::string alt = resolved;
+        std::string alt = path;
         if (alt.size() > 4 && alt.substr(alt.size() - 4) == ".txt")
             alt = alt.substr(0, alt.size() - 4);
         ctx.file.open(alt);
     }
     if (!ctx.file.is_open()) {
-        spdlog::error("UiScriptParser: Failed to open {} (resolved: {})", path, resolved);
+        spdlog::error("UiScriptParser: Failed to open {}", path);
         return {};
     }
     return ParseStream(ctx);
