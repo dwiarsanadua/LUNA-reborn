@@ -15,31 +15,15 @@ Komponen Old              Status    Rekomendasi Adaptasi
 HTML notice viewer        ✅       NoticeView.cpp sudah ada — render HTML stripped
 (CHtmlViewNotice)                  Saran: integrate WebView atau libcurl fetch
 
-Save ID checkbox          🔴       Tambah CheckBox di LoginScreen:
-                                     LoginScreen::init() {
-                                         save_id_cb_ = new CheckBox("Save ID", x, y);
-                                         save_id_cb_->OnClick([this](bool checked) {
-                                             if (checked) Config::Set("login.saved_id", id_field_.text());
-                                         });
-                                     }
+Save ID checkbox          ✅       LoginScreen.cpp sudah ada implementasi penuh:
+                                      `LoginScreen.cpp:133` — save_id_cb_ constant
+                                      `LoginScreen.cpp:179,182-188` — OnEnter load saved ID
+                                      `LoginScreen.cpp:236-241` — OnLoginSuccess save/clear
+                                      `LoginScreen.cpp:323-328` — Render checkbox visual
+                                      `LoginScreen.cpp:377` — Toggle via 'S' key
 
 Auto-attack combo loop    ✅       ComboSystem.cpp sudah handle chain attack
 (MAX_COMBO_NUM)
-
-Pseudo-code untuk Save ID:
-  class LoginScreen {
-      void OnLoginSuccess() {
-          if (save_id_cb_->IsChecked())
-              ConfigManager::SetString("login.saved_id", id_field_.GetText());
-          else
-              ConfigManager::SetString("login.saved_id", "");
-          ConfigManager::Save();
-      }
-      void OnEnter() {
-          auto saved = ConfigManager::GetString("login.saved_id", "");
-          if (!saved.empty()) { id_field_.SetText(saved); save_id_cb_->Check(); }
-      }
-  }
 ```
 
 ---
@@ -59,26 +43,16 @@ Komponen Old (.bin)       Status    Rekomendasi Adaptasi
                                     IMAGE → ScriptSprite, GAUGE → GaugeBar
 
 Missing dialogs (top 10, by priority):
-1. IdentificationDlg.bin  🔴       Item identification dialog
-                                    2 days, depends on ItemSystem
-2. ItemMallWarehouse.bin  🔴       Cash shop warehouse dialog
-                                    2 days, depends on CashShopDialog
-3. SiegeWarFlagDlg.bin    🔴       Siege flag placement dialog
-                                    2 days, depends on SiegeSystem
-4. ProgressDialog.bin     🔴       Progress bar dialog (crafting, moving)
-                                    1 day, no deps
-5. DissolveDialog.bin     🔴       Item dissolve dialog
-                                    1 day, depends on ItemSystem
-6. PetresDialog.bin       🔴       Pet resurrection dialog
-                                    1 day, depends on PetDialog
-7. QuickSlot.bin          🔴       Quick slot bar HUD
-                                    1 day, no deps
-8. BattleGuage.bin        🔴       Battle gauge HUD (HP/MP/SP bars)
-                                    4 hrs, no deps
-9. Channel.bin            🔴       Channel selection dialog
-                                    1 day, no deps
-10. SystemMsg.bin         🔴       System message popup dialog
-                                    4 hrs, no deps
+1. IdentificationDlg.bin  ✅       IdentificationDialog.cpp:11 — loaded via LoadFromScript
+2. ItemMallWarehouse.bin  ✅       ItemMallWarehouseDialog.cpp:10 — loaded via LoadFromScript
+3. SiegeWarFlagDlg.bin    ✅       SiegeWarFlagDialog.cpp:10 — loaded via LoadFromScript
+4. ProgressDialog.bin     ✅       ProgressDialog.cpp:13 — loaded via LoadFromScript
+5. DissolveDialog.bin     ✅       GameScreen.cpp:2930 — registered dialog
+6. PetresDialog.bin       🟡       PetDialog.cpp:18 loads PetInfo.bin.txt (nama berbeda)
+7. QuickSlot.bin          ✅       LegacyHudOverlay.cpp:17 — loaded via LoadFromScript
+8. BattleGuage.bin        🟡       LegacyHudOverlay.cpp:10 loads CharGage.bin.txt (nama berbeda)
+9. Channel.bin            ✅       ChannelDialog.cpp:10 — loaded via LoadFromScript
+10. SystemMsg.bin         🔴       System message popup dialog — belum ada
 
 Pseudo-code pattern untuk dialog baru:
   class XxxDialog {
@@ -199,17 +173,21 @@ Komponen Old              Status    Rekomendasi Adaptasi
 AgentServer (21 files)    10 files  Missing: NpcRecallMgr (L, 2d), PlustimeMgr (L, 2d)
                                     HackShield/NProtect removed (tidak bisa di-port)
 MapServer (210 files)     ~40 files 16/25 subsystems done
-                                    Missing: FSM engine integration (M, 2w)
-                                             Dungeon full system (M, 1w)
+                                    Missing: Dungeon full system (M, 1w)
                                              Trigger full system (M, 3d)
 DistributeServer (12)     5 files   Missing: Billing (L, 1w)
 
-Pseudo-code untuk subsystem yang belum:
-  // FSMEngine — state machine untuk AI
-  // Old: Finite State Machine/ folder dengan states:
-  //   IDLE, PATROL, CHASE, ATTACK, FLEE, RETURN, DIE
-  // Reborn: partial di AISystem.cpp
-  // Perlu tambah FSMEngine::SetState(), OnStateEnter(), OnStateExit()
+Pseudo-code untuk subsystem yang sudah:
+  // FSMEngine — state machine untuk Quest/Mission
+  // FSMEngine.hpp:62 & FSMEngine.cpp:177 — FULLY IMPLEMENTED
+  // States: IDLE → RUNNING → CONDITION_CHECK → REWARD → COMPLETE
+  // Triggers: KILL, ITEM, LEVEL, TALK, TIMER, CUSTOM
+  // Methods: CreateInstance, CreateQuestInstance, SendTrigger, Update,
+  //          SetVariable, GetVariable, GetState, IsCompleted
+  // Terintegrasi dengan LuaEngine untuk condition/action scripts
+  //
+  // AI states (combat) ditangani oleh AISystem.cpp:
+  //   IDLE, PATROL, CHASE, ATTACK, FLEE, RETURN, STUN, SLEEP
 ```
 
 ---
@@ -232,9 +210,9 @@ Physics         60%      Collision integration, vehicle/ragdoll (2 weeks)
 
 PRIORITAS EKSEKUSI:
   P0: Aggro penalty implementation (3 days)
-  P1: Missing dialogs (3 weeks)
+  P1: Remaining missing dialogs: SystemMsg.bin, PetresDialog.bin, BattleGuage.bin (1 week)
   P2: Error NACK codes (2 weeks)
-  P3: Server subsystems (4 weeks)
+  P3: Server subsystems — Dungeon + Trigger (4 weeks)
   P4: Font CJK + strings (1 week)
   P5: Build tools (1 week)
 ```

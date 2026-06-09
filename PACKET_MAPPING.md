@@ -68,10 +68,10 @@ tPos.wz                    WORD          target_position.z float        🟡    
 MoveMode                   eMoveMode     move_mode         MoveMode     ✅     -   -      -
 KyungGongIdx               WORD          kyung_gong_idx    uint16       ✅     M   1 day  Agent #001
 AddedMoveSpeed             float         added_move_speed  float        ✅     L   2 hrs  -
-(missing)                  -             target_position.y float        🟢     -   -      Added
-(missing)                  -             timestamp         uint64       🟢     -   -      Added
+(missing)                  -             target_position.y  float        🟢     -   -      Added
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Total: Old 7 field, Reborn 8 field. Match: 6/7 (86%). Added: target_position.y, timestamp.
+Total: Old 8 field, Reborn 7 field. Match: 7/8 (88%). Added: target_position.y.
+NOTE: timestamp exists in MoveResponse and EntityMove, NOT in MoveRequest.
 ```
 
 ---
@@ -96,7 +96,7 @@ Total: Old 7 field, Reborn 3 field. Major simplification — Old punya target li
 
 ---
 
-## 4. SKILL: MP_SKILL_START_SYN → Skill.fbs (SkillCastRequest)
+## 4. SKILL: MP_SKILL_START_SYN → Skill.fbs (SkillCastRequest / SkillCastResult)
 
 Sama dengan COMBAT — Old menggunakan MSG_SKILL_START_SYN untuk kedua skill dan combat.
 
@@ -107,10 +107,12 @@ SkillIdx                   DWORD         skill_id         uint16       ✅     -
 Operator (caster)          DWORD         caster_id        uint32       ✅     -   -      -
 MainTarget.dwID            DWORD         target_id        uint32       ✅     -   -      -
 MainTarget.cpPos           COMPRESSEDPOS position         Vec3         ✅     -   -      -
+ ── Response fields (SkillCastResult) ─────────────────────────────────────────────────────────────
 (missing)                  -             hits             uint8        🟢     -   -      Added
 (missing)                  -             results          [AttackResult] 🟢  -   -      Added
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Enhanced with results array — Old mengirim result per target individual.
+NOTE: hits and results are in SkillCastResult (response), NOT in SkillCastRequest.
 ```
 
 ---

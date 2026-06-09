@@ -26,7 +26,7 @@ MainDialog.cpp (1996 lines)  LauncherScreen.cpp
   ├─ ID input (EditBox)       InputField widget       ✅       -    -        -
   ├─ PW input (masked)        InputField masked       ✅       -    -        -
   ├─ Server selection          ServerInfo table        ✅       -    -        -
-  ├─ Save ID checkbox         (not implemented)       🔴       L    4 hrs    CheckBox widget
+  ├─ Save ID checkbox         (save_id_ toggle)       ✅       -    -        -
   └─ Version check            client_version field    ✅       -    -        -
 
 [Client]LUNA/CharSelect       client/ui/screens/      ✅       -    -        -
@@ -48,8 +48,8 @@ CharSelect.cpp               CharSelectScreen.cpp
 SUMMARY - PLAYER FLOW
   Total screens:              5
   Reborn C++ classes:         5 (100%)
-  Fully functional:           4 (80%)
-  Missing features:           1 (Save ID checkbox)
+  Fully functional:           5 (100%)
+  Missing features:           0
   Total estimated effort:     ~1 week (polish)
 ```
 
@@ -112,34 +112,34 @@ DateMatchingDlg.bin        DateMatchingDialog.cpp     ✅        -    -        -
 WeatherDlg.bin             WeatherDialog.cpp          ✅        -    -        -
 NpcImage.bin               NpcImageDialog.cpp         ✅        -    -        -
 
-CRITICAL MISSING:
-IdentificationDlg.bin      (not implemented)         🔴        M    2 days   Item system
-ItemMallWarehouse.bin      (not implemented)         🔴        M    2 days   CashShop system
-SiegeWarFlagDlg.bin        (not implemented)         🔴        M    2 days   Siege system
-ProgressDialog.bin         (not implemented)         🔴        L    1 day    -
+CRITICAL MISSING — some now implemented (agent FINAL-B verified):
+IdentificationDlg.bin      IdentificationDialog.cpp   ✅        -    -        -
+ItemMallWarehouse.bin      ItemMallWarehouseDialog.cpp✅        -    -        -
+SiegeWarFlagDlg.bin        SiegeWarFlagDialog.cpp     ✅        -    -        -
+ProgressDialog.bin         ProgressDialog.cpp          ✅        -    -        -
 DissolveDialog.bin         (not implemented)         🔴        L    1 day    -
 PetresDialog.bin           (not implemented)         🔴        L    1 day    -
 QuickSlot.bin              (not implemented)         🔴        L    1 day    -
 BattleGuage.bin            (not implemented)         🔴        L    4 hrs    -
-Channel.bin                (not implemented)         🔴        L    1 day    -
-SystemMsg.bin              (not implemented)         🔴        L    4 hrs    -
-MonsterKill.bin            (not implemented)         🔴        L    4 hrs    -
-QuestQuickView.bin         (not implemented)         🔴        L    1 day    QuestDialog
+Channel.bin                ChannelDialog.cpp           ✅        -    -        -
+MonsterKill.bin            MonsterKillDialog.cpp       ✅        -    -        -
+QuestQuickView.bin         QuestQuickViewDialog.cpp    ✅        -    -        -
+PartyMatching*.bin (4)     PartyMatchingDialog.cpp     ✅        -    -        -
+SystemMsg.bin              (not implemented)           🔴        L    4 hrs    -
 ShoutDlg.bin               (not implemented)         🔴        L    1 day    ChatPanel
-PartyMatching*.bin (4)     (not implemented)         🔴        L    2 days   PartyDialog
 Consignment_Guide.bin      (not implemented)         🔴        L    4 hrs    -
 BillingDlg.bin             (not implemented)         🔴        L    1 day    -
 HousingWebDlg.bin          (not implemented)         🔴        L    2 days   HousingDialog
 
 SUMMARY - UI SYSTEM
   Total Old .bin files:       213 (scan langsung)
-  PORTED (ada implementasi):  95 (45%) — dedicated class atau GameScreen inline
+  PORTED (ada implementasi):  103 (48%) — dedicated class atau GameScreen inline
   PARTIAL (class ada, no .bin):4 (2%) — FadeDlg, FamilyMark, Target, TargetMonster
-  MISSING (no reference):     114 (53%)
-  ─ Dari 114 missing:
+  MISSING (no reference):     106 (50%)
+  ─ Dari 106 missing:
     Sub-dialogs (minor):       ~70 (ChatRoom variants, Guild subs, Housing subs)
     Config/image_path files:   ~15 (image_*.bin, partymember*.bin)
-    Truly missing features:    ~29 (ApplyOption, AutoAnswer, BattleGuage, ShoutDlg, dll)
+    Truly missing features:    ~21 (ApplyOption, AutoAnswer, BattleGuage, ShoutDlg, dll)
   Total estimated effort:     ~4 weeks (1 FTE) — mostly minor sub-dialogs
 
   Technology:
@@ -374,8 +374,8 @@ SUMMARY - SERVER SYSTEMS
   ────────────────
   MAP SERVER (terbesar):
     Old: 116 .cpp files, 95.440 lines, 1.938 methods
-    Reborn: 18 .cpp files, 9.316 lines, 902 methods
-    Coverage: 902/1.938 = 47% methods ported
+    Reborn: 18 .cpp files, 9.316 lines, ~230 methods (CORRECTED from 902)
+    Coverage: ~230/1.938 ≈ 12% methods ported (CORRECTED from 47%)
     Lines reduced: 95.440 → 9.316 (-90%) — ECS refactor
   ────────────────
   AGENT SERVER:
@@ -494,7 +494,7 @@ SUMMARY - BUILD SYSTEM
   Compiler:        MSVC 7.1 → AppleClang 16 (✅)
   Libraries:       All replaced with modern equivalents (✅)
   Missing targets: PackingTool, NewPackingTool, LogReporter, MapEditor (🟡)
-  Total binaries:  18 di build/bin/
+  Total binaries:  17 di build/bin/ (CORRECTED: 18 include shaders/ directory)
   Build status:    0 error, 0 warning (✅)
   Total effort:    ~1 week (missing tools)
 
@@ -746,17 +746,17 @@ GRAND SUMMARY — ALL LAYERS (dengan data presisi)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Layer               Coverage    Data Presisi                                Total Effort
 ────────────────────────────────────────────────────────────────────────────────────────────
-B1. Player Flow     95%         5 screens, 1 minor: Save ID checkbox        1 week
-B2. UI System       45%         95/213 .bin ported, 114 missing (mostly     4 weeks
+B1. Player Flow     100%        5 screens, all features implemented ✅       1 week
+B2. UI System       48%         103/213 .bin ported, 106 missing (mostly    4 weeks
                                  minor sub-dialogs)
 B3. Gameplay        100%        12/12 formulas Old-accurate ✅               1 week (tuning)
 B4. Network         51%         28/55 MP_PROTOCOL have handlers.            1 week (opt)
                                  27 not ported (anti-cheat/admin/minor)
 B5. Asset Pipeline  90%         Spr/UI parser polish                        1 week
-B6. Server Systems  47%         Map: 902/1.938 methods ported (ECS refactor)4 weeks
+B6. Server Systems  12%         Map: ~230/1.938 methods ported (ECS refactor)4 weeks
                                  116 file → 18 file (-90% LOC)
 B7. Database        100%        75 tables ✅                                 ✅
-B8. Build System    90%         18 binaries, 4 tools missing                 1 week
+B8. Build System    90%         17 binaries, 4 tools missing                 1 week
 B9. Error Handling  50%         Perlu NACK codes per error case              2 weeks
 B10. Performance    90%         Frame cap                                    <1 day
 B11. Security       60%         27/55 protocol tidak di-port (anti-cheat)    3 weeks
@@ -765,15 +765,17 @@ B13. Localization   80%         CJK font, ~400 strings                       1 w
 B14. Audio          100%        ✅                                           ✅
 B15. Physics        60%         Ragdoll, vehicle physics                     2 weeks
 ────────────────────────────────────────────────────────────────────────────────────────────
-TOTAL:              ~65%       ~20 weeks (1 FTE ~5 months)
+TOTAL:              ~60%       ~20 weeks (1 FTE ~5 months)
 ────────────────────────────────────────────────────────────────────────────────────────────
 
 CATATAN KOREKSI DATA:
-  - B2 UI:  95/213 (45%) ported, bukan 73/213 (34%)
+  - B1:  Save ID checkbox sudah diimplement (save_id_ toggle), bukan "not implemented"
+  - B2 UI:  95/213 (45%) → 103/213 (48%) ported — 8 item missing ternyata sudah ada
   - B4 Net: 28/55 (51%) protocol punya handler, bukan "100%"
-  - B6 Svr: 47% methods ported (902/1.938), bukan "70%"
+  - B6 Svr: 902 methods → ~230 actual (CORRECTED: regex hitung variable sbg method)
+  - B8:  18 binaries → 17 (shaders/ adalah direktori, bukan binary)
   - MP_CATEGORY: 93 total (92 named + sentinel), bukan 94
-  - Overall real: ~65%, bukan ~82%
+  - Overall real: ~60% (setelah koreksi B6), bukan ~82%
 ────────────────────────────────────────────────────────────────────────────────────────────
 ```
 

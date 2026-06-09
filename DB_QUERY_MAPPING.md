@@ -125,13 +125,13 @@ guild_id                     GuildIdx PK                            ✅     -   
 guild_name                   GuildName UNIQUE                       ✅     -   -      -
 master_id                    MasterIdx                              ✅     -   -      -
 level                        Level                                  ✅     -   -      -
-gp                           GP                                     ✅     -   -      -
+gp                           ❌ GP — TIDAK ADA di schema           ❌     H   2 hrs  Agent FINAL-D
 member_count                 (implied — JOIN)                       🟡     M   2 hrs  -
 emblem_data                  MarkData BLOB / EmblemData BLOB        ✅     M   1 day  Agent #003
-notice                       GuildNotice TEXT / Notice TEXT         ✅     L   2 hrs  -
+notice                       Notice TEXT                            ✅     L   2 hrs  -
 create_date                  CreateDate                             ✅     -   -      -
 ─────────────────────────────────────────────────────────────────────────────────────────────
-Total: 9/9 columns. ✅ Complete (MarkData/EmblemData added by agent #003).
+Total: 8/9 columns. ❌ GP salah (kolom GP tidak ada di TB_GUILD schema).
 ```
 
 ---
@@ -145,9 +145,9 @@ Old Column (luna_game.db)    Reborn Column (schema_game_sqlite.sql)  Status Sev 
 ─────────────────────────────────────────────────────────────────────────────────────────────
 party_id                     PartyIdx PK                            ✅     -   -      -
 master_id                    MasterIdx                              ✅     -   -      -
-option                       Option                                 ✅     -   -      -
+option                       ❌ Option — TIDAK ADA di schema        ❌     H   1 hr   Agent FINAL-D
 ─────────────────────────────────────────────────────────────────────────────────────────────
-Party is mostly in-memory (not persisted). Basic coverage.
+Party is mostly in-memory (not persisted). Basic coverage. 2/3 columns match.
 ```
 
 ---
@@ -183,11 +183,12 @@ DATABASE MAPPING — ALL QUERIES
 14  Save QuickSlot          INSERT/UPDATE        INSERT/UPDATE       100%      ✅
 15+ ~36 other queries       (C++ DataBase.cpp)   (inline SQL)        ~90%      🟡
 ─────────────────────────────────────────────────────────────────────────────────────────────
-TOTAL: ~50 queries mapped. 100% column match for character/item/skill/quest/guild.
+TOTAL: ~50 queries mapped. 100% column match for character/item/skill/quest/friend.
+        ❌ TB_GUILD (GP), TB_PARTY (Option) — mapping error, lihat SP5 & SP6.
 
 NOTE: Old TIDAK punya stored procedures SQL. Semua query dieksekusi via C++
 (DataBase.cpp + DBThreadInterface.h). Reborn menggunakan prepared statements
-yang setara secara fungsional. Kolom sudah diverifikasi 100% match.
+yang setara secara fungsional. Kolom sudah diverifikasi oleh Agent FINAL-D.
 ----------------------------------------------------------------------------------------------
 ```
 
