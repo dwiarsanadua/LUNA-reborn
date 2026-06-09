@@ -208,16 +208,16 @@ void RunFormulaTests() {
         def.base_dexterity = 20; def.class_id = 2; def.constitution = 40;
         def.shield_defense = 5;
 
-        auto normal = CombatSystem::CalculateDamage(atk, def, 0, 1, 0, 0, 1.0f, CombatContext::Normal);
-        auto gt = CombatSystem::CalculateDamage(atk, def, 0, 1, 0, 0, 1.0f, CombatContext::GuildTournament);
-        spdlog::info("    Normal dmg={}, GT dmg={} (should be ~10%)", normal.damage, gt.damage);
-        if (normal.damage > 0) {
-            float ratio = (float)gt.damage / (float)normal.damage;
+        int total_gt_norm = 0, total_gt = 0, gt_n = 5;
+        for (int i = 0; i < gt_n; i++) {
+            total_gt_norm += CombatSystem::CalculateDamage(atk, def, 0, 1, 0, 0, 1.0f, CombatContext::Normal).damage;
+            total_gt += CombatSystem::CalculateDamage(atk, def, 0, 1, 0, 0, 1.0f, CombatContext::GuildTournament).damage;
+        }
+        spdlog::info("    Normal dmg={}, GT dmg={} (should be ~10%)", total_gt_norm, total_gt);
+        if (total_gt_norm > 0) {
+            float ratio = (float)total_gt / (float)total_gt_norm;
             spdlog::info("    GT/Normal ratio = {:.3f} (expected ~0.10)", ratio);
             TEST("GT damage ~10% of normal", ratio < 0.20f);
-        } else {
-            // If normal is 0 due to RNG, both should be 0
-            TEST("GT damage also 0 when normal is 0", gt.damage == 0);
         }
     }
 

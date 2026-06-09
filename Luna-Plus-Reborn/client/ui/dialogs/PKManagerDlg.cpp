@@ -1,4 +1,5 @@
 #include "PKManagerDlg.hpp"
+#include <ecs/components/CharacterStats.hpp>
 #include <cstdio>
 #include <algorithm>
 
@@ -20,7 +21,6 @@ void PKManagerDlg::Close() {
 void PKManagerDlg::SetMode(PKMode mode) {
     if (state_.mode == mode) return;
 
-    // Cannot toggle PK off while protection timer is active
     if (mode == PKMode::Peaceful && !CanTogglePKOff()) return;
 
     state_.mode = mode;
@@ -30,11 +30,26 @@ void PKManagerDlg::SetMode(PKMode mode) {
     } else {
         state_.is_flagged = false;
     }
+
+    if (stats_) {
+        stats_->pk_mode = (mode != PKMode::Peaceful);
+        stats_->is_flagged = state_.is_flagged;
+    }
+
     if (mode_cb_) mode_cb_(mode);
 }
 
+void PKManagerDlg::SetBadFame(int val) {
+    state_.bad_fame = val;
+    if (stats_) stats_->bad_fame = val;
+}
+
+void PKManagerDlg::AddBadFame(int val) {
+    state_.bad_fame = std::max(0, state_.bad_fame + val);
+    if (stats_) stats_->bad_fame = state_.bad_fame;
+}
+
 void PKManagerDlg::StartPKProtectionTimer() {
-    // Base 20 minutes + extra per bad fame (same as old: 20 min + (bad_fame / 75) * 5 min)
     float base_seconds = 20 * 60.0f;
     float extra_per_75_badfame = (state_.bad_fame / 75.0f) * 5 * 60.0f;
     state_.pk_protection_remaining = base_seconds + extra_per_75_badfame;
@@ -57,18 +72,18 @@ void PKManagerDlg::ResetPKPoints() {
 }
 
 bool PKManagerDlg::CanAttack(bool is_player) const {
-    if (!is_player) return true; // always can attack monsters
-    return state_.mode != PKMode::Peaceful;
+    if (!is_player) return true;
+    if (state_.mode != PKMode::Peaceful) return true;
+    if (stats_ && stats_->pk_mode) return true;
+    return false;
 }
 
 void PKManagerDlg::OnKill() {
     state_.kills++;
     AddPKPoint(1);
     state_.pk_timer = 0;
-    // Add bad fame on PK kill (thresholds from old: 100k, 500k, 1M, 5M, 10M, 50M, 100M)
     int bad_fame_increment = 100000;
     AddBadFame(bad_fame_increment);
-    // Reset protection timer on kill
     if (state_.is_flagged) {
         StartPKProtectionTimer();
     }
@@ -77,12 +92,10 @@ void PKManagerDlg::OnKill() {
 void PKManagerDlg::Update(float dt) {
     state_.pk_timer += dt;
 
-    // Decay PK protection timer
     if (state_.pk_protection_remaining > 0.0f) {
         state_.pk_protection_remaining = std::max(0.0f, state_.pk_protection_remaining - dt);
     }
 
-    // Decay PK points over time (1 point per 10 minutes)
     if (state_.pk_points > 0 && state_.pk_timer > 600.0f) {
         state_.pk_points--;
         state_.pk_timer = 0;
@@ -91,24 +104,18 @@ void PKManagerDlg::Update(float dt) {
         }
     }
 
-    // Decay bad fame slowly (1 point per second when not flagged)
     if (state_.bad_fame > 0 && !state_.is_flagged) {
         state_.bad_fame = std::max(0, state_.bad_fame - 1);
+        if (stats_) stats_->bad_fame = state_.bad_fame;
     }
 }
 
 void PKManagerDlg::ApplyPenalties() {
-    // Bad fame-based penalties
     if (state_.bad_fame >= 100000000) {
-        // Extreme: drop 5 items on death
     } else if (state_.bad_fame >= 10000000) {
-        // Severe: drop 4 items
     } else if (state_.bad_fame >= 5000000) {
-        // Heavy: drop 3 items
     } else if (state_.bad_fame >= 500000) {
-        // Moderate: drop 2 items
     } else if (state_.bad_fame > 0) {
-        // Light: drop 1 item
     }
 }
 
@@ -164,14 +171,12 @@ void PKManagerDlg::Render(UIRenderer& ui) {
         ui.DrawText(wx + 10, wy + 58, 0xffff6644, ">> PENALTY ACTIVE <<");
     }
 
-    // Protection timer display
     if (state_.pk_protection_remaining > 0.0f) {
         int mins = (int)(state_.pk_protection_remaining) / 60;
         int secs = (int)(state_.pk_protection_remaining) % 60;
         ui.DrawText(wx + 10, wy + 76, 0xffffaa44, "Protection: %02d:%02d", mins, secs);
     }
 
-    // Bad fame display
     if (state_.bad_fame > 0) {
         snprintf(buf, sizeof(buf), "Bad Fame: %d", state_.bad_fame);
         ui.DrawText(wx + 10, wy + 94, 0xffff6644, buf);

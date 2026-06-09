@@ -123,6 +123,10 @@ public:
     void HandleCombatInput(entt::registry& registry, entt::entity player, const CombatInput& input);
     void HandleAutoAttack(entt::registry& registry, entt::entity player, entt::entity target, float dt);
 
+    // PK System (FEEL-07) — Old IsEnemy_NormalTimes logic
+    static bool IsEnemy(const CharacterStats& a, const CharacterStats& b);
+    static bool IsEnemy(const CharacterStats& a, const CharacterStats& b, CombatContext ctx);
+
     // Crit & Block formulas (Agent B)
     static float CalcDexRate(const CharacterStats& s);
     static float CalcIntRate(const CharacterStats& s);

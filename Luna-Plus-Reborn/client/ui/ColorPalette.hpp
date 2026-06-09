@@ -4,10 +4,10 @@
 namespace ColorPalette {
 
 // ─── UI Windows ───────────────────────────────────────
-constexpr uint32_t WINDOW_BG      = 0xff0a0a1e;
-constexpr uint32_t WINDOW_TITLE   = 0xff2244aa;
-constexpr uint32_t WINDOW_BORDER  = 0xff6666aa;
-constexpr uint32_t WINDOW_BODY    = 0xff111133;
+constexpr uint32_t WINDOW_BG      = 0xff101020;
+constexpr uint32_t WINDOW_TITLE   = 0xff2a2a6e;
+constexpr uint32_t WINDOW_BORDER  = 0xff64b4ff;
+constexpr uint32_t WINDOW_BODY    = 0xff101020;
 
 // ─── Buttons ──────────────────────────────────────────
 constexpr uint32_t BTN_NORMAL     = 0xffcccccc;

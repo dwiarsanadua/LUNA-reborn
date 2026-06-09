@@ -106,4 +106,12 @@ struct CharacterStats {
     float magic_attack_plus = 0.0f;
     float magic_defense_pct = 0.0f;
     float magic_defense_plus = 0.0f;
+
+    // PK System (FEEL-07)
+    bool pk_mode = false;
+    uint32_t party_id = 0;
+    uint32_t guild_id = 0;
+    uint32_t guild_war_id = 0;
+    int32_t bad_fame = 0;
+    bool is_flagged = false;
 };

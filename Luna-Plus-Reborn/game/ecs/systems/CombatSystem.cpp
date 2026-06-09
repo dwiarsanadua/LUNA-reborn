@@ -110,6 +110,31 @@ bool CombatSystem::IsHit(const CharacterStats& attacker, const CharacterStats& d
     return roll < hit_chance;
 }
 
+// ---- PK System (FEEL-07) ----
+bool CombatSystem::IsEnemy(const CharacterStats& a, const CharacterStats& b) {
+    return IsEnemy(a, b, CombatContext::Normal);
+}
+
+bool CombatSystem::IsEnemy(const CharacterStats& a, const CharacterStats& b, CombatContext ctx) {
+    if (&a == &b) return false;
+
+    if (ctx == CombatContext::Siege) {
+        if (a.party_id > 0 && a.party_id == b.party_id) return false;
+        if (a.guild_id > 0 && a.guild_id == b.guild_id) return false;
+        if (a.guild_war_id > 0 && a.guild_war_id == b.guild_id) return true;
+        if (b.guild_war_id > 0 && b.guild_war_id == a.guild_id) return true;
+        return true;
+    }
+
+    if (a.party_id > 0 && a.party_id == b.party_id) return false;
+    if (a.pk_mode) return true;
+    if (b.pk_mode) return true;
+    if (a.guild_war_id > 0 && a.guild_war_id == b.guild_id) return true;
+    if (b.guild_war_id > 0 && b.guild_war_id == a.guild_id) return true;
+
+    return false;
+}
+
 // ---- Crit & Block helper formulas (Agent B) ----
 
 float CombatSystem::CalcDexRate(const CharacterStats& s) {

@@ -41,6 +41,8 @@ public:
     void Play(AnimClip* clip, bool loop = true, float blend_time = 0.2f);
     void BlendTo(AnimClip* clip, float blend_time);
     void Stop();
+    void SetSpeed(float speed) { speed_multiplier_ = speed; }
+    float GetSpeed() const { return speed_multiplier_; }
 
     bool IsPlaying() const { return is_playing_; }
     float GetCurrentTime() const { return current_time_; }
@@ -58,6 +60,7 @@ private:
     float current_time_ = 0.0f;
     float blend_timer_ = 0.0f;
     float blend_duration_ = 0.0f;
+    float speed_multiplier_ = 1.0f;
     bool is_playing_ = false;
     bool looping_ = true;
 };

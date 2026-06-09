@@ -25,9 +25,9 @@ public:
 protected:
     std::string text_;
     bool pressed_ = false;
-    UIColor color_normal_ = {40, 50, 80, 220};
-    UIColor color_hover_ = {80, 100, 140, 220};
-    UIColor color_pressed_ = {30, 40, 60, 220};
+    UIColor color_normal_ = {50, 90, 130, 220};
+    UIColor color_hover_ = {80, 120, 160, 220};
+    UIColor color_pressed_ = {30, 60, 100, 220};
     TextureInfo tex_normal_;
     TextureInfo tex_hover_;
     TextureInfo tex_pressed_;

@@ -70,7 +70,7 @@ public:
         title_color_ = title; body_color_ = body; border_color_ = border;
     }
     
-    UIColor title_color_ = {60, 60, 120, 230};
+    UIColor title_color_ = {42, 42, 110, 230};
     UIColor body_color_ = {16, 16, 32, 220};
     UIColor border_color_ = {100, 180, 255, 200};
 

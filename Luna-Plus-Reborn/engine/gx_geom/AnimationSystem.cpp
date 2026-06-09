@@ -25,11 +25,70 @@ bool AnimationSystem::LoadFromJson(const std::string& path, AnimClip& out_clip) 
         f >> j;
 
         out_clip.name = j.value("name", path);
-        out_clip.duration_sec = j.value("duration", 1.0f);
-        out_clip.fps = j.value("fps", 30.0f);
         out_clip.loop = j.value("loop", false);
 
-        if (j.contains("tracks")) {
+        float json_fps = 30.0f;
+        float json_duration = 1.0f;
+
+        if (j.contains("header")) {
+            auto& h = j["header"];
+            json_fps = h.value("frame_speed", 30.0f);
+            int last_frame = h.value("last_frame", 30);
+            json_duration = json_fps > 0 ? (float)last_frame / json_fps : 1.0f;
+        }
+        json_fps = j.value("fps", json_fps);
+        json_duration = j.value("duration", json_duration);
+        out_clip.fps = json_fps;
+        out_clip.duration_sec = json_duration;
+
+        if (j.contains("objects")) {
+            float ticks_per_frame = 160.0f;
+            if (j.contains("header") && j["header"].contains("ticks_per_frame"))
+                ticks_per_frame = j["header"]["ticks_per_frame"];
+            float fps = out_clip.fps;
+            for (auto& jobj : j["objects"]) {
+                AnimBoneTrack track;
+                track.bone_name = jobj.value("name", "");
+                size_t max_keys = 0;
+                if (jobj.contains("pos_keys")) max_keys = std::max(max_keys, jobj["pos_keys"].size());
+                if (jobj.contains("rot_keys")) max_keys = std::max(max_keys, jobj["rot_keys"].size());
+                if (jobj.contains("scale_keys")) max_keys = std::max(max_keys, jobj["scale_keys"].size());
+                track.keyframes.resize(max_keys);
+                auto load_keys = [&](const std::string& key, auto&& set_field) {
+                    if (!jobj.contains(key)) return;
+                    for (auto& jk : jobj[key]) {
+                        int frame = jk.value("frame", 0);
+                        size_t idx = static_cast<size_t>(frame);
+                        if (idx >= track.keyframes.size()) track.keyframes.resize(idx + 1);
+                        track.keyframes[idx].time_seconds = fps > 0 ? (float)frame / fps : 0.0f;
+                        set_field(track.keyframes[idx], jk);
+                    }
+                };
+                load_keys("pos_keys", [](AnimKeyframe& kf, json& jk) {
+                    if (jk.contains("pos")) {
+                        kf.position.x = jk["pos"][0];
+                        kf.position.y = jk["pos"][1];
+                        kf.position.z = jk["pos"][2];
+                    }
+                });
+                load_keys("rot_keys", [](AnimKeyframe& kf, json& jk) {
+                    if (jk.contains("quat")) {
+                        kf.rotation.x = jk["quat"][0];
+                        kf.rotation.y = jk["quat"][1];
+                        kf.rotation.z = jk["quat"][2];
+                        kf.rotation.w = jk["quat"][3];
+                    }
+                });
+                load_keys("scale_keys", [](AnimKeyframe& kf, json& jk) {
+                    if (jk.contains("scale")) {
+                        kf.scale.x = jk["scale"][0];
+                        kf.scale.y = jk["scale"][1];
+                        kf.scale.z = jk["scale"][2];
+                    }
+                });
+                out_clip.tracks.push_back(track);
+            }
+        } else if (j.contains("tracks")) {
             for (auto& jtrack : j["tracks"]) {
                 AnimBoneTrack track;
                 track.bone_name = jtrack.value("bone", "");
@@ -266,7 +325,7 @@ void AnimationSystem::Stop() {
 void AnimationSystem::Update(float delta_time) {
     if (!is_playing_ || !current_clip_) return;
 
-    current_time_ += delta_time;
+    current_time_ += delta_time * speed_multiplier_;
 
     if (looping_) {
         if (current_clip_->duration_sec > 0.0f) {
@@ -281,7 +340,7 @@ void AnimationSystem::Update(float delta_time) {
 
     // Handle blending
     if (next_clip_ && blend_duration_ > 0.0f) {
-        blend_timer_ += delta_time;
+        blend_timer_ += delta_time * speed_multiplier_;
         if (blend_timer_ >= blend_duration_) {
             current_clip_ = next_clip_;
             current_time_ = 0.0f;

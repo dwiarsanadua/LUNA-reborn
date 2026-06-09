@@ -28,7 +28,7 @@ void Button::Render(UIRenderer& ui) {
     } else {
         UIColor c = pressed_ ? color_pressed_ : (hovered_ ? color_hover_ : color_normal_);
         ui.DrawRect(x_, y_, w_, h_, c);
-        ui.DrawBorder(x_, y_, w_, h_, {100, 150, 200, 150});
+        ui.DrawBorder(x_, y_, w_, h_, {150, 180, 220, 150});
     }
 
     if (!text_.empty()) {
