@@ -473,9 +473,10 @@ int main(int argc, char** argv) {
             screenManager.Render(ui, view, proj);
             
             if (frame % 30 == 0) fps = 1.0f / dt;
-            if (screenManager.CurrentName() == "game") {
+            {
                 char fps_buf[32]; snprintf(fps_buf, sizeof(fps_buf), "FPS: %.0f", fps);
-                ui.DrawText(1200, 2, 0xff888888, "%s", fps_buf);
+                float tw = ui.MeasureText(fps_buf);
+                ui.DrawText(ui.logicalWidth - tw - 8, 6, 0xFF888888, "%s", fps_buf);
             }
             
             // Flush batch SEBELUM EndFrame — pastikan draw calls di-submit

@@ -79,11 +79,11 @@ bool RenderDevice::Init(const RenderDeviceConfig& config) {
         return false;
     }
 
-    // Set debug text and clear color globally
-    bgfx::setDebug(BGFX_DEBUG_TEXT | BGFX_DEBUG_STATS);
+    // Debug text only — STATS overlay obscures the full screen in Metal
+    bgfx::setDebug(BGFX_DEBUG_NONE);
     
-    // Clear View 0 (Main) to dark gray
-    bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH,     0xFF6688AA, 1.0f, 0);
+    // Clear View 0 (Main Scene) to near-black
+    bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0xFF0A0A14, 1.0f, 0);
     bgfx::setViewRect(0, 0, 0, (uint16_t)width_, (uint16_t)height_);
 
     // Create DX9-style fixed-function uniforms
@@ -119,8 +119,6 @@ void RenderDevice::BeginFrame() {
     bgfx::setViewClear(debugView, BGFX_CLEAR_NONE, 0, 1.0f, 0);
     
     bgfx::dbgTextClear();
-    bgfx::dbgTextPrintf(1, 1, 0x0f, "LUNA Plus Reborn - BGFX ACTIVE");
-    bgfx::dbgTextPrintf(1, 2, 0x0f, "Resolution: %dx%d", width_, height_);
     
     SetLightingUniforms();
 
