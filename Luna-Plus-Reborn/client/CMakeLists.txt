@@ -192,3 +192,48 @@ target_compile_definitions(LunaPlusClient PRIVATE
     ASSETS_PATH="${CMAKE_SOURCE_DIR}/assets/"
     GAME_DATA_PATH="${CMAKE_SOURCE_DIR}/assets/data/game_data.db"
 )
+
+# ── Asset deployment ─────────────────────────────────────────────────────────
+# Create a symlink from bin/assets → <source>/assets so the client can find
+# assets via relative "./assets/" regardless of which dir it was launched from.
+# On Windows a symlink needs elevated permissions; use a directory junction
+# instead (cmake -E create_symlink on Windows creates a junction for dirs).
+set(ASSET_SRC  "${CMAKE_SOURCE_DIR}/assets")
+set(ASSET_LINK "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/assets")
+
+if(NOT EXISTS "${ASSET_LINK}")
+    add_custom_command(TARGET LunaPlusClient POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E create_symlink "${ASSET_SRC}" "${ASSET_LINK}"
+        COMMENT "Linking assets → ${ASSET_LINK}"
+        VERBATIM
+    )
+endif()
+
+# Likewise for shaders: bin/shaders is already handled by ShaderCompile.cmake,
+# but ensure source shaders dir is also reachable for platforms where shaderc
+# isn't run at build time (the .bin files are pre-compiled in source tree).
+set(SHADER_SRC  "${CMAKE_SOURCE_DIR}/shaders")
+set(SHADER_LINK "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders_src")
+if(NOT EXISTS "${SHADER_LINK}")
+    add_custom_command(TARGET LunaPlusClient POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E create_symlink "${SHADER_SRC}" "${SHADER_LINK}"
+        COMMENT "Linking source shaders → ${SHADER_LINK}"
+        VERBATIM
+    )
+endif()
+
+# ── macOS app bundle resources ───────────────────────────────────────────────
+# When building with Xcode or packaging as a .app, add assets as Resources.
+if(APPLE AND CMAKE_GENERATOR STREQUAL "Xcode")
+    set_target_properties(LunaPlusClient PROPERTIES
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/cmake/MacOSXBundleInfo.plist.in"
+    )
+    # Copy the assets directory into the .app bundle Resources/
+    add_custom_command(TARGET LunaPlusClient POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${ASSET_SRC}" "$<TARGET_BUNDLE_CONTENT_DIR:LunaPlusClient>/Resources/assets"
+        COMMENT "Copying assets into .app bundle"
+        VERBATIM
+    )
+endif()

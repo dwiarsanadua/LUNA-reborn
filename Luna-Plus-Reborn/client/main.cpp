@@ -97,6 +97,11 @@ int main(int argc, char** argv) {
     signal(SIGINT, signal_handler); signal(SIGTERM, signal_handler);
     signal(SIGPIPE, SIG_IGN);
 
+    // Log LUNA_ASSETS_PATH early so macOS users can debug asset loading
+    const char* luna_env = getenv("LUNA_ASSETS_PATH");
+    if (luna_env) spdlog::info("LUNA_ASSETS_PATH={}", luna_env);
+    else          spdlog::debug("LUNA_ASSETS_PATH not set — using auto-detect");
+
     // 3. RenderDevice (initializes VFS from executable location first)
     RenderDeviceConfig config{};
     config.width = ConfigManager::GetInt("video.width", 1920);
@@ -107,6 +112,11 @@ int main(int argc, char** argv) {
     RenderDevice device;
     if (!device.Init(config)) return 1;
     Paths::Init();
+    // Log resolved asset root so macOS users can verify the path
+    spdlog::info("Assets root : {}", Paths::Assets());
+    spdlog::info("Game DB     : {}", Paths::GameDataDb());
+    spdlog::info("Font check  : {}", VFS::Exists("assets/fonts/2002_EYA.ttf") ? "OK" : "MISSING");
+    spdlog::info("Shaders     : {}", VFS::Exists("shaders/vs_ui.bin") ? "OK" : "MISSING");
     UiSkinManager::Init();
 
     // 4. AudioManager (after Paths/VFS so audio files resolve correctly)

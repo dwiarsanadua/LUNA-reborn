@@ -2,6 +2,7 @@
 #include "FontManager.hpp"
 #include <spdlog/spdlog.h>
 #include <fstream>
+#include <filesystem>
 #include <cstdio>
 #include <cstdarg>
 #include <vector>
@@ -433,7 +434,9 @@ void UIRenderer::LoadGlyphsForText(const std::string& text) {
 
     if (new_count <= atlas.range_count && new_first >= atlas.range_first) return;
 
-    std::string fontPath = VFS::Resolve("assets/interface/Windows/2002_EYA.ttf");
+    std::string fontPath = VFS::Find("assets/fonts/2002_EYA.ttf");
+    if (fontPath.empty() || !std::filesystem::exists(fontPath))
+        fontPath = VFS::Find("assets/interface/Windows/2002_EYA.ttf");
     std::ifstream f(fontPath, std::ios::binary);
     if (!f) return;
     std::vector<unsigned char> data((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
@@ -636,9 +639,15 @@ FontAtlas& UIRenderer::GetOrCreateFontAtlas(float size) {
     atlas.range_first = 32;
     atlas.range_count = 224;
 
-    std::string fontPath = VFS::Resolve("assets/interface/Windows/2002_EYA.ttf");
+    // Try canonical location first, then legacy path
+    std::string fontPath = VFS::Find("assets/fonts/2002_EYA.ttf");
+    if (fontPath.empty() || !std::filesystem::exists(fontPath))
+        fontPath = VFS::Find("assets/interface/Windows/2002_EYA.ttf");
     std::ifstream f(fontPath, std::ios::binary);
-    if (!f) return atlas;
+    if (!f) {
+        spdlog::error("UIRenderer: font 2002_EYA.ttf not found — UI text will be blank");
+        return atlas;
+    }
     std::vector<unsigned char> data((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
     stbtt_fontinfo info;
     if (!stbtt_InitFont(&info, data.data(), 0)) return atlas;
