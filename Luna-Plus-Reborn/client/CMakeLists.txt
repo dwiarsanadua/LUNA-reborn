@@ -194,30 +194,43 @@ target_compile_definitions(LunaPlusClient PRIVATE
 )
 
 # ── Asset deployment ─────────────────────────────────────────────────────────
-# Create a symlink from bin/assets → <source>/assets so the client can find
-# assets via relative "./assets/" regardless of which dir it was launched from.
-# On Windows a symlink needs elevated permissions; use a directory junction
-# instead (cmake -E create_symlink on Windows creates a junction for dirs).
+# On macOS/Linux: create a symlink from bin/assets → <source>/assets so the
+# client can find assets via relative "./assets/".
+# On Windows: symlinks need elevated privileges, so we create an NTFS junction
+# via cmd /c mklink /J, falling back to a plain copy_directory if that fails.
 set(ASSET_SRC  "${CMAKE_SOURCE_DIR}/assets")
 set(ASSET_LINK "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/assets")
+set(SHADER_SRC  "${CMAKE_SOURCE_DIR}/shaders")
+set(SHADER_LINK "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders")
 
-if(NOT EXISTS "${ASSET_LINK}")
+if(WIN32)
+    # Windows: junction (no admin needed unlike symlink)
     add_custom_command(TARGET LunaPlusClient POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E create_symlink "${ASSET_SRC}" "${ASSET_LINK}"
-        COMMENT "Linking assets → ${ASSET_LINK}"
+        COMMAND if not exist "${ASSET_LINK}" (
+            cmd /c mklink /J "${ASSET_LINK}" "${ASSET_SRC}"
+            || ${CMAKE_COMMAND} -E copy_directory "${ASSET_SRC}" "${ASSET_LINK}"
+        )
+        COMMENT "Linking/copying assets → ${ASSET_LINK}"
         VERBATIM
     )
-endif()
-
-# Likewise for shaders: bin/shaders is already handled by ShaderCompile.cmake,
-# but ensure source shaders dir is also reachable for platforms where shaderc
-# isn't run at build time (the .bin files are pre-compiled in source tree).
-set(SHADER_SRC  "${CMAKE_SOURCE_DIR}/shaders")
-set(SHADER_LINK "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders_src")
-if(NOT EXISTS "${SHADER_LINK}")
+    add_custom_command(TARGET LunaPlusClient POST_BUILD
+        COMMAND if not exist "${SHADER_LINK}" (
+            cmd /c mklink /J "${SHADER_LINK}" "${SHADER_SRC}"
+            || ${CMAKE_COMMAND} -E copy_directory "${SHADER_SRC}" "${SHADER_LINK}"
+        )
+        COMMENT "Linking/copying shaders → ${SHADER_LINK}"
+        VERBATIM
+    )
+else()
+    # macOS / Linux: plain symlink — no privileges needed for directory symlinks
+    add_custom_command(TARGET LunaPlusClient POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E create_symlink "${ASSET_SRC}" "${ASSET_LINK}"
+        COMMENT "Symlinking assets → ${ASSET_LINK}"
+        VERBATIM
+    )
     add_custom_command(TARGET LunaPlusClient POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E create_symlink "${SHADER_SRC}" "${SHADER_LINK}"
-        COMMENT "Linking source shaders → ${SHADER_LINK}"
+        COMMENT "Symlinking shaders → ${SHADER_LINK}"
         VERBATIM
     )
 endif()
