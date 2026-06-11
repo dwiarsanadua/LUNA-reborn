@@ -84,12 +84,17 @@ static uint32_t HeightColor(float h, float hmin, float hmax) {
 
 bgfx::TextureHandle TerrainRenderer::LoadTileTexture(const std::string& name, int index) {
     (void)index;
-    std::string paths[] = {
-        VFS::Resolve("assets/textures/unpacked/map/" + name),
-        VFS::Resolve("assets/textures/unpacked/farm/" + name),
-        VFS::Resolve("assets/textures/" + name),
-        VFS::Resolve("assets_converted/mod_objs/" + name),
-    };
+    // Try VFS::Find first (searches all registered roots), then explicit fallbacks
+    std::vector<std::string> paths;
+    auto found = VFS::Find(name);
+    if (!found.empty()) paths.push_back(found);
+    // Concrete sub-directories where Luna terrain textures live after asset extraction
+    for (const char* sub : {"assets/textures/unpacked/map/", "assets/textures/unpacked/farm/",
+                             "assets/textures/unpacked/", "assets/textures/",
+                             "assets_converted/mod_objs/", "assets_converted/textures/"}) {
+        std::string p = VFS::Resolve(std::string(sub) + name);
+        if (!p.empty()) paths.push_back(p);
+    }
     for (auto& p : paths) {
         int w, h, n;
         unsigned char* d = stbi_load(p.c_str(), &w, &h, &n, 4);
@@ -281,7 +286,7 @@ void TerrainRenderer::Render(const glm::mat4& view, const glm::mat4& proj, const
     if (!bgfx::isValid(prog)) return;
 
     bgfx::setViewTransform(view_id_, &view, &proj);
-    bgfx::setViewClear(view_id_, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0xFF6688AA, 1.0f, 0);
+    bgfx::setViewClear(view_id_, BGFX_CLEAR_DEPTH, 0x0A0A14FF, 1.0f, 0);
     bgfx::setViewRect(view_id_, 0, 0, (uint16_t)width, (uint16_t)height);
 
     bgfx::setUniform(u_light_dir_, glm::value_ptr(env.light_dir));
@@ -397,8 +402,8 @@ void TerrainRenderer::Init(int size, float height_scale) {
     u_fog_data_  = bgfx::createUniform("u_fogData",  bgfx::UniformType::Vec4);
     u_fog_color_ = bgfx::createUniform("u_fogColor", bgfx::UniformType::Vec4);
 
-    uint32_t white = 0xffffffff;
-    white_tex_ = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::makeRef(&white, sizeof(white)));
+    uint32_t white_pixel = 0xffffffff;
+    white_tex_ = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::copy(&white_pixel, sizeof(white_pixel)));
     grass_tex_ = LoadTileTexture("01_farm_ground_lv1.png", 0);
     rock_tex_  = LoadTileTexture("19_ground_e0_01.png", 1);
     dirt_tex_  = LoadTileTexture("01_farm_ground_lv1.png", 2);

@@ -176,16 +176,16 @@ int main(int argc, char** argv) {
     sky.SetSampler(ui.GetSampler(), ui.GetWhiteTexture());
     ParticleRenderer particles; particles.Init();
 
-    // BGM will be played by screen manager when screen is active
-    // if (g_audio) {
-    //     std::string bgm_path = Paths::Asset("audio/BGM/BGM_Login.mp3");
-    //     struct stat bgm_stat;
-    //     if (::stat(bgm_path.c_str(), &bgm_stat) == 0) {
-    //         audio.PlayBGM("BGM_Login");
-    //     } else {
-    //         spdlog::warn("BGM: login BGM not found at {}", bgm_path);
-    //     }
-    // }
+    // Play login BGM if the file exists (no crash if missing)
+    if (g_audio) {
+        std::string bgm_path = Paths::Asset("audio/BGM/BGM_Login.mp3");
+        struct stat bgm_stat;
+        if (::stat(bgm_path.c_str(), &bgm_stat) == 0) {
+            audio.PlayBGM("BGM_Login");
+        } else {
+            spdlog::warn("BGM: login BGM not found at {} — skipping", bgm_path);
+        }
+    }
 
     AmbientSystem ambient;
     ambient.Init();
