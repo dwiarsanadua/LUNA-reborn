@@ -1,4 +1,6 @@
 #include "NavMeshSystem.hpp"
+#include <functional>
+#include <queue>
 #include <algorithm>
 #include <cmath>
 #include <queue>

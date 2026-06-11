@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.30)
+cmake_minimum_required(VERSION 3.25)
 
 if(APPLE)
     execute_process(COMMAND xcrun --show-sdk-path
@@ -38,9 +38,20 @@ find_package(glm REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(fmt REQUIRED)
 find_package(SQLite3 REQUIRED)
+# Some configs export SQLite::SQLite3 (CMake module), others SQLite3::SQLite3
+# (Homebrew/vcpkg config). Provide both names.
+if(TARGET SQLite::SQLite3 AND NOT TARGET SQLite3::SQLite3)
+    add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
+elseif(TARGET SQLite3::SQLite3 AND NOT TARGET SQLite::SQLite3)
+    add_library(SQLite::SQLite3 ALIAS SQLite3::SQLite3)
+endif()
 find_package(Freetype REQUIRED)
 find_package(EnTT REQUIRED)
-find_package(flatbuffers REQUIRED)
+# Homebrew/vcpkg ship "flatbuffers", Debian/Ubuntu ship "FlatBuffers"
+find_package(flatbuffers QUIET)
+if(NOT flatbuffers_FOUND)
+    find_package(FlatBuffers REQUIRED)
+endif()
 find_package(assimp REQUIRED)
 find_package(BZip2 REQUIRED)
 
@@ -53,22 +64,40 @@ target_include_directories(luna_bspatch PUBLIC
 target_link_libraries(luna_bspatch PUBLIC BZip2::BZip2)
 
 # Asio networking library
-find_path(ASIO_INCLUDE_DIR asio.hpp PATHS /opt/homebrew/include /usr/local/include /usr/include)
+set(ASIO_SEARCH_PATHS /usr/local/include /usr/include)
+if(APPLE)
+    list(PREPEND ASIO_SEARCH_PATHS /opt/homebrew/include)
+elseif(WIN32 AND DEFINED ENV{VCPKG_ROOT})
+    list(PREPEND ASIO_SEARCH_PATHS "$ENV{VCPKG_ROOT}/installed/x64-windows/include")
+endif()
+find_path(ASIO_INCLUDE_DIR asio.hpp PATHS ${ASIO_SEARCH_PATHS})
 if(ASIO_INCLUDE_DIR)
     add_library(asio::asio INTERFACE IMPORTED)
     set_target_properties(asio::asio PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${ASIO_INCLUDE_DIR}"
     )
     message(STATUS "Found asio: ${ASIO_INCLUDE_DIR}")
-else()
+elseif(APPLE)
     message(FATAL_ERROR "asio not found. Install with: brew install asio")
+elseif(WIN32)
+    message(FATAL_ERROR "asio not found. Install with: vcpkg install asio:x64-windows")
+else()
+    message(FATAL_ERROR "asio not found. Install with: apt install libasio-dev")
 endif()
 
 # sol2 Lua scripting (optional)
 find_package(sol2 QUIET)
 if(NOT sol2_FOUND)
-    message(WARNING "sol2 not found. Scripting engine disabled. Install with: brew install sol2")
+    # Header-only fallback: look for sol/sol.hpp directly
+    find_path(SOL2_INCLUDE_DIR sol/sol.hpp PATHS /opt/homebrew/include /usr/local/include /usr/include)
     add_library(sol2::sol2 INTERFACE IMPORTED)
+    if(SOL2_INCLUDE_DIR)
+        set_target_properties(sol2::sol2 PROPERTIES
+            INTERFACE_INCLUDE_DIRECTORIES "${SOL2_INCLUDE_DIR}")
+        message(STATUS "Found sol2 headers: ${SOL2_INCLUDE_DIR}")
+    else()
+        message(WARNING "sol2 not found. Scripting engine disabled. Install with: brew install sol2 (or vcpkg install sol2)")
+    endif()
 endif()
 
 # Jolt Physics (optional)

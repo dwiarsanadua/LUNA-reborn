@@ -37,6 +37,7 @@
 #include <Vehicle_generated.h>
 #include <PacketType_generated.h>
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <spdlog/spdlog.h>
 #include <cstdio>
@@ -613,7 +614,11 @@ bool GameScreen::IsDialogOpen(const std::string& name) const {
 
 bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
     (void)scancode; (void)mods;
-    if (action != 1) return true;
+    // Accept PRESS and REPEAT for movement keys so holding WASD keeps moving;
+    // everything else fires on PRESS only.
+    bool is_move_key = key == 87 || key == 83 || key == 65 || key == 68 ||
+                       (key >= 262 && key <= 265);
+    if (action != 1 && !(action == 2 && is_move_key)) return true;
 
     // Dialog hotkeys (Old-style mapping: I K Q C M P G T R)
     switch (key) {
@@ -626,7 +631,7 @@ bool GameScreen::HandleKey(int key, int scancode, int action, int mods) {
         case 71:  ToggleDialog("guild"); return true;
         case 84:  ToggleDialog("pet"); return true;
         case 82:  ToggleDialog("mount"); return true;
-        case 87:  ToggleDialog("weather"); return true;
+        case 293: ToggleDialog("weather"); return true; // F4 (W is movement)
         default: break;
     }
 
@@ -2242,6 +2247,9 @@ void GameScreen::Update(float dt) {
             minimap_dlg_.AddEntity(m.GetID(), m.GetX(), m.GetZ(), 0xffff6633, 4.0f);
     }
 
+    if (state_->click_marker_time > 0.0f)
+        state_->click_marker_time = std::max(0.0f, state_->click_marker_time - dt);
+
     for (auto& df : state_->damage_floats) df.life -= dt;
     state_->damage_floats.erase(
         std::remove_if(state_->damage_floats.begin(), state_->damage_floats.end(),
@@ -2379,13 +2387,14 @@ void GameScreen::DoCombat(float dt) {
         return;
     }
 
-    // Global cooldown between attacks (1.0s)
+    // Old Luna auto-attack cadence: 1.2s per swing, damage lands mid-swing
+    // (0.7s wind-up) followed by a short 0.3s recovery lock.
     state_->combat_timer += dt;
-    if (state_->combat_timer < 1.0f) return;
+    if (state_->combat_timer < 1.2f) return;
     state_->combat_timer = 0;
 
-    state_->combat_cast_time = 0.3f;
-    state_->combat_anim_lock = 0.8f;
+    state_->combat_cast_time = 0.7f;
+    state_->combat_anim_lock = 0.3f;
     CharRenderer_Move(0, hero_.GetX(), hero_.GetY(), hero_.GetZ(), false, CharAnim::Attack);
 
     // Drain weapon durability on attack
@@ -2437,7 +2446,9 @@ void GameScreen::DoCombat(float dt) {
                     if (item.id == drop.id) { item.count += drop.count; drop.count = 0; break; }
                 }
                 if (drop.count > 0) state_->inventory.push_back(drop);
-                state_->battle_delay_timer = 10.0f;
+                // Short out-of-combat beat after a kill (Old felt ~2s, the
+                // previous 10s froze the player and read as a hang)
+                state_->battle_delay_timer = 2.0f;
                 state_->chat_messages.push_back(m.GetName() + " defeated! +" + std::to_string(xpGain) + " XP");
                 effect_mgr_.SpawnBillboard(m.GetX(), m.GetY() + 2.0f, m.GetZ(), 0xFFFFD700, 24, 1.5f);
                 if (m.IsBoss()) {
@@ -2546,6 +2557,9 @@ void GameScreen::Render(UIRenderer& ui) {
 
 void GameScreen::Render(UIRenderer& ui, const glm::mat4& view, const glm::mat4& proj) {
     // 3D world + sky rendered in main.cpp before this call.
+    last_view_ = view;
+    last_proj_ = proj;
+    have_camera_matrices_ = true;
     std::vector<glm::vec3> ppos;
     std::vector<uint32_t> pcol;
     std::vector<float> psiz;
@@ -2593,15 +2607,19 @@ void GameScreen::RenderUI(UIRenderer& ui) {
         }
     }
 
-    // Target frame
+    // Target frame — Old Luna places it top-center under the hero plate
     if (state_->target_entity >= 0) {
         for (auto& m : monsters_) {
             if ((int32_t)m.GetID() == state_->target_entity) {
-                ui.DrawWindow(10, 115, 240, 75, "TARGET", {80, 30, 30, 200});
-                ui.DrawText(18, 135, 0xffffffff, "%s  Lv.%d", m.GetName().c_str(), m.GetLevel());
+                float tf_w = 260, tf_x = (lw - tf_w) * 0.5f, tf_y = 8;
+                ui.DrawRect(tf_x, tf_y, tf_w, 46, {20, 14, 14, 210});
+                ui.DrawBorder(tf_x, tf_y, tf_w, 46, {200, 90, 90, 180});
+                const char* type_tag = m.IsBoss() ? "[Boss] " : "";
+                ui.DrawText(tf_x + 8, tf_y + 4, m.IsBoss() ? 0xff5555ff : 0xffffffff,
+                            "%s%s  Lv.%d", type_tag, m.GetName().c_str(), m.GetLevel());
                 float hp = (float)m.GetHP() / std::max(1, m.GetMaxHP());
-                ui.DrawBar(18, 155, 220, 16, hp, {255, 60, 60, 255}, {60, 0, 0, 180});
-                ui.DrawText(20, 155, 0xffffffff, "%d/%d", m.GetHP(), m.GetMaxHP());
+                ui.DrawBar(tf_x + 8, tf_y + 24, tf_w - 16, 14, hp, {255, 60, 60, 255}, {60, 0, 0, 180});
+                ui.DrawText(tf_x + 12, tf_y + 24, 0xffffffff, "%d/%d", m.GetHP(), m.GetMaxHP());
                 break;
             }
         }
@@ -2624,12 +2642,24 @@ void GameScreen::RenderUI(UIRenderer& ui) {
     
     if (bgfx::isValid(mmTex.handle)) {
         ui.DrawImage(mm_x, mm_y, mm_size, mm_size, mmTex.handle);
-        ui.DrawBorder(mm_x, mm_y, mm_size, mm_size, {100, 180, 255, 150});
     } else {
         ui.DrawRect(mm_x, mm_y, mm_size, mm_size, {20, 30, 50, 220});
-        ui.DrawBorder(mm_x, mm_y, mm_size, mm_size, {100, 180, 255, 150});
         ui.DrawText(mm_x + 4, mm_y + 2, 0x88ffffff, "MINIMAP");
     }
+    // Old-style double frame + gold corner ticks and N compass mark
+    ui.DrawBorder(mm_x - 1, mm_y - 1, mm_size + 2, mm_size + 2, {10, 12, 24, 220}, 1);
+    ui.DrawBorder(mm_x, mm_y, mm_size, mm_size, {100, 180, 255, 170}, 1);
+    ui.DrawRect(mm_x, mm_y, 10, 2, {212, 175, 96, 230});
+    ui.DrawRect(mm_x, mm_y, 2, 10, {212, 175, 96, 230});
+    ui.DrawRect(mm_x + mm_size - 10, mm_y, 10, 2, {212, 175, 96, 230});
+    ui.DrawRect(mm_x + mm_size - 2, mm_y, 2, 10, {212, 175, 96, 230});
+    ui.DrawRect(mm_x, mm_y + mm_size - 2, 10, 2, {212, 175, 96, 230});
+    ui.DrawRect(mm_x, mm_y + mm_size - 10, 2, 10, {212, 175, 96, 230});
+    ui.DrawRect(mm_x + mm_size - 10, mm_y + mm_size - 2, 10, 2, {212, 175, 96, 230});
+    ui.DrawRect(mm_x + mm_size - 2, mm_y + mm_size - 10, 2, 10, {212, 175, 96, 230});
+    ui.DrawText(mm_cx - 4, mm_y + 3, 0xffffd780, "N");
+    // Map name label under the minimap
+    ui.DrawText(mm_x + 4, mm_y + mm_size + 4, 0xffd0d8ff, "Map %u", state_->map_id ? state_->map_id : 51);
     
     float mm_scale = 3.0f;
     // Player dot (center, green)
@@ -2643,8 +2673,28 @@ void GameScreen::RenderUI(UIRenderer& ui) {
         ui.DrawRect(mm_cx + dx - 2, mm_cy + dz - 2, 4, 4, isBoss ? UIColor{255,50,50,255} : UIColor{255,100,50,200});
     }
 
-    // === Effects ===
-    effect_mgr_.Render(ui, glm::mat4(1), glm::mat4(1));
+    // === Click-to-move destination marker (Old Luna ground ring) ===
+    if (state_->click_marker_time > 0.0f && have_camera_matrices_) {
+        float gy = terrain_ ? terrain_->GetHeight(state_->click_marker_x, state_->click_marker_z) : state_->player_y;
+        glm::vec4 clip = last_proj_ * last_view_ *
+            glm::vec4(state_->click_marker_x, gy + 0.05f, state_->click_marker_z, 1.0f);
+        if (clip.w > 0.0f) {
+            float sx = (clip.x / clip.w * 0.5f + 0.5f) * lw;
+            float sy = (1.0f - (clip.y / clip.w * 0.5f + 0.5f)) * lh;
+            float t = state_->click_marker_time;            // 1 → 0
+            float ring = 14.0f + (1.0f - t) * 10.0f;        // expands as it fades
+            uint8_t a = (uint8_t)(200 * t);
+            ui.DrawBorder(sx - ring * 0.5f, sy - ring * 0.25f, ring, ring * 0.5f,
+                          {120, 255, 120, a}, 2.0f);
+            ui.DrawRect(sx - 2, sy - 1, 4, 2, {180, 255, 180, a});
+        }
+    }
+
+    // === Effects (damage numbers projected with the real camera) ===
+    if (have_camera_matrices_)
+        effect_mgr_.Render(ui, last_view_, last_proj_);
+    else
+        effect_mgr_.Render(ui, glm::mat4(1), glm::mat4(1));
 
     if (!legacy_hud_.IsActive())
         chat_panel_.Render(ui, state_);
@@ -2654,20 +2704,28 @@ void GameScreen::RenderUI(UIRenderer& ui) {
     {
         float hb_y = lh - 50.0f, hb_s = 40, hb_p = 4;
         float hb_x = (lw - (10 * (hb_s + hb_p))) / 2;
+        // Backplate strip behind the slots (Old quickbar plate)
+        ui.DrawRect(hb_x - 6, hb_y - 4, 10 * (hb_s + hb_p) + 8, hb_s + 12, {12, 14, 28, 190});
+        ui.DrawBorder(hb_x - 6, hb_y - 4, 10 * (hb_s + hb_p) + 8, hb_s + 12, {90, 120, 170, 140});
         for (int s = 0; s < 10; s++) {
             float sx = hb_x + s * (hb_s + hb_p);
             bool has_skill = state_->hotbar_skills[s] != 0;
             ui.DrawRect(sx, hb_y, hb_s, hb_s, has_skill ? UIColor{40, 40, 70, 220} : UIColor{30, 30, 50, 200});
-            ui.DrawBorder(sx, hb_y, hb_s, hb_s, {100, 100, 150, 150});
-            char buf[8]; snprintf(buf, 8, "%d", (s + 1) % 10);
-            ui.DrawText(sx + 12, hb_y + 24, 0xffcccccc, "%s", buf);
+            // Beveled slot frame
+            ui.DrawBorder(sx, hb_y, hb_s, hb_s, {16, 20, 36, 220}, 1);
+            ui.DrawBorder(sx + 1, hb_y + 1, hb_s - 2, hb_s - 2, {120, 150, 200, 150}, 1);
             if (has_skill) {
                 ui.DrawText(sx + 4, hb_y + 4, 0xff88ccff, "%u", state_->hotbar_skills[s]);
             }
             if (state_->hotbar_cooldowns[s] > 0.0f) {
-                float pct = state_->hotbar_cooldowns[s] / 2.5f;
-                ui.DrawRect(sx, hb_y, hb_s, hb_s * pct, {0, 0, 0, 170});
+                float pct = std::min(1.0f, state_->hotbar_cooldowns[s] / 2.5f);
+                // Bottom-up dark sweep + remaining seconds, like Old cooldown
+                ui.DrawRect(sx, hb_y + hb_s * (1.0f - pct), hb_s, hb_s * pct, {0, 0, 0, 170});
+                ui.DrawText(sx + 12, hb_y + 12, 0xffffe080, "%.0f", ceilf(state_->hotbar_cooldowns[s]));
             }
+            // Keybind number in the corner (Old shows it bottom-right)
+            char buf[8]; snprintf(buf, 8, "%d", (s + 1) % 10);
+            ui.DrawText(sx + hb_s - 12, hb_y + hb_s - 16, 0xffcccccc, "%s", buf);
         }
     }
     }
@@ -2702,7 +2760,9 @@ void GameScreen::RenderUI(UIRenderer& ui) {
 
     // === Monster overhead rendering ===
     for (auto& m : monsters_) {
-        if (m.IsAlive()) m.RenderOverhead(ui);
+        if (!m.IsAlive()) continue;
+        if (have_camera_matrices_) m.RenderOverhead(ui, &last_view_, &last_proj_);
+        else m.RenderOverhead(ui);
     }
     pet_.RenderOverhead(ui);
 

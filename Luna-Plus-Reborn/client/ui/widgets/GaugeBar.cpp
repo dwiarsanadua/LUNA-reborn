@@ -22,7 +22,10 @@ void GaugeBar::Render(UIRenderer& ui) {
             return;
         }
     }
-    ui.DrawRect(x_, y_, w_, h_, {40, 40, 40, 200});
-    ui.DrawRect(x_, y_, fill_w, h_, {200, 60, 60, 255});
+    // Fallback: filled bar with a top gloss highlight (Old gauge look)
+    ui.DrawRect(x_, y_, w_, h_, {30, 30, 36, 210});
+    ui.DrawRect(x_, y_, fill_w, h_, fill_color_);
+    if (fill_w > 0)
+        ui.DrawRect(x_, y_, fill_w, h_ * 0.4f, {255, 255, 255, 60});
     ui.DrawBorder(x_, y_, w_, h_, {0, 0, 0, 180});
 }

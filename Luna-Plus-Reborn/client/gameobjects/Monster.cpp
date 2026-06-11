@@ -265,11 +265,20 @@ void Monster::UpdateBossPhases() {
     }
 }
 
-void Monster::RenderOverhead(UIRenderer& ui) {
+void Monster::RenderOverhead(UIRenderer& ui, const glm::mat4* view, const glm::mat4* proj) {
     if (!alive_) return;
-    float sx = (x_ * 12.0f + 640.0f) - 25;
-    float sy = (z_ * 12.0f + 360.0f) - 50;
-    if (sx < -50 || sx > 1330 || sy < -50 || sy > 770) return;
+    float sx, sy;
+    if (view && proj) {
+        // Project nameplate anchor (above the head) with the real camera
+        glm::vec4 clip = (*proj) * (*view) * glm::vec4(x_, y_ + 2.2f, z_, 1.0f);
+        if (clip.w <= 0.0f) return; // behind camera
+        sx = (clip.x / clip.w * 0.5f + 0.5f) * ui.logicalWidth - 25;
+        sy = (1.0f - (clip.y / clip.w * 0.5f + 0.5f)) * ui.logicalHeight - 20;
+    } else {
+        sx = (x_ * 12.0f + 640.0f) - 25;
+        sy = (z_ * 12.0f + 360.0f) - 50;
+    }
+    if (sx < -50 || sx > ui.logicalWidth + 50 || sy < -50 || sy > ui.logicalHeight + 50) return;
     
     float hp_pct = (float)hp_ / std::max(1, max_hp_);
     UIColor bar_color = {60, 200, 60, 200};

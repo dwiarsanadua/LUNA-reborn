@@ -9,9 +9,11 @@ public:
     float GetProgress() const { return progress_; }
     void SetPieceImage(const UiScriptUV& uv) { piece_uv_ = uv; }
     void SetGaugeWidth(float w) { gauge_width_ = w; }
+    void SetFillColor(UIColor c) { fill_color_ = c; }
     void Render(UIRenderer& ui) override;
 private:
     float progress_ = 1.0f;
     float gauge_width_ = 100.0f;
     UiScriptUV piece_uv_{-1, 0, 0, 0, 0};
+    UIColor fill_color_{200, 60, 60, 255};
 };

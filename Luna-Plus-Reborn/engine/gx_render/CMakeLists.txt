@@ -12,8 +12,10 @@ add_library(gx_render STATIC
 target_include_directories(gx_render PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include/external
-    /opt/homebrew/include
 )
+if(APPLE)
+    target_include_directories(gx_render PUBLIC /opt/homebrew/include)
+endif()
 
 target_link_libraries(gx_render PUBLIC
     luna_compile_options

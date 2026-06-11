@@ -12,9 +12,9 @@ struct Camera {
     float fov = 45.0f;
     float near_plane = 0.1f;
     float far_plane = 500.0f;
-    float min_distance = 20.0f;
-    float max_distance = 200.0f;
-    float zoom_speed = 5.0f;
+    float min_distance = 18.0f;
+    float max_distance = 160.0f;
+    float zoom_speed = 6.0f;
     int view_width = 1280;
     int view_height = 720;
 

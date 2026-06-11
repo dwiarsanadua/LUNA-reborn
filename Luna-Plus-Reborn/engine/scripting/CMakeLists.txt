@@ -27,8 +27,11 @@ if(LUAJIT_LIBRARY AND LUAJIT_INCLUDE_DIR)
     target_compile_definitions(gx_scripting PUBLIC LUNA_HAS_LUA=1 LUNA_LUA_JIT=1 SOL_LUAJIT=1)
     message(STATUS "gx_scripting: using LuaJIT")
 else()
-    find_library(LUA_LIBRARY NAMES lua lua5.4 lua5.5 PATHS /opt/homebrew/lib /usr/local/lib)
-    find_path(LUA_INCLUDE_DIR lua.h PATHS /opt/homebrew/include /opt/homebrew/include/lua /usr/local/include)
+    find_library(LUA_LIBRARY NAMES lua lua5.4 lua5.5
+        PATHS /opt/homebrew/lib /usr/local/lib /usr/lib /usr/lib/x86_64-linux-gnu)
+    find_path(LUA_INCLUDE_DIR lua.h
+        PATHS /opt/homebrew/include /opt/homebrew/include/lua /usr/local/include
+              /usr/include/lua5.4 /usr/include/lua5.3 /usr/include)
     if(LUA_LIBRARY AND LUA_INCLUDE_DIR)
         target_include_directories(gx_scripting PRIVATE ${LUA_INCLUDE_DIR})
         target_link_libraries(gx_scripting PUBLIC ${LUA_LIBRARY})
