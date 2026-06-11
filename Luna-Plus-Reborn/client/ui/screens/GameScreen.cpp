@@ -1311,6 +1311,8 @@ bool GameScreen::HandleChar(unsigned int codepoint) {
 
 void GameScreen::InitializeWorld() {
     std::string player_model = VFS::Find("assets/models/character/d_man.glb");
+    if (player_model.empty()) player_model = VFS::Find("assets/models/prop/d_man.glb");
+    if (player_model.empty()) player_model = VFS::Find("assets_converted/mod_objs/d_man.glb");
     if (player_model.empty()) player_model = "assets/models/d_man.glb";
     CharRenderer_Spawn(0, player_model, state_->player_x, state_->player_y, state_->player_z, 0xffffffff);
     hero_.Init(state_, audio_);

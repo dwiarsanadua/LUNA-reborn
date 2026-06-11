@@ -1,4 +1,5 @@
 #include "CostumeDialog.hpp"
+#include <engine/gx_render/VFS.h>
 #include <cstdio>
 
 void CostumeDialog::Open(GameState* state, WindowManager* wm, CostumeSystem* cs) {
@@ -37,8 +38,11 @@ void CostumeDialog::Open(GameState* state, WindowManager* wm, CostumeSystem* cs)
     apply_btn->SetColors({40,60,100,220}, {80,100,160,220}, {30,40,70,220});
     apply_btn->OnEvent([this](const UIEvent& e) {
         if (e.type == UIEvent::Click && costume_) {
-            costume_->EquipItem(EquipSlot::Weapon, 1001, "assets/models/d_man.glb");
-            costume_->EquipItem(EquipSlot::Armor, 1002, "assets/models/d_man.glb");
+            std::string dman = VFS::Find("assets/models/prop/d_man.glb");
+            if (dman.empty()) dman = VFS::Find("assets/models/character/d_man.glb");
+            if (dman.empty()) dman = "assets/models/d_man.glb";
+            costume_->EquipItem(EquipSlot::Weapon, 1001, dman);
+            costume_->EquipItem(EquipSlot::Armor, 1002, dman);
             costume_->ApplyFashion(EquipSlot::FashionHead, "assets/models/n030.glb");
             Refresh();
         }
