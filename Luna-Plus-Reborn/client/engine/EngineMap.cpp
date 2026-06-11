@@ -141,12 +141,16 @@ bool EngineMap::Load(const std::string& map_id) {
         spdlog::info("EngineMap: procedural terrain for map {}", map_id);
     }
     
+extern class CharacterRenderer* g_char_renderer;
+
+// ...
+
     std::string json_path = VFS::Find("assets/maps/" + map_id + ".json");
     LoadSceneObjects(json_path);
     
     // SceneLoader: additional scene object loading with proper JSON parsing
     auto scene = SceneLoader::Load(json_path);
-    SceneLoader::Instantiate(scene);
+    SceneLoader::Instantiate(scene, g_char_renderer);
     
     // Parse environment data from JSON
     std::ifstream jf(json_path);
@@ -318,16 +322,27 @@ void EngineMap::LoadSceneObjects(const std::string& json_path) {
 
         // Try .glb first, then .obj, then .mod
         auto tryLoad = [&](const std::string& ext) -> bool {
-            std::string fname = VFS::Resolve("assets/models/" + modLower + ext);
-            std::ifstream test(fname);
-            if (test.good()) {
-                test.close();
-                int mesh_idx = props_->LoadObj(fname);
-                if (mesh_idx >= 0) {
-                    float avgScale = (sx + sy + sz) / 3.0f * 0.005f;
-                    props_->AddInstance(mesh_idx, {px * 0.0001f, py * 0.0001f, pz * 0.0001f}, avgScale);
+            std::string variations[] = {
+                "assets_converted/mod_objs/[r]" + modLower + ext,
+                "assets_converted/mod_objs/" + modLower + ext,
+                "assets/models/" + modLower + ext,
+                "assets/models/map/" + modLower + ext,
+                modLower + ext
+            };
+            
+            for (const auto& rel : variations) {
+                std::string fname = VFS::Resolve(rel);
+                if (fname.empty()) continue;
+                std::ifstream test(fname);
+                if (test.good()) {
+                    test.close();
+                    int mesh_idx = props_->LoadObj(fname);
+                    if (mesh_idx >= 0) {
+                        float avgScale = (sx + sy + sz) / 3.0f * 0.005f;
+                        props_->AddInstance(mesh_idx, {px * 0.0001f, py * 0.0001f, pz * 0.0001f}, avgScale);
+                    }
+                    return true;
                 }
-                return true;
             }
             return false;
         };

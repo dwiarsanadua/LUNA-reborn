@@ -39,6 +39,7 @@ add_executable(LunaPlusClient
     ui/UiTooltip.cpp
     util/ScreenshotCapture.cpp
     ui/screens/LoginScreen.cpp
+    ui/screens/LauncherScreen.cpp
     ui/screens/CharSelectScreen.cpp
     ui/screens/LoadingScreen.cpp
     ui/screens/GameScreen.cpp

@@ -23,7 +23,7 @@ void WorldRenderer::Init() {
 
     uint32_t white = 0xffffffff;
     white_tex_ = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0,
-                                        bgfx::makeRef(&white, sizeof(white)));
+                                        bgfx::copy(&white, sizeof(white)));
     
     CreateGroundGrid(grid_size_);
     CreatePlayerCube();

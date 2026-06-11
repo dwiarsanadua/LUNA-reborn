@@ -281,8 +281,8 @@ void TerrainRenderer::Render(const glm::mat4& view, const glm::mat4& proj, const
     if (!bgfx::isValid(prog)) return;
 
     bgfx::setViewTransform(view_id_, &view, &proj);
-    bgfx::setViewClear(view_id_, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0xFF6688AA, 1.0f, 0);
-    bgfx::setViewRect(view_id_, 0, 0, (uint16_t)width, (uint16_t)height);
+    // Terrain should NOT clear color, just depth so it layers correctly over sky
+    bgfx::setViewClear(view_id_, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
 
     bgfx::setUniform(u_light_dir_, glm::value_ptr(env.light_dir));
     bgfx::setUniform(u_fog_data_,  glm::value_ptr(env.fog_data));
@@ -384,24 +384,28 @@ void TerrainRenderer::RenderShadow(bgfx::ViewId view_id, const glm::mat4& light_
 
 void TerrainRenderer::Init(int size, float height_scale) {
     size_ = size; height_scale_ = height_scale;
-    terrain_program_ = ShaderUtils::LoadProgram("shaders/vs_terrain.bin", "shaders/fs_terrain.bin");
-    shadow_program_ = ShaderUtils::LoadProgram("shaders/vs_default.bin", "shaders/fs_unlit.bin");
+    
+    if (!bgfx::isValid(terrain_program_)) {
+        terrain_program_ = ShaderUtils::LoadProgram("shaders/vs_terrain.bin", "shaders/fs_terrain.bin");
+        shadow_program_ = ShaderUtils::LoadProgram("shaders/vs_default.bin", "shaders/fs_unlit.bin");
 
-    s_tex_color_ = bgfx::createUniform("s_texColor", bgfx::UniformType::Sampler);
-    s_tex_grass_ = bgfx::createUniform("s_texGrass", bgfx::UniformType::Sampler);
-    s_tex_rock_  = bgfx::createUniform("s_texRock",  bgfx::UniformType::Sampler);
-    s_tex_dirt_  = bgfx::createUniform("s_texDirt",  bgfx::UniformType::Sampler);
-    u_shadow_map_ = bgfx::createUniform("u_shadowMap", bgfx::UniformType::Sampler);
-    u_shadow_mvp_ = bgfx::createUniform("u_shadowMVP", bgfx::UniformType::Mat4);
-    u_light_dir_ = bgfx::createUniform("u_lightDir", bgfx::UniformType::Vec4);
-    u_fog_data_  = bgfx::createUniform("u_fogData",  bgfx::UniformType::Vec4);
-    u_fog_color_ = bgfx::createUniform("u_fogColor", bgfx::UniformType::Vec4);
+        s_tex_color_ = bgfx::createUniform("s_texColor", bgfx::UniformType::Sampler);
+        s_tex_grass_ = bgfx::createUniform("s_texGrass", bgfx::UniformType::Sampler);
+        s_tex_rock_  = bgfx::createUniform("s_texRock",  bgfx::UniformType::Sampler);
+        s_tex_dirt_  = bgfx::createUniform("s_texDirt",  bgfx::UniformType::Sampler);
+        u_shadow_map_ = bgfx::createUniform("u_shadowMap", bgfx::UniformType::Sampler);
+        u_shadow_mvp_ = bgfx::createUniform("u_shadowMVP", bgfx::UniformType::Mat4);
+        u_light_dir_ = bgfx::createUniform("u_lightDir", bgfx::UniformType::Vec4);
+        u_fog_data_  = bgfx::createUniform("u_fogData",  bgfx::UniformType::Vec4);
+        u_fog_color_ = bgfx::createUniform("u_fogColor", bgfx::UniformType::Vec4);
 
-    uint32_t white = 0xffffffff;
-    white_tex_ = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::makeRef(&white, sizeof(white)));
-    grass_tex_ = LoadTileTexture("01_farm_ground_lv1.png", 0);
-    rock_tex_  = LoadTileTexture("19_ground_e0_01.png", 1);
-    dirt_tex_  = LoadTileTexture("01_farm_ground_lv1.png", 2);
+        uint32_t white = 0xffffffff;
+        white_tex_ = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::copy(&white, sizeof(white)));
+        grass_tex_ = LoadTileTexture("01_farm_ground_lv1.png", 0);
+        rock_tex_  = LoadTileTexture("19_ground_e0_01.png", 1);
+        dirt_tex_  = LoadTileTexture("01_farm_ground_lv1.png", 2);
+    }
+    
     BuildPatches();
 }
 

@@ -13,9 +13,10 @@
 
 class GraphicEngine {
 public:
-    void Init(uint16_t fb_width = 1280, uint16_t fb_height = 720);
-    void BeginFrame(const glm::mat4& view, const glm::mat4& proj);
+    void Init(uint16_t fb_width, uint16_t fb_height);
+    void BeginFrame(const glm::mat4& view, const glm::mat4& proj, uint16_t width, uint16_t height);
     void Render(TerrainRenderer* terrain, PropRenderer* props, WorldRenderer* world,
+
                 const glm::mat4& view, const glm::mat4& proj,
                 const glm::vec3& light_dir = glm::vec3(0.5f, -0.8f, -0.3f));
     void RenderCharacters(float time, const glm::mat4& view, const glm::mat4& proj);

@@ -41,6 +41,7 @@ public:
 
     using EventCallback = std::function<void(const UIEvent&)>;
     void OnEvent(EventCallback cb) { callback_ = cb; }
+    bool HasEvent() const { return (bool)callback_; }
     void SetUserData(void* data) { userdata_ = data; }
     void* GetUserData() const { return userdata_; }
     void SetTooltip(const std::string& t) { tooltip_ = t; }

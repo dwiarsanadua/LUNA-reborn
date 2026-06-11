@@ -32,7 +32,6 @@ static bgfx::VertexLayout getLayout() {
 }
 
 void UIRenderer::BeginFrame() {
-    // Flush whatever was left over from last frame, then reset state
     FlushBatch();
     batch_verts_.clear();
     batch_indices_.clear();
@@ -40,10 +39,13 @@ void UIRenderer::BeginFrame() {
     atlas_bind_count_ = 0;
     scissor_stack_.clear();
 
-    // Set up the UI view with an identity transform — vertices are in NDC already
+    // Use explicit physical dimensions for UI viewport
     bgfx::setViewRect(view_id_, 0, 0, (uint16_t)width, (uint16_t)height);
-    bgfx::setViewClear(view_id_, BGFX_CLEAR_NONE); // don't wipe the 3D scene behind UI
     bgfx::setViewMode(view_id_, bgfx::ViewMode::Sequential);
+    
+    // UI should NOT clear the color buffer, otherwise it wipes the 3D scene
+    bgfx::setViewClear(view_id_, BGFX_CLEAR_DEPTH | BGFX_CLEAR_STENCIL, 0, 1.0f, 0);
+    
     float identity[16]; std::memset(identity, 0, sizeof(identity));
     identity[0] = identity[5] = identity[10] = identity[15] = 1.0f;
     bgfx::setViewTransform(view_id_, identity, identity);
@@ -71,14 +73,16 @@ void UIRenderer::FlushBatch() {
         bgfx::setVertexBuffer(0, &tvb);
         bgfx::setIndexBuffer(&tib);
 
-        // UI must not depth-test against the 3D scene.  Use write+no-depth only.
-        uint64_t state = BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_BLEND_ALPHA;
+        uint64_t state = BGFX_STATE_DEFAULT | BGFX_STATE_BLEND_ALPHA;
         if (!scissor_stack_.empty()) {
             const auto& s = scissor_stack_.back();
-            uint16_t px = (uint16_t)(s.x / logicalWidth * width);
-            uint16_t py = (uint16_t)(s.y / logicalHeight * height);
-            uint16_t pw = (uint16_t)(s.w / logicalWidth * width);
-            uint16_t ph = (uint16_t)(s.h / logicalHeight * height);
+            // Scale scissor to physical pixels
+            float scaleX = width / logicalWidth;
+            float scaleY = height / logicalHeight;
+            uint16_t px = (uint16_t)(s.x * scaleX);
+            uint16_t py = (uint16_t)(s.y * scaleY);
+            uint16_t pw = (uint16_t)(s.w * scaleX);
+            uint16_t ph = (uint16_t)(s.h * scaleY);
             bgfx::setScissor(px, py, pw, ph);
         }
         bgfx::setState(state);
@@ -240,7 +244,8 @@ bool UIRenderer::LoadCjkFont(const std::string& font_path, float size) {
 
     if (bgfx::isValid(base.tex)) bgfx::destroy(base.tex);
     base.tex = bgfx::createTexture2D((uint16_t)aw, (uint16_t)ah, false, 1,
-        bgfx::TextureFormat::RGBA8, 0, bgfx::copy(rgba.data(), (uint32_t)rgba.size()));
+        bgfx::TextureFormat::RGBA8, BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT,
+        bgfx::copy(rgba.data(), (uint32_t)rgba.size()));
 
     base.glyphs.resize(total_count);
     for (int i = 0; i < total_count; i++) {
@@ -279,9 +284,9 @@ void UIRenderer::SetLanguage(const std::string& lang) {
 
     if (lang == "ko" || lang == "kr") {
         std::string fontPaths[] = {
-            VFS::Resolve("assets/fonts/NotoSansKR-Regular.otf"),
-            VFS::Resolve("assets/fonts/NanumGothic.ttf"),
-            VFS::Resolve("assets/fonts/gulim.ttf"),
+            VFS::Resolve("assets/fonts/2002_EYA.ttf"),
+            VFS::Resolve("assets/interface/Windows/2002_EYA.ttf"),
+            VFS::Resolve("assets/fonts/2002_EYA.ttf"),
         };
         for (auto& fp : fontPaths) {
             if (LoadCjkFont(fp, current_font_size_)) break;
@@ -292,9 +297,9 @@ void UIRenderer::SetLanguage(const std::string& lang) {
         }
     } else if (lang == "zh" || lang == "zh-cn" || lang == "zh-tw") {
         std::string fontPaths[] = {
-            VFS::Resolve("assets/fonts/NotoSansSC-Regular.otf"),
-            VFS::Resolve("assets/fonts/NotoSansTC-Regular.otf"),
-            VFS::Resolve("assets/fonts/msyh.ttf"),
+            VFS::Resolve("assets/fonts/2002_EYA.ttf"),
+            VFS::Resolve("assets/interface/Windows/2002_EYA.ttf"),
+            VFS::Resolve("assets/fonts/2002_EYA.ttf"),
         };
         for (auto& fp : fontPaths) {
             if (LoadCjkFont(fp, current_font_size_)) break;
@@ -361,7 +366,9 @@ void UIRenderer::DrawText(float x, float y, uint32_t color, const char* fmt, ...
                 }
             }
             if (!loaded && cjk_fonts_.empty()) {
-                std::string cjkFallback = VFS::Resolve("assets/fonts/NotoSansSC-Regular.otf");
+                std::string cjkFallback = VFS::Resolve("assets/fonts/2002_EYA.ttf");
+                if (cjkFallback.empty()) cjkFallback = VFS::Resolve("assets/interface/Windows/2002_EYA.ttf");
+                
                 if (!cjkFallback.empty()) {
                     LoadCjkFont(cjkFallback, current_font_size_);
                     FontAtlas& updated = font_atlases_[current_font_size_];
@@ -466,8 +473,10 @@ void UIRenderer::LoadGlyphsForText(const std::string& text) {
     }
 
     if (bgfx::isValid(atlas.tex)) bgfx::destroy(atlas.tex);
-    atlas.tex = bgfx::createTexture2D((uint16_t)aw, (uint16_t)ah, false, 1,
-        bgfx::TextureFormat::RGBA8, 0, bgfx::copy(rgba.data(), (uint32_t)rgba.size()));
+    atlas.tex = bgfx::createTexture2D((uint16_t)atlas.atlas_w, (uint16_t)atlas.atlas_h, false, 1,
+        bgfx::TextureFormat::RGBA8, BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT,
+        bgfx::copy(rgba.data(), (uint32_t)rgba.size()));
+
 
     atlas.glyphs.resize(new_count);
     for (int i = 0; i < new_count; i++) {
@@ -618,10 +627,8 @@ void UIRenderer::Init() {
         spdlog::info("UIRenderer: Program UI valid (handle={})", ui_prog_.idx);
     }
     s_tex_ = bgfx::createUniform("s_texColor", bgfx::UniformType::Sampler);
-    // makeRef is NOT safe for a local variable — use bgfx::copy so bgfx owns the memory.
-    static const uint32_t white_pixel = 0xffffffff;
-    white_tex_ = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0,
-        bgfx::copy(&white_pixel, sizeof(white_pixel)));
+    uint32_t white_val = 0xffffffff;
+    white_tex_ = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::copy(&white_val, 4));
     CreateFont();
 
     atlas_data_.resize(ATLAS_SIZE * ATLAS_SIZE, 0);
@@ -675,7 +682,8 @@ FontAtlas& UIRenderer::GetOrCreateFontAtlas(float size) {
     }
 
     atlas.tex = bgfx::createTexture2D((uint16_t)atlas.atlas_w, (uint16_t)atlas.atlas_h, false, 1,
-        bgfx::TextureFormat::RGBA8, 0, bgfx::copy(rgba.data(), (uint32_t)rgba.size()));
+        bgfx::TextureFormat::RGBA8, BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT,
+        bgfx::copy(rgba.data(), (uint32_t)rgba.size()));
 
     atlas.glyphs.resize(atlas.range_count);
     for (int i = 0; i < atlas.range_count; i++) {

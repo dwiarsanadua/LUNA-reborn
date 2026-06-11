@@ -73,28 +73,33 @@ void Shader::Destroy() {
 // ─── ShaderUtils ───────────────────────────────────────────
 
 const bgfx::Memory* ShaderUtils::LoadShaderBin(const std::string& name) {
-    std::string searchPaths[] = {
-        "build/bin/" + name,
-        "bin/" + name,
-        name,
-        "../" + name,
-        "shaders/" + name,
-        VFS::Resolve("assets/shaders/" + name),
-        VFS::Resolve("assets/" + name),
+    std::string clean_name = name;
+    if (clean_name.starts_with("shaders/")) clean_name = clean_name.substr(8);
+
+    std::vector<std::string> searchPaths = {
+        "build/macos-debug/bin/shaders/" + clean_name,
+        "build/bin/shaders/" + clean_name,
+        "bin/shaders/" + clean_name,
+        "shaders/" + clean_name,
+        clean_name,
+        VFS::Resolve("assets/shaders/" + clean_name),
+        VFS::Resolve("assets/" + clean_name),
+        "../shaders/" + clean_name
     };
 
     for (const auto& p : searchPaths) {
         std::ifstream file(p, std::ios::binary | std::ios::ate);
-        if (file) {
+        if (file && file.is_open()) {
             size_t size = file.tellg();
+            if (size == 0) continue;
             file.seekg(0);
             auto* mem = bgfx::alloc(static_cast<uint32_t>(size));
-            file.read(reinterpret_cast<char*>(mem->data), size);
+            file.read(reinterpret_cast<char*>(mem->data), (std::streamsize)size);
             spdlog::info("ShaderUtils: loaded {} ({} bytes)", p, size);
             return mem;
         }
     }
-    spdlog::error("ShaderUtils: failed to load '{}'", name);
+    spdlog::error("ShaderUtils: failed to load '{}' (searched {} paths)", name, searchPaths.size());
     return nullptr;
 }
 

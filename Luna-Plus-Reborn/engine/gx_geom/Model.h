@@ -43,6 +43,7 @@ public:
     void ComputeSkinningMatrices(const std::vector<glm::mat4>& bone_poses,
                                  glm::mat4* out_matrices, size_t max_count);
 
+    const std::vector<std::string>& GetTextures() const { return textures_; }
     const std::string& GetPath() const { return path_; }
 
 private:
@@ -51,4 +52,5 @@ private:
     std::string path_;
     std::vector<MeshPart> meshes_;
     std::vector<ModelBone> bones_;
+    std::vector<std::string> textures_;
 };

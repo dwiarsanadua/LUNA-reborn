@@ -58,7 +58,7 @@ bgfx::TextureHandle PropRenderer::LoadNormalMap(const std::string& base_name) {
 bool PropRenderer::Init() {
     program_ = ShaderUtils::LoadProgram("shaders/vs_main.bin", "shaders/fs_main.bin");
     if (!bgfx::isValid(program_)) { spdlog::error("PropRenderer: shader load failed"); return false; }
-    shadow_program_ = ShaderUtils::LoadProgram("shaders/vs_main.bin", "shaders/fs_unlit.bin");
+    shadow_program_ = ShaderUtils::LoadProgram("shaders/vs_default.bin", "shaders/fs_unlit.bin");
     // DX9 fixed-function uniforms (matching vs_main.sc)
     u_ambient_ = bgfx::createUniform("u_ambient", bgfx::UniformType::Vec4);
     u_light_dir_ = bgfx::createUniform("u_light_dir", bgfx::UniformType::Vec4);
@@ -71,7 +71,7 @@ bool PropRenderer::Init() {
     s_tex_normal_ = bgfx::createUniform("s_texNormal", bgfx::UniformType::Sampler);
     u_shadow_mvp_ = bgfx::createUniform("u_shadowMVP", bgfx::UniformType::Mat4);
     uint32_t white = 0xffffffff;
-    white_tex_ = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::makeRef(&white, 4));
+    white_tex_ = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::copy(&white, 4));
 
     layout_.begin()
         .add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
@@ -196,14 +196,14 @@ void PropRenderer::Render(const glm::mat4& view, const glm::mat4& proj, const En
     if (instances_.empty()) return;
 
     bgfx::setViewTransform(view_id_, &view, &proj);
-    bgfx::setViewClear(view_id_, BGFX_CLEAR_NONE, 0, 1.0f, 0);
-    bgfx::setViewRect(view_id_, 0, 0, (uint16_t)width, (uint16_t)height);
+    // Props should NOT clear color
+    bgfx::setViewClear(view_id_, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
 
     // DX9 fixed-function lighting uniforms
     float ambient[4]   = {0.2f, 0.2f, 0.3f, 1.0f};
     float light_dir[4] = {0.5f, -0.8f, 0.3f, 0.0f};
     float diff[4]      = {0.8f, 0.8f, 0.8f, 1.0f};
-    float spec[4]      = {0.6f, 0.6f, 0.6f, 16.0f};
+    float spec[4]      = {0.0f, 0.0f, 0.0f, 0.0f}; // Disabled for Luna Old
     float fog[4]       = {0.0f, 0.0f, 0.0f, 50.0f};
     float fog_end[4]   = {1.0f/150.0f, 0, 0, 0};
     if (bgfx::isValid(u_ambient_)) bgfx::setUniform(u_ambient_, ambient);

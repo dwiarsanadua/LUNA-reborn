@@ -13,15 +13,20 @@ std::string UiScriptParser::WidgetTypeName(const std::string& raw_type) {
 
 UiElement UiScriptParser::ParseFile(const std::string& path) {
     ParseContext ctx;
-    ctx.file.open(path);
+    std::string resolved = VFS::Find(path);
+    if (resolved.empty()) resolved = path;
+    
+    ctx.file.open(resolved);
     if (!ctx.file.is_open()) {
         std::string alt = path;
         if (alt.size() > 4 && alt.substr(alt.size() - 4) == ".txt")
             alt = alt.substr(0, alt.size() - 4);
-        ctx.file.open(alt);
+        resolved = VFS::Find(alt);
+        if (!resolved.empty()) ctx.file.open(resolved);
     }
+    
     if (!ctx.file.is_open()) {
-        spdlog::error("UiScriptParser: Failed to open {}", path);
+        spdlog::error("UiScriptParser: Failed to open {} (resolved: {})", path, resolved);
         return {};
     }
     return ParseStream(ctx);
@@ -82,7 +87,10 @@ UiElement UiScriptParser::ParseBlock(ParseContext& ctx, const std::string& name)
                 if (sscanf(rest.c_str(), "%f %f", &w, &h) == 2) { elem.rect.w = w; elem.rect.h = h; }
             }
             else if (cmd == "#FUNC") elem.func_name = rest;
-            else if (cmd == "#ID") elem.id = rest;
+            else if (cmd == "#ID") {
+                std::stringstream id_ss(rest);
+                id_ss >> elem.id;
+            }
             else if (cmd == "#FONTIDX") elem.font_idx = std::atoi(rest.c_str());
             else if (cmd == "#AUTOCLOSE") elem.auto_close = (std::atoi(rest.c_str()) != 0);
             else if (cmd == "#TEXT") {

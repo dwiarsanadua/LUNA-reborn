@@ -28,6 +28,18 @@ bool Model::LoadAssimp(const std::string& path, unsigned int flags) {
     path_ = path;
     meshes_.clear();
     bones_.clear();
+    textures_.clear();
+
+    // Extract materials/textures
+    for (unsigned int i = 0; i < scene->mNumMaterials; ++i) {
+        aiMaterial* mtl = scene->mMaterials[i];
+        aiString texPath;
+        if (mtl->GetTexture(aiTextureType_DIFFUSE, 0, &texPath) == AI_SUCCESS) {
+            textures_.push_back(texPath.C_Str());
+        } else {
+            textures_.push_back("white.png");
+        }
+    }
 
     // Extract meshes
     for (unsigned int m = 0; m < scene->mNumMeshes; ++m) {

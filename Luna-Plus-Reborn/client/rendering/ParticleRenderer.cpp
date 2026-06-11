@@ -21,7 +21,7 @@ void ParticleRenderer::Init() {
     prog_ = ShaderUtils::LoadProgram("shaders/vs_default.bin", "shaders/fs_default.bin");
     s_tex_ = bgfx::createUniform("s_texColor", bgfx::UniformType::Sampler);
     uint32_t white = 0xffffffff;
-    white_tex_ = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::makeRef(&white, sizeof(white)));
+    white_tex_ = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::copy(&white, sizeof(white)));
 }
 
 void ParticleRenderer::Render(const glm::mat4& view, const glm::mat4& proj,

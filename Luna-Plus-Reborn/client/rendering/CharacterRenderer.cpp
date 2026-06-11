@@ -18,8 +18,12 @@
 #include <algorithm>
 #include <engine/gx_render/VFS.h>
 #include <engine/gx_render/Shader.h>
+#include <stb_image.h>
+
+#include <audio/AnimationSfxSync.hpp>
 
 namespace {
+// ... existing anonymous namespace ...
 constexpr int MAX_BONES = 64;
 constexpr size_t MAX_PREVIEW_SLOTS = 5;
 
@@ -41,13 +45,16 @@ struct LoadedModel {
     std::vector<MeshObject> meshes;
     Skeleton skeleton;
     std::vector<glm::mat4> bind_pose;
+    std::vector<bgfx::TextureHandle> textures;
 };
 
-struct AnimationState {
-    AnimationSystem anim_sys;
+struct SharedAnimationData {
     std::unordered_map<std::string, AnimClip> clips;
+};
+
+struct InstanceAnimationState {
+    AnimationSystem anim_sys;
     CharAnim current_anim = CharAnim::Idle;
-    bool needs_transition = false;
 };
 
 struct RenderInstance {
@@ -57,7 +64,7 @@ struct RenderInstance {
     uint32_t color = 0xffffffff;
     CharAnim anim = CharAnim::Idle;
     bool moving = false;
-    float anim_time = 0;
+    InstanceAnimationState anim_state;
 
     struct Attachment {
         std::string model_key;
@@ -74,7 +81,7 @@ struct CharacterRenderer::Impl {
     float frame_dt = 1.0f / 60.0f;
 
     std::unordered_map<std::string, LoadedModel> models;
-    std::unordered_map<std::string, AnimationState> anim_states;
+    std::unordered_map<std::string, SharedAnimationData> shared_anims;
     std::unordered_map<uint32_t, RenderInstance> instances;
 
     bgfx::ProgramHandle prog = BGFX_INVALID_HANDLE;
@@ -87,6 +94,7 @@ struct CharacterRenderer::Impl {
     bgfx::TextureHandle white = BGFX_INVALID_HANDLE;
 
     ModelManager model_mgr;
+    AnimationSfxSync sfx_sync;
     bool initialized = false;
 
     PreviewSlotConfig preview_slots[MAX_PREVIEW_SLOTS];
@@ -121,10 +129,13 @@ bool CharacterRenderer::Init(const std::string& shader_dir) {
     i.light_dir = bgfx::createUniform("u_lightDir", bgfx::UniformType::Vec4);
     i.u_color = bgfx::createUniform("u_color", bgfx::UniformType::Vec4);
     i.u_ambient = bgfx::createUniform("u_ambient", bgfx::UniformType::Vec4);
-    uint32_t white = 0xffffffff;
-    i.white = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::makeRef(&white, 4));
+    uint32_t white_val = 0xffffffff;
+    i.white = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::copy(&white_val, 4));
+
+    i.sfx_sync.Init();
 
     for (size_t si = 0; si < MAX_PREVIEW_SLOTS; si++) {
+
         i.preview_slots[si].position = glm::vec3((static_cast<float>(si) - 2.0f) * 120.0f, 27930.0f, 7834.0f);
         i.preview_slots[si].scale = 0.4f;
     }
@@ -179,51 +190,102 @@ uint32_t CharacterRenderer::LoadModel(const std::string& path) {
         }
     }
 
-    i.models[resolved] = std::move(lm);
+    // Load textures
+    const auto& tex_paths = lm.model.GetTextures();
+    lm.textures.resize(tex_paths.size(), i.white);
+    for (size_t ti = 0; ti < tex_paths.size(); ti++) {
+        std::string tname = tex_paths[ti];
+        
+        // Resolve texture path with multiple fallbacks
+        std::vector<std::string> candidates = {
+            "assets_converted/mod_objs/" + tname,
+            "assets_converted/textures/" + tname,
+            "assets/textures/" + tname,
+            tname
+        };
+        
+        // Add case-insensitive or prefix-aware variants if needed
+        if (tname.find("[r]") == std::string::npos) {
+            candidates.insert(candidates.begin(), "assets_converted/mod_objs/[r]" + tname);
+        }
 
-    AnimationState as;
-    std::string base_path = resolved.substr(0, resolved.find_last_of('.'));
-    const char* clip_names[] = {"idle", "walk", "run", "attack", "die"};
-    for (auto* name : clip_names) {
-        std::string json_path = VFS::Find(base_path + "_" + name + ".anm.json");
-        if (json_path.empty()) json_path = base_path + "_" + name + ".anm.json";
-        AnimClip clip;
-        if (as.anim_sys.LoadFromJson(json_path, clip)) {
-            clip.name = name;
-            clip.loop = (std::string(name) != "die");
-            as.clips[name] = std::move(clip);
-            spdlog::debug("CharRenderer: loaded anim clip '{}' from {}", name, json_path);
-        } else {
-            std::string anm_path = VFS::Find(base_path + "_" + name + ".anm");
-            if (anm_path.empty()) anm_path = base_path + "_" + name + ".anm";
-            if (as.anim_sys.LoadFromAnm(anm_path, clip)) {
-                clip.name = name;
-                clip.loop = (std::string(name) != "die");
-                as.clips[name] = std::move(clip);
-                spdlog::debug("CharRenderer: loaded anim clip '{}' from {}", name, anm_path);
+        std::string resolved_tex;
+        for (const auto& c : candidates) {
+            resolved_tex = VFS::Resolve(c);
+            if (!resolved_tex.empty()) break;
+        }
+        
+        if (!resolved_tex.empty()) {
+            int w, h, n;
+            unsigned char* data = stbi_load(resolved_tex.c_str(), &w, &h, &n, 4);
+            if (data) {
+                lm.textures[ti] = bgfx::createTexture2D(
+                    (uint16_t)w, (uint16_t)h, false, 1,
+                    bgfx::TextureFormat::RGBA8, 0,
+                    bgfx::copy(data, w * h * 4)
+                );
+                stbi_image_free(data);
+                spdlog::debug("CharRenderer: loaded texture {} for {}", tname, path);
             }
         }
     }
 
-    auto it = as.clips.find("idle");
-    if (it != as.clips.end()) {
-        as.anim_sys.Play(&it->second, true, 0.0f);
+    i.models[resolved] = std::move(lm);
+
+    SharedAnimationData sa;
+    std::string model_filename = resolved.substr(resolved.find_last_of("/\\") + 1);
+    std::string base_name = model_filename.substr(0, model_filename.find_last_of('.'));
+    
+    const char* clip_names[] = {"idle", "walk", "run", "attack", "die"};
+    for (auto* name : clip_names) {
+        // Search in animations directory
+        std::string anim_base = "assets/animations/" + base_name + "_" + name;
+        std::string json_path = VFS::Find(anim_base + ".anm.json");
+        if (json_path.empty()) json_path = anim_base + ".anm.json";
+        AnimClip clip;
+        // Use a temporary AnimationSystem just to load the data
+        AnimationSystem loader;
+        if (loader.LoadFromJson(json_path, clip)) {
+            clip.name = name;
+            clip.loop = (std::string(name) != "die");
+            sa.clips[name] = std::move(clip);
+            spdlog::debug("CharRenderer: loaded anim clip '{}' from {}", name, json_path);
+        } else {
+            std::string anm_path = VFS::Find(anim_base + ".anm");
+            if (anm_path.empty()) anm_path = anim_base + ".anm";
+            if (loader.LoadFromAnm(anm_path, clip)) {
+                clip.name = name;
+                clip.loop = (std::string(name) != "die");
+                sa.clips[name] = std::move(clip);
+                spdlog::debug("CharRenderer: loaded anim clip '{}' from {}", name, anm_path);
+            }
+        }
     }
-    as.current_anim = CharAnim::Idle;
-    i.anim_states[resolved] = std::move(as);
+    i.shared_anims[resolved] = std::move(sa);
 
     return 1;
 }
 
 uint32_t CharacterRenderer::Spawn(uint32_t id, const std::string& model,
                                    float x, float y, float z, uint32_t color) {
+    auto& i = *impl_;
     LoadModel(model);
     RenderInstance inst;
     std::string found = VFS::Find(model);
     inst.model_key = found.empty() ? model : found;
     inst.pos = {x, y, z};
     inst.color = color;
-    impl_->instances[id] = inst;
+
+    // Init instance animation
+    auto ait = i.shared_anims.find(inst.model_key);
+    if (ait != i.shared_anims.end()) {
+        auto cit = ait->second.clips.find("idle");
+        if (cit != ait->second.clips.end()) {
+            inst.anim_state.anim_sys.Play(&cit->second, true, 0.0f);
+        }
+    }
+
+    i.instances[id] = std::move(inst);
     return id;
 }
 
@@ -239,18 +301,18 @@ void CharacterRenderer::Move(uint32_t id, float x, float y, float z, bool moving
     inst.pos = {x, y, z};
     inst.moving = moving;
 
-    auto anim_it = i.anim_states.find(inst.model_key);
-    if (anim_it == i.anim_states.end()) return;
-    auto& as = anim_it->second;
+    auto anim_it = i.shared_anims.find(inst.model_key);
+    if (anim_it == i.shared_anims.end()) return;
+    auto& sa = anim_it->second;
 
     CharAnim desired = anim;
     if (desired == CharAnim::Idle && moving) desired = CharAnim::Walk;
 
-    if (desired != as.current_anim) {
-        auto clip_it = as.clips.find(AnimNameForCharAnim(desired));
-        if (clip_it != as.clips.end()) {
-            as.anim_sys.BlendTo(&clip_it->second, 0.2f);
-            as.current_anim = desired;
+    if (desired != inst.anim_state.current_anim) {
+        auto clip_it = sa.clips.find(AnimNameForCharAnim(desired));
+        if (clip_it != sa.clips.end()) {
+            inst.anim_state.anim_sys.BlendTo(&clip_it->second, 0.2f);
+            inst.anim_state.current_anim = desired;
         }
     }
 }
@@ -286,52 +348,64 @@ void CharacterRenderer::Render(const glm::mat4& view, const glm::mat4& proj, flo
     if (!bgfx::isValid(i.prog)) return;
     bgfx::ViewId vid = (bgfx::ViewId)ViewId::Character;
     bgfx::setViewTransform(vid, &view, &proj);
-    bgfx::setViewClear(vid, BGFX_CLEAR_NONE, 0, 1.0f, 0);
-    bgfx::setViewRect(vid, 0, 0, i.fb_width, i.fb_height);
+    // Characters should NOT clear color
+    bgfx::setViewClear(vid, BGFX_CLEAR_DEPTH, 0, 1.0f, 0);
 
-    float white[4] = {1, 1, 1, 1};
-    bgfx::setUniform(i.light_dir, glm::value_ptr(env.light_dir));
-    bgfx::setUniform(i.u_color, white);
+        float white_col[4] = {1, 1, 1, 1};
+        float ambient_col[4] = {0.5f, 0.5f, 0.5f, 1.0f}; // Default ambient
+        
+        bgfx::setUniform(i.light_dir, glm::value_ptr(env.light_dir));
+        bgfx::setUniform(i.u_color, white_col);
+        bgfx::setUniform(i.u_ambient, ambient_col);
 
-    for (auto& [id_, inst] : i.instances) {
-        (void)id_;
-        auto mit = i.models.find(inst.model_key);
-        if (mit == i.models.end()) continue;
-        auto& lm = mit->second;
+        for (auto& [id_, inst] : i.instances) {
+            (void)id_;
+            auto mit = i.models.find(inst.model_key);
+            if (mit == i.models.end()) continue;
+            auto& lm = mit->second;
 
-        auto ait = i.anim_states.find(inst.model_key);
-        AnimationState* as = (ait != i.anim_states.end()) ? &ait->second : nullptr;
+            inst.anim_state.anim_sys.Update(i.frame_dt);
 
-        if (as) {
-            as->anim_sys.Update(i.frame_dt);
-        }
-
-        glm::mat4 bone_matrices[MAX_BONES];
-        std::fill_n(bone_matrices, MAX_BONES, glm::mat4(1.0f));
-
-        if (as && lm.model.HasBones()) {
-            std::vector<glm::mat4> blended_pose(lm.bind_pose.size(), glm::mat4(1.0f));
-            as->anim_sys.GetBlendedPose(lm.bind_pose, blended_pose.data(), blended_pose.size());
-
-            std::vector<glm::mat4> world_pose;
-            lm.skeleton.ComputeFinalPose(blended_pose, world_pose);
-
-            const auto& inv_bind = lm.skeleton.GetInverseBindMatrices();
-            size_t count = std::min(world_pose.size(), (size_t)MAX_BONES);
-            for (size_t bi = 0; bi < count; bi++) {
-                bone_matrices[bi] = world_pose[bi] * inv_bind[bi];
+            const AnimClip* current = inst.anim_state.anim_sys.GetCurrentClip();
+            if (current) {
+                int frame = (int)(inst.anim_state.anim_sys.GetCurrentTime() * current->fps);
+                i.sfx_sync.OnAnimationFrame(current->name, frame, inst.pos.x, inst.pos.y, inst.pos.z);
             }
-        }
+
+            glm::mat4 bone_matrices[MAX_BONES];
+            std::fill_n(bone_matrices, MAX_BONES, glm::mat4(1.0f));
+
+            if (lm.model.HasBones()) {
+                std::vector<glm::mat4> blended_pose(lm.bind_pose.size(), glm::mat4(1.0f));
+                inst.anim_state.anim_sys.GetBlendedPose(lm.bind_pose, blended_pose.data(), blended_pose.size());
+
+                std::vector<glm::mat4> world_pose;
+                lm.skeleton.ComputeFinalPose(blended_pose, world_pose);
+
+                const auto& inv_bind = lm.skeleton.GetInverseBindMatrices();
+                size_t count = std::min(world_pose.size(), (size_t)MAX_BONES);
+                for (size_t bi = 0; bi < count; bi++) {
+                    bone_matrices[bi] = world_pose[bi] * inv_bind[bi];
+                }
+            }
 
         bgfx::setUniform(i.bones_uniform, bone_matrices, MAX_BONES);
 
         float mtx[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, inst.pos.x, inst.pos.y, inst.pos.z, 1};
         bgfx::setTransform(mtx);
 
-        for (auto& mesh_obj : lm.meshes) {
+        const auto& mesh_parts = lm.model.GetMeshes();
+        for (size_t mi = 0; mi < lm.meshes.size(); mi++) {
+            auto& mesh_obj = lm.meshes[mi];
+            uint32_t mtl_idx = mesh_parts[mi].material_index;
+            bgfx::TextureHandle mesh_tex = i.white;
+            if (mtl_idx < lm.textures.size()) {
+                mesh_tex = lm.textures[mtl_idx];
+            }
+
             mesh_obj.Render(0);
             bgfx::setState(BGFX_STATE_DEFAULT | BGFX_STATE_WRITE_Z);
-            bgfx::setTexture(0, i.tex, i.white);
+            bgfx::setTexture(0, i.tex, mesh_tex);
             bgfx::submit(vid, i.prog);
         }
 
@@ -461,12 +535,13 @@ void CharacterRenderer::SelectSlot(uint32_t id) {
     i.selected_slot = static_cast<int>(id);
     i.select_anim_time = 0.0f;
 
-    auto ait = i.anim_states.find(it->second.model_key);
-    if (ait != i.anim_states.end()) {
+    auto& inst = it->second;
+    auto ait = i.shared_anims.find(inst.model_key);
+    if (ait != i.shared_anims.end()) {
         auto clip_it = ait->second.clips.find("selected");
         if (clip_it != ait->second.clips.end()) {
-            ait->second.anim_sys.Play(&clip_it->second, false, 0.0f);
-            ait->second.current_anim = CharAnim::Selected;
+            inst.anim_state.anim_sys.Play(&clip_it->second, false, 0.0f);
+            inst.anim_state.current_anim = CharAnim::Selected;
         }
     }
 }
@@ -478,18 +553,13 @@ void CharacterRenderer::DeselectSlot(uint32_t id) {
     i.selected_slot = -1;
     i.select_anim_time = 0.0f;
 
-    auto ait = i.anim_states.find(it->second.model_key);
-    if (ait != i.anim_states.end()) {
+    auto& inst = it->second;
+    auto ait = i.shared_anims.find(inst.model_key);
+    if (ait != i.shared_anims.end()) {
         auto clip_it = ait->second.clips.find("deselected");
         if (clip_it != ait->second.clips.end()) {
-            ait->second.anim_sys.Play(&clip_it->second, false, 0.0f);
-            ait->second.current_anim = CharAnim::Deselected;
-        } else {
-            clip_it = ait->second.clips.find("idle");
-            if (clip_it != ait->second.clips.end()) {
-                ait->second.anim_sys.BlendTo(&clip_it->second, 0.3f);
-                ait->second.current_anim = CharAnim::Idle;
-            }
+            inst.anim_state.anim_sys.Play(&clip_it->second, false, 0.0f);
+            inst.anim_state.current_anim = CharAnim::Deselected;
         }
     }
 }
@@ -513,7 +583,7 @@ void CharacterRenderer::Shutdown() {
     impl_->initialized = false;
 
     impl_->models.clear();
-    impl_->anim_states.clear();
+    impl_->shared_anims.clear();
     if (bgfx::isValid(impl_->prog)) bgfx::destroy(impl_->prog);
     if (bgfx::isValid(impl_->tex)) bgfx::destroy(impl_->tex);
     if (bgfx::isValid(impl_->bones_uniform)) bgfx::destroy(impl_->bones_uniform);

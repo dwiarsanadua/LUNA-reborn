@@ -12,7 +12,7 @@ void GraphicEngine::Init(uint16_t fb_width, uint16_t fb_height) {
     }
 }
 
-void GraphicEngine::BeginFrame(const glm::mat4& view, const glm::mat4& proj) {
+void GraphicEngine::BeginFrame(const glm::mat4& view, const glm::mat4& proj, uint16_t width, uint16_t height) {
     // Set view order every frame — must run before any view clears color
     const bgfx::ViewId order[] = {
         static_cast<bgfx::ViewId>(ViewId::Sky),
@@ -30,6 +30,13 @@ void GraphicEngine::BeginFrame(const glm::mat4& view, const glm::mat4& proj) {
         static_cast<bgfx::ViewId>(ViewId::PostFX4),
     };
     bgfx::setViewOrder(0, sizeof(order) / sizeof(order[0]), order);
+
+    // Explicitly set viewport for EVERY view to ensure Retina coverage
+    for (bgfx::ViewId i = 0; i < (bgfx::ViewId)ViewId::Count; ++i) {
+        bgfx::setViewRect(i, 0, 0, width, height);
+    }
+    // Shadow view uses fixed size
+    bgfx::setViewRect(static_cast<bgfx::ViewId>(ViewId::Shadow), 0, 0, 1024, 1024);
 
     scene_.Render(view, proj);
 }

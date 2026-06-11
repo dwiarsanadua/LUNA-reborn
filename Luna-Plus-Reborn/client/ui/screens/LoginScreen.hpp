@@ -1,8 +1,10 @@
 #pragma once
 #include <ui/Screen.hpp>
+#include <ui/WindowManager.hpp>
 #include <rendering/SceneRenderer.hpp>
 #include <bgfx/bgfx.h>
 #include <functional>
+#include <glm/glm.hpp>
 
 class LoginScreen : public Screen {
 public:
@@ -16,11 +18,25 @@ public:
     bool HandlePacket(uint16_t type, const std::vector<uint8_t>& payload) override;
     void SetSceneClearer(std::function<void(uint32_t)> f) { set_clear_color_ = f; }
     void SetSceneRenderer(SceneRenderer* sr) { scene_renderer_ = sr; }
+    
+    WindowManager* GetWindowManager() { return &wm_; }
+    
 private:
-    struct F { char buf[64]={0}; int pos=0; bool act=false; bool mask=false; char lbl[16]={0}; };
+    struct TextField { 
+        char buf[64] = {0}; 
+        int pos = 0; 
+        bool active = false; 
+        bool masked = false; 
+        char label[16] = {0};
+        glm::vec4 rect = {0,0,0,0};  // x, y, w, h
+    };
+    
     bool DoLogin();
+    
     bgfx::TextureHandle tex_bg_ = BGFX_INVALID_HANDLE;
-    F fields_[2] = {};
+    WindowManager wm_;
+    class Window* login_win_ = nullptr;
+    TextField fields_[2] = {};
     bool sent_ = false;
     float anim_time_ = 0.0f;
     std::function<void(uint32_t)> set_clear_color_;

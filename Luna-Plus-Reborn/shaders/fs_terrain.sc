@@ -29,8 +29,8 @@ void main() {
     vec3 N = normalize(v_normal);
     vec3 L = normalize(-u_lightDir.xyz);
     
-    // Better diffuse for terrain
-    float diff = max(0.25, dot(N, L));
+    // Use Half-Lambert for bright, soft terrain shadows (Luna Old style)
+    float diff = dot(N, L) * 0.5 + 0.5;
     vec4 color = texel * diff;
 
     // Distance fog

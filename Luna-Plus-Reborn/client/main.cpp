@@ -128,13 +128,17 @@ int main(int argc, char** argv) {
     spdlog::info("Window Size: {}x{} | Framebuffer: {}x{}", config.width, config.height, device.GetWidth(), device.GetHeight());
 
     // 5. SceneRenderer (via GraphicEngine)
-    GraphicEngine gfx; gfx.Init();
-    gfx.GetScene()->width = (float)device.GetWidth();
-    gfx.GetScene()->height = (float)device.GetHeight();
-    EngineCamera cam; cam.Init(config.width, config.height);
+    GraphicEngine gfx; 
+    uint32_t width = device.GetWidth();
+    uint32_t height = device.GetHeight();
+    gfx.Init((uint16_t)width, (uint16_t)height);
+    
+    gfx.GetScene()->width = (float)width;
+    gfx.GetScene()->height = (float)height;
+    EngineCamera cam; cam.Init(width, height);
 
     // 6. TerrainRenderer / PropRenderer — needed for login 3D background
-    TerrainRenderer terrain;
+    TerrainRenderer terrain; terrain.Init();
     PropRenderer props; props.Init();
     props.width = (float)device.GetWidth();
     props.height = (float)device.GetHeight();
@@ -147,7 +151,7 @@ int main(int argc, char** argv) {
     map.SetProps(&props);
     map.SetSpawnSystem(&spawn_sys);
     map.SetRegistry(&registry);
-    map.Load("51");
+    map.Load("01_loginpage_01"); // Load authentic login map
 
     // 8. EngineSky
     EngineSky sky;
@@ -229,6 +233,8 @@ int main(int argc, char** argv) {
     loginScreen->SetSceneClearer([&gfx](uint32_t c) { gfx.GetScene()->SetClearColor(c); });
     screenManager.Register("login", std::move(loginScreen));
 
+    screenManager.Register("launcher", std::make_unique<LauncherScreen>());
+
     auto charSelectScreen = std::make_unique<CharSelectScreen>();
     charSelectScreen->SetSceneClearer([&gfx](uint32_t c) { gfx.GetScene()->SetClearColor(c); });
     screenManager.Register("charselect", std::move(charSelectScreen));
@@ -242,7 +248,7 @@ int main(int argc, char** argv) {
     screenManager.Register("game", std::move(gameScreen));
     ClientFlow::Init(&screenManager, nullptr);
 
-    // 12. Enter Launcher Screen (Prompt A)
+    // 12. Enter Login Screen (User preference)
     screenManager.SwitchTo("login");
 
     static Luna::PacketDispatcher client_dispatcher;
@@ -431,10 +437,11 @@ int main(int argc, char** argv) {
             bool is_login = (screenManager.CurrentName() == "login" ||
                             screenManager.CurrentName() == "charselect");
             if (is_login) {
-                cam.SetTarget(glm::vec3(0, 0, 0));
-                cam.SetDistance(80.0f);
-                cam.SetYaw(-45.0f);
-                cam.SetPitch(-30.0f);
+                // Adjust for 01_loginpage_01 map
+                cam.SetTarget(glm::vec3(0.0f, 100.0f, 0.0f)); 
+                cam.SetDistance(400.0f);
+                cam.SetYaw(time * 12.0f); 
+                cam.SetPitch(-15.0f);
             } else {
                 // Smooth follow: exponential lag toward the hero, aimed at
                 // chest height so the character sits low in frame like Old.
@@ -466,33 +473,41 @@ int main(int argc, char** argv) {
             }
         }
 
-        // --- RENDERING (update already applied this frame) ---
+        // --- RENDERING ---
         const glm::mat4& view = cam.GetViewMatrix();
         const glm::mat4& proj = cam.GetProjectionMatrix();
-        {
-            gfx.BeginFrame(view, proj);
-            ambient.Update(dt, 51, sky.GetTimeOfDay(),
-                           g_state.player_x, 0, g_state.player_z);
-            sky.Render(ui, view, proj);
-            gfx.Render(&terrain, &props, nullptr, view, proj, sky.GetLightDirection());
-            gfx.RenderCharacters(time, view, proj);
-            gfx.RenderUI(ui);
-            
-            // Render UI on top
-            ui.BeginFrame();
-            screenManager.Render(ui, view, proj);
-            
-            if (frame % 30 == 0) fps = 1.0f / dt;
-            {
-                char fps_buf[32]; snprintf(fps_buf, sizeof(fps_buf), "FPS: %.0f", fps);
-                float tw = ui.MeasureText(fps_buf);
-                ui.DrawText(ui.logicalWidth - tw - 8, 6, 0xFF888888, "%s", fps_buf);
-            }
-            
-            // Flush batch SEBELUM EndFrame — pastikan draw calls di-submit
-            // sebelum bgfx::frame() dipanggil
-            ui.FlushBatch();
-        }
+        
+        // 1. Start Frame & Set View Order
+        gfx.BeginFrame(view, proj, (uint16_t)width, (uint16_t)height);
+
+        // 2. Sync Environment (Light/Fog)
+        ambient.Update(dt, 51, sky.GetTimeOfDay(), g_state.player_x, 0, g_state.player_z);
+        EnvData env;
+        env.light_dir = glm::vec4(sky.GetLightDirection(), 0.0f);
+        env.fog_color = glm::vec4(sky.GetFogColor(), 1.0f);
+        env.fog_data = glm::vec4(100.0f, 10000.0f, 0.5f, 0);
+
+        // 3. Render 3D World (Orchestrated by gfx)
+        sky.Render(ui, view, proj);
+        terrain.Render(view, proj, env);
+        props.Render(view, proj, env);
+        g_char_renderer->Render(view, proj, time, env);
+        
+        std::vector<glm::vec3> p_pos; std::vector<uint32_t> p_col; std::vector<float> p_size;
+        particles.Render(view, proj, p_pos, p_col, p_size);
+        
+        // 4. Render UI Layers
+        ui.BeginFrame();
+        screenManager.Render(ui, view, proj);
+        
+        // 5. Draw Performance Overlay
+        if (frame % 30 == 0) fps = 1.0f / dt;
+        char fps_buf[32]; snprintf(fps_buf, sizeof(fps_buf), "FPS: %.0f", fps);
+        ui.DrawText(10, 2, 0xffffffff, "%s", fps_buf);
+
+        // 6. Submit all draw calls
+        ui.FlushBatch();
+        device.EndFrame();
 
         if (Keyboard::IsActionPressed("screenshot")) {
             char path[256];

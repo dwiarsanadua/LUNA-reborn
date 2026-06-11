@@ -25,14 +25,30 @@ def convert_mod(input_path, output_dir):
     ver, obj_num, mtl_num = struct.unpack_from('<III', data, 0)[:3]
     
     offset = 28
-    # Skip materials
+    materials = []
+    # Parse materials
     for i in range(mtl_num):
         mtype, msize = struct.unpack_from('<II', data, offset)
+        if mtype == OT_MATERIAL:
+            # Material name is usually at offset + 8
+            # Followed by texture names. We'll search for strings.
+            mdata = data[offset+8:offset+8+msize]
+            # Simple heuristic: find .dds or .tga or .bmp strings
+            import re
+            tex_matches = re.findall(b'[a-zA-Z0-9_\\-\\/]+\\.(?:dds|tga|bmp|tif|png)', mdata, re.I)
+            tex_name = "white.png"
+            if tex_matches:
+                # Convert original ext to .png since convert_assets.py converts them to png
+                orig_tex = tex_matches[0].decode('ascii', errors='ignore')
+                tex_name = os.path.splitext(os.path.basename(orig_tex))[0] + ".png"
+            materials.append(tex_name)
+        else:
+            materials.append("white.png")
         offset += 8 + msize
     
     all_verts = []
     all_uvs = []
-    all_faces = []
+    all_faces = [] # list of (v1, v2, v3, mtl_idx)
     
     for obj_idx in range(obj_num):
         if offset + 8 > len(data):
@@ -114,28 +130,45 @@ def convert_mod(input_path, output_dir):
     if not all_verts or not all_faces:
         return False
     
+    # Write MTL file
+    mtl_path = os.path.join(output_dir, f"{name}.mtl")
+    with open(mtl_path, 'w') as f:
+        for i, tex in enumerate(materials):
+            f.write(f"newmtl mat{i}\n")
+            f.write(f"Kd 1.0 1.0 1.0\n")
+            f.write(f"map_Kd {tex}\n\n")
+
     dst = os.path.join(output_dir, f"{name}.obj")
     with open(dst, 'w') as f:
         f.write(f"# MOD converted: {os.path.basename(input_path)}\n")
-        f.write(f"# {len(all_verts)} verts, {len(all_faces)} faces\n\n")
+        f.write(f"mtllib {name}.mtl\n\n")
         for v in all_verts:
             f.write(f"v {v[0]:.6f} {v[1]:.6f} {v[2]:.6f}\n")
         f.write("\n")
         for uv in all_uvs[:len(all_verts)]:
             f.write(f"vt {uv[0]:.6f} {uv[1]:.6f}\n")
         f.write("\n")
+        
+        current_mtl = -1
         for fa in all_faces:
+            if fa[3] != current_mtl:
+                current_mtl = fa[3]
+                f.write(f"usemtl mat{current_mtl}\n")
             f.write(f"f {fa[0]+1}/{fa[0]+1} {fa[1]+1}/{fa[1]+1} {fa[2]+1}/{fa[2]+1}\n")
     
-    print(f"  {name}: {len(all_verts)}v {len(all_faces)}t -> OK")
+    print(f"  {name}: {len(all_verts)}v {len(all_faces)}t {len(materials)}mtl -> OK")
     return True
 
 
 def main():
-    dst = "/Users/macbookair/PRIBADI/luna-plus-master/LUNA-Plus-Reborn/assets_converted/mod_objs"
+    dst = "/Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Reborn/assets_converted/mod_objs"
     os.makedirs(dst, exist_ok=True)
     
-    src = "/Users/macbookair/PRIBADI/luna-plus-master/assets/unpacked/character"
+    src = "/Users/macbookair/PRIBADI/luna-plus-master/Luna-Plus-Old/LEGACY_ASSETS/legacy_unpacked/raw_originals/assets/unpacked/character"
+    if not os.path.exists(src):
+        print(f"Error: Source directory not found: {src}")
+        return
+    
     mods = sorted([f for f in os.listdir(src) if f.endswith('.mod')])
     
     print(f"Converting {len(mods)} character .MOD files...\n")

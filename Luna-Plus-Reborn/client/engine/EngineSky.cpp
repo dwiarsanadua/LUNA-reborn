@@ -178,8 +178,10 @@ void EngineSky::Render(UIRenderer& ui, const glm::mat4& view, const glm::mat4& p
     uint32_t clear_col = ((uint32_t)(fog.r * 255) << 24) |
                          ((uint32_t)(fog.g * 255) << 16) |
                          ((uint32_t)(fog.b * 255) << 8) | 0xff;
-    bgfx::setViewClear(sky_view, BGFX_CLEAR_DEPTH, clear_col, 1.0f, 0);
-    bgfx::setViewRect(sky_view, 0, 0, bgfx::BackbufferRatio::Equal);
+
+    // Sky is the base layer: clear color AND depth
+    bgfx::setViewClear(sky_view, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, clear_col, 1.0f, 0);
+    // Viewport is already set globally in GraphicEngine::BeginFrame
     bgfx::setViewTransform(sky_view, glm::value_ptr(view), glm::value_ptr(proj));
 
     // Translate dome to camera position

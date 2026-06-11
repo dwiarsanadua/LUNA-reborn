@@ -116,9 +116,9 @@ bool PostProcessor::Init(uint16_t width, uint16_t height) {
     uint16_t idx[] = {0, 1, 2, 1, 3, 2};
 
     fullscreen_vb_ = bgfx::createVertexBuffer(
-        bgfx::makeRef(verts, sizeof(verts)), PostVertexLayout());
+        bgfx::copy(verts, sizeof(verts)), PostVertexLayout());
     fullscreen_ib_ = bgfx::createIndexBuffer(
-        bgfx::makeRef(idx, sizeof(idx)));
+        bgfx::copy(idx, sizeof(idx)));
 
     s_tex_color_ = bgfx::createUniform("s_texColor", bgfx::UniformType::Sampler);
     s_tex_bloom_ = bgfx::createUniform("s_texBloom", bgfx::UniformType::Sampler);
@@ -148,6 +148,7 @@ void PostProcessor::Render(bgfx::TextureHandle scene_color, bgfx::ViewId start_v
     RenderBlur(bgfx::ViewId(uint8_t(start_view) + 2), bloom_tex_[1], false);
 
     // Final composite: scene + bloom → output (backbuffer)
+    bloom_intensity_ = 0.0f; // Disable bloom for Luna Old feel
     RenderFinal(bgfx::ViewId(uint8_t(start_view) + 3), scene_color, bloom_tex_[0]);
 }
 

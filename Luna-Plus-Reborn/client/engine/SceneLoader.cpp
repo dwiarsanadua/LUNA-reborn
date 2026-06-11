@@ -1,4 +1,5 @@
 #include "SceneLoader.hpp"
+#include <rendering/CharacterRenderer.hpp>
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
@@ -85,10 +86,13 @@ std::string SceneLoader::ResolveModelPath(const std::string& model_ref) {
     if (dot != std::string::npos) base = base.substr(0, dot);
 
     std::string paths[] = {
-        VFS::Resolve("assets/models/" + base + ".glb"),
+        VFS::Resolve("assets_converted/mod_objs/[r]" + base + ".obj"),
+        VFS::Resolve("assets_converted/mod_objs/" + base + ".obj"),
         VFS::Resolve("assets/models/" + base + ".obj"),
+        VFS::Resolve("assets/models/prop/" + base + ".obj"),
+        VFS::Resolve("assets/models/map/" + base + ".obj"),
+        VFS::Resolve("assets/models/" + base + ".glb"),
         VFS::Resolve("assets/models/prop/" + base + ".glb"),
-        VFS::Resolve("assets/models/character/" + base + ".glb"),
         VFS::Resolve("assets/models/map/" + base + ".glb"),
     };
 
@@ -101,17 +105,31 @@ std::string SceneLoader::ResolveModelPath(const std::string& model_ref) {
     return "";
 }
 
-bool SceneLoader::Instantiate(const SceneData& scene) {
+bool SceneLoader::Instantiate(const SceneData& scene, CharacterRenderer* chars) {
+    if (!chars) return false;
     int loaded = 0, failed = 0;
+    static uint32_t scene_id_base = 100000; // Offset IDs to avoid collision with players/monsters
+
     for (auto& obj : scene.objects) {
         std::string model_path = ResolveModelPath(obj.model_name);
         if (model_path.empty()) { failed++; continue; }
-        spdlog::info("SceneLoader: model found: {} -> {}", obj.model_name, model_path);
+
+        uint32_t id = scene_id_base++;
+
+        // Spawn using CharacterRenderer. It handles .glb models natively.
+        // We use the rotation parameter internally if we expand the API, but for now
+        // pos and scale are the primary requirements.
+        chars->Spawn(id, model_path, obj.position.x * 0.0001f, obj.position.y * 0.0001f, obj.position.z * 0.0001f, 0xffffffff);
+
+        // If we needed scale/rotation, we would add setters to CharacterRenderer.
+        // For login map, just getting the models on screen is the priority.
+
         loaded++;
     }
-    spdlog::info("SceneLoader: instantiated {}/{} objects", loaded, loaded + failed);
+    spdlog::info("SceneLoader: instantiated {}/{} objects via CharacterRenderer", loaded, loaded + failed);
     return failed == 0;
 }
+
 
 bgfx::VertexBufferHandle SceneLoader::LoadModel(const std::string& name) {
     spdlog::warn("SceneLoader::LoadModel not fully implemented for '{}'", name);

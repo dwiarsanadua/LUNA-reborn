@@ -16,10 +16,13 @@ static std::string ResolveAtlasFile(const std::string& legacy_path) {
 
     // 1. Try exact filename in known texture directories
     const std::string candidates[] = {
+        "assets/textures/ui/atlas/" + name,
+        "assets/textures/ui/" + name,
         "assets/textures/" + name,
         "assets/textures/unpacked/image/" + name,
         "assets/interface/2DImage/image/" + name,
         "assets/interface/image/" + name,
+        "assets/interface/Windows/" + name,
     };
     for (const auto& rel : candidates) {
         std::string found = VFS::Find(rel);
@@ -33,10 +36,13 @@ static std::string ResolveAtlasFile(const std::string& legacy_path) {
         std::string stem = base.substr(0, dot);
         std::string png = stem + ".png";
         const std::string png_candidates[] = {
+            "assets/textures/ui/atlas/" + png,
+            "assets/textures/ui/" + png,
             "assets/textures/" + png,
             "assets/textures/unpacked/image/" + png,
             "assets/interface/2DImage/image/" + png,
             "assets/interface/image/" + png,
+            "assets/interface/Windows/" + png,
         };
         for (const auto& rel : png_candidates) {
             std::string found = VFS::Find(rel);

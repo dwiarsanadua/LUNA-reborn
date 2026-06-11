@@ -25,7 +25,7 @@ struct SceneData {
 class SceneLoader {
 public:
     static SceneData Load(const std::string& path);
-    static bool Instantiate(const SceneData& scene);
+    static bool Instantiate(const SceneData& scene, class CharacterRenderer* chars);
     static bgfx::VertexBufferHandle LoadModel(const std::string& name);
 private:
     static std::string ResolveModelPath(const std::string& model_ref);
