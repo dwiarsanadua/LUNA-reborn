@@ -277,44 +277,48 @@ void UIRenderer::SetLanguage(const std::string& lang) {
     font_atlas_w_ = 1024;
     font_atlas_h_ = 1024;
 
+    // Fallback chain: preferred CJK font → 2002_EYA.ttf (always available)
+    std::string fallback_eya = VFS::Resolve("assets/fonts/2002_EYA.ttf");
+    if (fallback_eya.empty()) fallback_eya = VFS::Find("assets/interface/Windows/2002_EYA.ttf");
+
     if (lang == "ko" || lang == "kr") {
         std::string fontPaths[] = {
             VFS::Resolve("assets/fonts/NotoSansKR-Regular.otf"),
+            VFS::Resolve("assets/fonts/NotoSansKR-Regular.ttf"),
             VFS::Resolve("assets/fonts/NanumGothic.ttf"),
             VFS::Resolve("assets/fonts/gulim.ttf"),
+            fallback_eya,
         };
         for (auto& fp : fontPaths) {
-            if (LoadCjkFont(fp, current_font_size_)) break;
+            if (!fp.empty() && LoadCjkFont(fp, current_font_size_)) break;
         }
-        if (!font_atlases_[current_font_size_].ready) {
+        if (!font_atlases_[current_font_size_].ready)
             GetOrCreateFontAtlas(current_font_size_);
-            LoadCjkFont(fontPaths[0], current_font_size_);
-        }
     } else if (lang == "zh" || lang == "zh-cn" || lang == "zh-tw") {
         std::string fontPaths[] = {
             VFS::Resolve("assets/fonts/NotoSansSC-Regular.otf"),
+            VFS::Resolve("assets/fonts/NotoSansSC-Regular.ttf"),
             VFS::Resolve("assets/fonts/NotoSansTC-Regular.otf"),
             VFS::Resolve("assets/fonts/msyh.ttf"),
+            fallback_eya,
         };
         for (auto& fp : fontPaths) {
-            if (LoadCjkFont(fp, current_font_size_)) break;
+            if (!fp.empty() && LoadCjkFont(fp, current_font_size_)) break;
         }
-        if (!font_atlases_[current_font_size_].ready) {
+        if (!font_atlases_[current_font_size_].ready)
             GetOrCreateFontAtlas(current_font_size_);
-            LoadCjkFont(fontPaths[0], current_font_size_);
-        }
     } else if (lang == "ja") {
         std::string fontPaths[] = {
             VFS::Resolve("assets/fonts/NotoSansJP-Regular.otf"),
+            VFS::Resolve("assets/fonts/NotoSansJP-Regular.ttf"),
             VFS::Resolve("assets/fonts/msgothic.ttc"),
+            fallback_eya,
         };
         for (auto& fp : fontPaths) {
-            if (LoadCjkFont(fp, current_font_size_)) break;
+            if (!fp.empty() && LoadCjkFont(fp, current_font_size_)) break;
         }
-        if (!font_atlases_[current_font_size_].ready) {
+        if (!font_atlases_[current_font_size_].ready)
             GetOrCreateFontAtlas(current_font_size_);
-            LoadCjkFont(fontPaths[0], current_font_size_);
-        }
     } else {
         GetOrCreateFontAtlas(current_font_size_);
     }

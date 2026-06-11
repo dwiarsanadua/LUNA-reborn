@@ -73,7 +73,7 @@ std::string ResolveMonsterModel(const std::string& model_file) {
         if (!resolved.empty()) return resolved;
     }
 
-    const char* folders[] = {"monster/", "npc/", "character/", "map/", "effect/", "farm/", "housing/", ""};
+    const char* folders[] = {"monster/", "npc/", "character/", "map/", "prop/", "effect/", "farm/", "housing/", ""};
     for (const char* folder : folders) {
         std::string prefix = Paths::Asset("models/") + folder;
         auto found = FirstExisting({
@@ -82,6 +82,16 @@ std::string ResolveMonsterModel(const std::string& model_file) {
         });
         if (!found.empty()) return found;
     }
+
+    // Fallback: assets_converted/mod_objs/ for item/equipment models ([r]_*.obj, etc.)
+    std::string mod_objs = Paths::Asset("../assets_converted/mod_objs/");
+    auto found_converted = FirstExisting({
+        mod_objs + base + ".glb",
+        mod_objs + base + ".obj",
+        VFS::Find("assets_converted/mod_objs/" + base + ".glb"),
+        VFS::Find("assets_converted/mod_objs/" + base + ".obj"),
+    });
+    if (!found_converted.empty()) return found_converted;
 
     return FirstExisting({
         Paths::Asset("models/monster/" + base + ".glb"),

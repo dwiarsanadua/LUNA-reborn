@@ -84,20 +84,23 @@ std::string SceneLoader::ResolveModelPath(const std::string& model_ref) {
     auto dot = base.find_last_of('.');
     if (dot != std::string::npos) base = base.substr(0, dot);
 
-    std::string paths[] = {
-        VFS::Resolve("assets/models/" + base + ".glb"),
-        VFS::Resolve("assets/models/" + base + ".obj"),
-        VFS::Resolve("assets/models/prop/" + base + ".glb"),
-        VFS::Resolve("assets/models/character/" + base + ".glb"),
-        VFS::Resolve("assets/models/map/" + base + ".glb"),
-    };
+    const char* subdirs[] = {"", "prop/", "character/", "map/", "monster/", "npc/", "effect/", "farm/", "housing/"};
+    for (const char* sub : subdirs) {
+        for (const char* ext : {".glb", ".obj"}) {
+            std::string p = VFS::Resolve(std::string("assets/models/") + sub + base + ext);
+            std::ifstream test(p);
+            if (test.good()) { test.close(); return p; }
+        }
+    }
 
-    for (auto& p : paths) {
+    // Fallback: assets_converted/mod_objs/ for item/equipment models
+    for (const char* ext : {".glb", ".obj"}) {
+        std::string p = VFS::Resolve(std::string("assets_converted/mod_objs/") + base + ext);
         std::ifstream test(p);
         if (test.good()) { test.close(); return p; }
     }
 
-    spdlog::warn("SceneLoader: model not found: {} (tried .glb/.obj)", base);
+    spdlog::warn("SceneLoader: model not found: {} (tried assets/models + assets_converted/mod_objs)", base);
     return "";
 }
 
