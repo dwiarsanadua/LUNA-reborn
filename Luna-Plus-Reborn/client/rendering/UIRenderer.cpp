@@ -31,6 +31,7 @@ static bgfx::VertexLayout getLayout() {
 }
 
 void UIRenderer::BeginFrame() {
+    // Flush whatever was left over from last frame, then reset state
     FlushBatch();
     batch_verts_.clear();
     batch_indices_.clear();
@@ -38,14 +39,14 @@ void UIRenderer::BeginFrame() {
     atlas_bind_count_ = 0;
     scissor_stack_.clear();
 
+    // Set up the UI view with an identity transform — vertices are in NDC already
     bgfx::setViewRect(view_id_, 0, 0, (uint16_t)width, (uint16_t)height);
+    bgfx::setViewClear(view_id_, BGFX_CLEAR_NONE); // don't wipe the 3D scene behind UI
     bgfx::setViewMode(view_id_, bgfx::ViewMode::Sequential);
     float identity[16]; std::memset(identity, 0, sizeof(identity));
     identity[0] = identity[5] = identity[10] = identity[15] = 1.0f;
     bgfx::setViewTransform(view_id_, identity, identity);
     bgfx::touch(view_id_);
-
-    FlushBatch();
 }
 
 void UIRenderer::FlushBatch() {
@@ -69,7 +70,8 @@ void UIRenderer::FlushBatch() {
         bgfx::setVertexBuffer(0, &tvb);
         bgfx::setIndexBuffer(&tib);
 
-        uint64_t state = BGFX_STATE_DEFAULT | BGFX_STATE_BLEND_ALPHA;
+        // UI must not depth-test against the 3D scene.  Use write+no-depth only.
+        uint64_t state = BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_BLEND_ALPHA;
         if (!scissor_stack_.empty()) {
             const auto& s = scissor_stack_.back();
             uint16_t px = (uint16_t)(s.x / logicalWidth * width);
@@ -613,7 +615,10 @@ void UIRenderer::Init() {
         spdlog::info("UIRenderer: Program UI valid (handle={})", ui_prog_.idx);
     }
     s_tex_ = bgfx::createUniform("s_texColor", bgfx::UniformType::Sampler);
-    uint32_t white = 0xffffffff; white_tex_ = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0, bgfx::makeRef(&white, 4));
+    // makeRef is NOT safe for a local variable — use bgfx::copy so bgfx owns the memory.
+    static const uint32_t white_pixel = 0xffffffff;
+    white_tex_ = bgfx::createTexture2D(1, 1, false, 1, bgfx::TextureFormat::RGBA8, 0,
+        bgfx::copy(&white_pixel, sizeof(white_pixel)));
     CreateFont();
 
     atlas_data_.resize(ATLAS_SIZE * ATLAS_SIZE, 0);

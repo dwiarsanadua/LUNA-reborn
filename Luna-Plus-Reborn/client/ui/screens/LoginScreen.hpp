@@ -22,6 +22,7 @@ private:
     bgfx::TextureHandle tex_bg_ = BGFX_INVALID_HANDLE;
     F fields_[2] = {};
     bool sent_ = false;
+    float anim_time_ = 0.0f;
     std::function<void(uint32_t)> set_clear_color_;
     SceneRenderer* scene_renderer_ = nullptr;
     GameState* state_ = nullptr;
