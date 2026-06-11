@@ -34,6 +34,9 @@ private:
     bgfx::TextureHandle tex_div_      = BGFX_INVALID_HANDLE; // _05.png  472x9    divider/separator
     bgfx::TextureHandle tex_close_n_  = BGFX_INVALID_HANDLE; // _02.png   17x17   close btn normal
     bgfx::TextureHandle tex_close_h_  = BGFX_INVALID_HANDLE; // _03.png   17x17   close btn hover
+    // Original Luna Plus converted assets
+    bgfx::TextureHandle tex_logo_     = BGFX_INVALID_HANDLE; // loginbar_logo.png  87x62   Luna logo
+    bgfx::TextureHandle tex_bar_      = BGFX_INVALID_HANDLE; // login_bar00.png  1024x128  bottom bar strip
 
     F fields_[2] = {};
     bool btn_login_hover_   = false;

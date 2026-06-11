@@ -89,15 +89,18 @@ void LoginScreen::Enter() {
     spdlog::info("[LOGIN] Enter");
 
     // ── Load Launcher sprite sheet textures ───────────────────────────────────
-    // Background: C_launcher.png (946×539) is the full-screen launcher BG
+    // Background — try Launcher sprite first, then the converted Luna assets
+    // (assets/textures/login.png is the original 2048x2048 atlas from Luna Plus)
     {
         const char* paths[] = {
-            "assets/textures/ui/Launcher/C_launcher.png",
-            "assets/textures/ui/Launcher/lunaclient.png",
+            "assets/textures/ui/Launcher/C_launcher.png",   // extracted launcher BG
+            "assets/textures/ui/Launcher/lunaclient.png",   // alternate name
+            "assets/textures/login.png",                    // original Luna Plus login atlas
+            "assets/textures/loginloading.png",             // loading screen variant
             "assets/textures/ui/lunaclient.png",
         };
         if (!bgfx::isValid(tex_bg_))
-            tex_bg_ = LoadTex(paths, 3);
+            tex_bg_ = LoadTex(paths, 5);
     }
 
     // Main panel frame: Launcher_01_01.png (595×480)
@@ -137,6 +140,23 @@ void LoginScreen::Enter() {
         const char* ch[] = {"assets/textures/ui/Launcher/Launcher_01_03.png"};
         if (!bgfx::isValid(tex_close_n_)) tex_close_n_ = LoadTex(cn, 1);
         if (!bgfx::isValid(tex_close_h_)) tex_close_h_ = LoadTex(ch, 1);
+    }
+
+    // Bottom bar elements from original Luna Plus converted assets
+    // loginbar_top/bottom = 40x128 side decorations, login_bar00 = 1024x128 main bar strip
+    {
+        const char* logo[] = {
+            "assets/textures/loginbar_logo.png",   // 87x62  Luna logo
+            "assets/textures/ui/loginbar_logo.png",
+        };
+        if (!bgfx::isValid(tex_logo_)) tex_logo_ = LoadTex(logo, 2);
+    }
+    {
+        const char* bar[] = {
+            "assets/textures/login_bar00.png",     // 1024x128  main bar strip
+            "assets/textures/ui/login_bar00.png",
+        };
+        if (!bgfx::isValid(tex_bar_)) tex_bar_ = LoadTex(bar, 2);
     }
 
     fields_[0] = {"", 0, true,  false, "ID"};
@@ -292,17 +312,31 @@ void LoginScreen::Render(UIRenderer& ui) {
         ui.DrawText(tx, ty, 0xFFFFFFFF, "OFFLINE");
     }
 
-    // ── Bottom bar ────────────────────────────────────────────────────────────
-    float barH = 36.0f;
-    ui.DrawRect(0, lh - barH, lw, barH, UIColor{8, 12, 36, 220});
-    ui.DrawRect(0, lh - barH, lw, 1, UIColor{212, 175, 96, 160});
-    ui.DrawRect(0, lh - barH + 1, lw, 1, UIColor{60, 80, 160, 80});
+    // ── Bottom bar — use original Luna Plus loginbar sprite if available ───────
+    // login_bar00.png (1024x128) is the full-width bottom bar strip from Luna Plus
+    float barH = 64.0f;  // tall enough to match the original bar proportions
+    if (bgfx::isValid(tex_bar_)) {
+        // Original bar is 1024x128 — scale to full width at bottom
+        ui.DrawImage(0, lh - barH, lw, barH, tex_bar_);
+    } else {
+        // Procedural fallback
+        ui.DrawRect(0, lh - barH, lw, barH, UIColor{8, 12, 36, 220});
+        ui.DrawRect(0, lh - barH, lw, 1, UIColor{212, 175, 96, 160});
+        ui.DrawRect(0, lh - barH + 1, lw, 1, UIColor{60, 80, 160, 80});
+    }
 
-    // Fade-in version text
+    // Luna logo (loginbar_logo.png 87x62) positioned bottom-right in bar
     float logo_alpha = std::min(255.0f, anim_time_ * 280.0f);
     uint8_t la = (uint8_t)logo_alpha;
-    ui.DrawText(lw - 340, lh - barH - 40, (uint32_t(la) << 24) | 0x00EED090, "LUNA Plus Reborn");
-    ui.DrawText(lw - 140, lh - barH + 10, 0xFF666677, "LUNA Plus Reborn v1.1");
+    if (bgfx::isValid(tex_logo_)) {
+        float logo_w = 87.0f * scale, logo_h = 62.0f * scale;
+        float logo_x = lw - logo_w - 20.0f, logo_y = lh - barH + (barH - logo_h) * 0.5f;
+        ui.DrawImage(logo_x, logo_y, logo_w, logo_h, tex_logo_, UIColor{255, 255, 255, la});
+    } else {
+        ui.DrawText(lw - 340, lh - barH - 30, (uint32_t(la) << 24) | 0x00EED090, "LUNA Plus Reborn");
+    }
+
+    ui.DrawText(lw - 150, lh - barH + barH * 0.6f, 0xFF555566, "LUNA Plus Reborn v1.1");
     ui.DrawText(px + 10, btn_y + BTN_H + 12.0f, 0xFF505868, "Tab = Switch field   Enter = Login");
 }
 
