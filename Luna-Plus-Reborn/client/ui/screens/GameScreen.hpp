@@ -296,6 +296,12 @@ private:
     ParticleSystem particleSys_;
     float prev_x_ = 0, prev_z_ = 0;
 
+    // Camera matrices from the last 3D render pass, used to project
+    // world-space effects (damage numbers, overheads) into screen space.
+    glm::mat4 last_view_{1.0f};
+    glm::mat4 last_proj_{1.0f};
+    bool have_camera_matrices_ = false;
+
     std::unordered_map<std::string, bool> dialog_visibility_;
     void ToggleDialog(const std::string& name);
     bool IsDialogOpen(const std::string& name) const;

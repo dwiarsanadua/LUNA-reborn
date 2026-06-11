@@ -35,7 +35,8 @@ public:
             MonsterType type = MonsterType::Normal, const std::string& model_path = "");
     
     void Update(float dt, float player_x = 0, float player_z = 0);
-    void RenderOverhead(UIRenderer& ui);
+    void RenderOverhead(UIRenderer& ui, const glm::mat4* view = nullptr,
+                        const glm::mat4* proj = nullptr);
     
     // Getters
     uint32_t GetID() const { return id_; }

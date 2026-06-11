@@ -1,5 +1,14 @@
 set(BGFX_EXTERNAL_DIR "${CMAKE_SOURCE_DIR}/external")
 
+# Per-platform bgfx GENie build output dirs (Release artifacts)
+set(BGFX_LIB_SEARCH_DIRS
+    ${BGFX_EXTERNAL_DIR}/bgfx/.build/osx-arm64/bin
+    ${BGFX_EXTERNAL_DIR}/bgfx/.build/linux64_gcc/bin
+    ${BGFX_EXTERNAL_DIR}/bgfx/.build/linux64_clang/bin
+    ${BGFX_EXTERNAL_DIR}/bgfx/.build/win64_vs2022/bin
+    ${BGFX_EXTERNAL_DIR}/bgfx/.build/win64_mingw-gcc/bin
+)
+
 find_path(bgfx_INCLUDE_DIR
     NAMES bgfx/bgfx.h
     PATHS
@@ -35,7 +44,7 @@ find_path(bimg_INCLUDE_DIR
 find_library(bgfx_LIBRARY
     NAMES bgfxRelease bgfx libbgfxRelease libbgfx
     PATHS
-        ${BGFX_EXTERNAL_DIR}/bgfx/.build/osx-arm64/bin
+        ${BGFX_LIB_SEARCH_DIRS}
         /opt/homebrew/lib
         /usr/local/lib
         /usr/lib
@@ -47,7 +56,7 @@ find_library(bgfx_LIBRARY NAMES bgfx libbgfx)
 find_library(bx_LIBRARY
     NAMES bxRelease bx libbxRelease libbx
     PATHS
-        ${BGFX_EXTERNAL_DIR}/bgfx/.build/osx-arm64/bin
+        ${BGFX_LIB_SEARCH_DIRS}
         /opt/homebrew/lib
         /usr/local/lib
         /usr/lib
@@ -58,7 +67,7 @@ find_library(bx_LIBRARY NAMES bx libbx)
 find_library(bimg_LIBRARY
     NAMES bimgRelease bimg libbimgRelease libbimg
     PATHS
-        ${BGFX_EXTERNAL_DIR}/bgfx/.build/osx-arm64/bin
+        ${BGFX_LIB_SEARCH_DIRS}
         /opt/homebrew/lib
         /usr/local/lib
         /usr/lib
@@ -69,14 +78,14 @@ find_library(bimg_LIBRARY NAMES bimg libbimg)
 find_library(bimg_decode_LIBRARY
     NAMES bimg_decodeRelease bimg_decode libbimg_decodeRelease libbimg_decode
     PATHS
-        ${BGFX_EXTERNAL_DIR}/bgfx/.build/osx-arm64/bin
+        ${BGFX_LIB_SEARCH_DIRS}
     NO_DEFAULT_PATH
 )
 
 find_library(bimg_encode_LIBRARY
     NAMES bimg_encodeRelease bimg_encode libbimg_encodeRelease libbimg_encode
     PATHS
-        ${BGFX_EXTERNAL_DIR}/bgfx/.build/osx-arm64/bin
+        ${BGFX_LIB_SEARCH_DIRS}
     NO_DEFAULT_PATH
 )
 
@@ -109,6 +118,16 @@ if(bgfx_FOUND AND NOT TARGET bgfx::bgfx)
     if(APPLE)
         set_property(TARGET bgfx::bgfx APPEND PROPERTY
             INTERFACE_LINK_OPTIONS "SHELL:-Xlinker -framework -Xlinker Cocoa -Xlinker -framework -Xlinker Metal -Xlinker -framework -Xlinker MetalKit -Xlinker -framework -Xlinker QuartzCore -Xlinker -framework -Xlinker IOKit -Xlinker -framework -Xlinker CoreGraphics"
+        )
+    elseif(WIN32)
+        set_property(TARGET bgfx::bgfx APPEND PROPERTY
+            INTERFACE_LINK_LIBRARIES gdi32 user32 psapi
+        )
+    else()
+        # Linux: X11 + GL/Vulkan loaders are resolved at runtime by bgfx (dlopen)
+        find_package(Threads REQUIRED)
+        set_property(TARGET bgfx::bgfx APPEND PROPERTY
+            INTERFACE_LINK_LIBRARIES X11 GL Threads::Threads ${CMAKE_DL_LIBS} rt
         )
     endif()
 endif()

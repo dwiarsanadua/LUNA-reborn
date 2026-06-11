@@ -2,32 +2,78 @@
 
 > **Misi:** Membangkitkan LUNA Online Plus sebagai game modern cross-platform dengan teknologi paling mutakhir.
 > **Engine:** C++23 · bgfx (Metal) · EnTT ECS · Jolt Physics · Asio · miniaudio
-> **Platform:** macOS (Apple Silicon) · Windows (coming)
+> **Platform:** macOS (Apple Silicon · Metal) · Windows (x64 · D3D11) · Linux (x64 · Vulkan/OpenGL)
 > **Status:** 🚀 **Engine, client, server 100% selesai. Gap adaptasi Old→Reborn ~90% tertutup.**
 
 ---
 
 ## Quick Start
 
+### macOS (Apple Silicon)
+
 ```bash
 git clone https://github.com/dwiarsanadua/LUNA-reborn.git
-cd Luna-Plus-Reborn
+cd LUNA-reborn/Luna-Plus-Reborn
 
 # Build dependencies
-brew install asio sol2 spdlog fmt glfw glm assimp freetype sqlite3 flatbuffers miniaudio
+brew install asio sol2 spdlog fmt glfw glm assimp freetype sqlite3 flatbuffers entt nlohmann-json
 cd external && git clone --depth 1 https://github.com/bkaradzic/bx.git
 git clone --depth 1 https://github.com/bkaradzic/bimg.git
 git clone --depth 1 https://github.com/bkaradzic/bgfx.git
-cd bgfx && cmake -B .build/ci -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DBGFX_CONFIG_RENDERER_METAL=ON -DBGFX_BUILD_EXAMPLES=OFF && ninja -C .build/ci bgfx
-cd ../.. && git clone --depth 1 --branch v5.2.0 https://github.com/jrouwe/JoltPhysics.git external/JoltPhysics
-cd external/JoltPhysics && cmake -B Build -G Ninja -DCMAKE_BUILD_TYPE=Release && ninja -C Build
+cd bgfx && make osx-arm64-release   # builds libs + shaderc via GENie
+cd .. && git clone --depth 1 --branch v5.2.0 https://github.com/jrouwe/JoltPhysics.git
+cd JoltPhysics && cmake -S Build -B Build -G Ninja -DCMAKE_BUILD_TYPE=Release && ninja -C Build Jolt
+cd ../..
 
 # Build game
-cmake -B build -G Ninja
-cmake --build build --target LunaPlusClient
+cmake --preset macos-release
+cmake --build build/macos-release --target LunaPlusClient
 
 # Run
-./build/bin/LunaPlusClient
+./build/macos-release/bin/LunaPlusClient
+```
+
+### Windows (x64, Visual Studio 2022 + vcpkg)
+
+```powershell
+git clone https://github.com/dwiarsanadua/LUNA-reborn.git
+cd LUNA-reborn/Luna-Plus-Reborn
+
+# Dependencies via vcpkg (set VCPKG_ROOT first)
+vcpkg install asio spdlog fmt glfw3 glm assimp freetype sqlite3 flatbuffers entt nlohmann-json sol2 --triplet x64-windows
+
+# bgfx + Jolt
+cd external
+git clone --depth 1 https://github.com/bkaradzic/bx.git
+git clone --depth 1 https://github.com/bkaradzic/bimg.git
+git clone --depth 1 https://github.com/bkaradzic/bgfx.git
+cd bgfx && ..\bx\tools\bin\windows\genie.exe --with-tools vs2022
+msbuild .build\projects\vs2022\bgfx.sln /p:Configuration=Release /p:Platform=x64
+cd .. && git clone --depth 1 --branch v5.2.0 https://github.com/jrouwe/JoltPhysics.git
+cd JoltPhysics && cmake -S Build -B Build -DCMAKE_BUILD_TYPE=Release && cmake --build Build --config Release
+cd ..\..
+
+# Build game (D3D11 renderer)
+cmake --preset windows-release
+cmake --build build/win-release --target LunaPlusClient --config Release
+```
+
+### Linux (x64)
+
+```bash
+sudo apt install cmake ninja-build pkg-config libglfw3-dev libglm-dev libspdlog-dev \
+    libfmt-dev libasio-dev libfreetype-dev libsqlite3-dev libflatbuffers-dev \
+    libassimp-dev libbz2-dev nlohmann-json3-dev liblua5.4-dev libuv1-dev
+cd Luna-Plus-Reborn/external
+git clone --depth 1 https://github.com/bkaradzic/bx.git
+git clone --depth 1 https://github.com/bkaradzic/bimg.git
+git clone --depth 1 https://github.com/bkaradzic/bgfx.git
+(cd bgfx && make linux-gcc-release64)
+git clone --depth 1 --branch v5.2.0 https://github.com/jrouwe/JoltPhysics.git
+(cd JoltPhysics && cmake -S Build -B Build -G Ninja -DCMAKE_BUILD_TYPE=Release && ninja -C Build Jolt)
+cd ..
+cmake --preset linux-release
+cmake --build build/linux-release --target LunaPlusClient
 ```
 
 ---

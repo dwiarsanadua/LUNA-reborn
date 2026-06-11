@@ -114,12 +114,21 @@ void LegacyHudOverlay::Update(GameState* state, float screen_w, float screen_h) 
         int exp_next = state->level * 100 + 500;
         float exp_pct = exp_next > 0 ? (float)state->exp / exp_next : 0;
 
-        if (auto* hp = char_gage_->FindWidget<GaugeBar>("CG_GUAGELIFE"))
+        if (auto* hp = char_gage_->FindWidget<GaugeBar>("CG_GUAGELIFE")) {
             hp->SetProgress(hp_pct);
-        if (auto* mp = char_gage_->FindWidget<GaugeBar>("CG_GUAGEMANA"))
+            // Old HP bar shifts red -> yellow as health drops
+            hp->SetFillColor(hp_pct > 0.5f ? UIColor{220, 50, 50, 255}
+                            : hp_pct > 0.25f ? UIColor{230, 170, 40, 255}
+                                             : UIColor{255, 60, 60, 255});
+        }
+        if (auto* mp = char_gage_->FindWidget<GaugeBar>("CG_GUAGEMANA")) {
             mp->SetProgress(mp_pct);
-        if (auto* xp = char_gage_->FindWidget<GaugeBar>("CG_GUAGEEXPPOINT"))
+            mp->SetFillColor({60, 110, 240, 255});
+        }
+        if (auto* xp = char_gage_->FindWidget<GaugeBar>("CG_GUAGEEXPPOINT")) {
             xp->SetProgress(exp_pct);
+            xp->SetFillColor({250, 210, 60, 255});
+        }
 
         char hp_txt[32], mp_txt[32];
         snprintf(hp_txt, sizeof(hp_txt), "%d / %d", state->hp, state->max_hp);

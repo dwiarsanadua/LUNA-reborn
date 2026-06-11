@@ -44,7 +44,9 @@
 #include <input/Keyboard.hpp>
 #include <game/network/PacketDispatcher.hpp>
 #include <spdlog/spdlog.h>
+#include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <csignal>
 #include <chrono>
 #include <thread>
@@ -305,7 +307,9 @@ int main(int argc, char** argv) {
 
     // Input event handlers
     input_sys.SetKeyCallback([&](const KeyEvent& e) {
-        if (e.action != 1 && e.key != 259) return; // PRESS only, allow BACKSPACE repeat
+        // Forward PRESS and REPEAT (screens use repeat for held movement
+        // keys and chat backspace); ignore RELEASE
+        if (e.action == 0) return;
         if (g_state.chat_open) {
             if (e.key == 257) {
                 g_state.chat_open = false;
@@ -333,17 +337,44 @@ int main(int argc, char** argv) {
         if (g_screen_mgr) g_screen_mgr->HandleChar(codepoint);
     });
 
+    // Old Luna click-to-move: unproject the cursor through the camera and
+    // intersect with the ground plane at the hero's height, instead of a
+    // fixed screen-center offset (which broke once the camera rotated).
+    auto screen_to_ground = [&](double sx, double sy, float& out_x, float& out_z) -> bool {
+        float w = (float)device.GetLogicalWidth();
+        float h = (float)device.GetLogicalHeight();
+        if (w <= 0 || h <= 0) return false;
+        glm::mat4 inv_vp = glm::inverse(cam.GetProjectionMatrix() * cam.GetViewMatrix());
+        float nx = (float)(sx / w) * 2.0f - 1.0f;
+        float ny = 1.0f - (float)(sy / h) * 2.0f;
+        glm::vec4 p_near = inv_vp * glm::vec4(nx, ny, -1.0f, 1.0f);
+        glm::vec4 p_far  = inv_vp * glm::vec4(nx, ny,  1.0f, 1.0f);
+        if (p_near.w == 0.0f || p_far.w == 0.0f) return false;
+        glm::vec3 ro = glm::vec3(p_near) / p_near.w;
+        glm::vec3 rd = glm::normalize(glm::vec3(p_far) / p_far.w - ro);
+        if (fabsf(rd.y) < 1e-5f) return false;
+        float t = (g_state.player_y - ro.y) / rd.y;
+        if (t < 0.0f) return false;
+        out_x = ro.x + rd.x * t;
+        out_z = ro.z + rd.z * t;
+        return true;
+    };
+
     input_sys.SetMouseCallback([&](const MouseEvent& e) {
         if (e.button == 0 && e.action == 1) {
-            float wx = (float)(e.x - 640) / 12.0f;
-            float wz = (float)(e.y - 360) / 12.0f;
-            if (screenManager.CurrentName() == "game") {
-                g_state.waypoint_x = wx;
-                g_state.waypoint_z = wz;
-                g_state.has_waypoint = true;
-            } else {
-                g_state.player_x = wx;
-                g_state.player_z = wz;
+            float wx, wz;
+            if (screen_to_ground(e.x, e.y, wx, wz)) {
+                if (screenManager.CurrentName() == "game") {
+                    g_state.waypoint_x = wx;
+                    g_state.waypoint_z = wz;
+                    g_state.has_waypoint = true;
+                    g_state.click_marker_x = wx;
+                    g_state.click_marker_z = wz;
+                    g_state.click_marker_time = 1.0f;
+                } else {
+                    g_state.player_x = wx;
+                    g_state.player_z = wz;
+                }
             }
         }
         if (e.button == 1 && e.action == 1) { g_dragging = true; g_last_mx = e.x; g_last_my = e.y; }
@@ -368,11 +399,26 @@ int main(int argc, char** argv) {
         input_sys.Update(dt);
         Mouse::Update();
 
+        // Camera control (Old Luna style): right-drag rotates, wheel zooms
+        if (screenManager.CurrentName() == "game") {
+            if (g_dragging) {
+                double mx = input_sys.GetMouseX(), my = input_sys.GetMouseY();
+                g_state.cam_yaw   += (float)(mx - g_last_mx) * 0.35f;
+                g_state.cam_pitch += (float)(my - g_last_my) * 0.25f;
+                g_state.cam_pitch = std::clamp(g_state.cam_pitch, -75.0f, -12.0f);
+                g_last_mx = mx; g_last_my = my;
+            }
+            float scroll = input_sys.GetScrollDelta();
+            if (scroll != 0.0f) {
+                g_state.cam_dist = std::clamp(g_state.cam_dist - scroll * 6.0f, 18.0f, 160.0f);
+            }
+        }
+
         // --- PROCESS NETWORK EVENTS (thread-safe) ---
         g_network.ProcessEvents();
 
         {
-            bool is_login = (screenManager.CurrentName() == "login" || 
+            bool is_login = (screenManager.CurrentName() == "login" ||
                             screenManager.CurrentName() == "charselect");
             if (is_login) {
                 cam.SetTarget(glm::vec3(0, 0, 0));
@@ -380,7 +426,13 @@ int main(int argc, char** argv) {
                 cam.SetYaw(-45.0f);
                 cam.SetPitch(-30.0f);
             } else {
-                cam.SetTarget(glm::vec3(g_state.player_x, 0, g_state.player_z));
+                // Smooth follow: exponential lag toward the hero, aimed at
+                // chest height so the character sits low in frame like Old.
+                static glm::vec3 cam_follow{0.0f};
+                glm::vec3 hero_pos(g_state.player_x, g_state.player_y + 1.2f, g_state.player_z);
+                float follow_rate = 1.0f - expf(-dt * 10.0f);
+                cam_follow += (hero_pos - cam_follow) * follow_rate;
+                cam.SetTarget(cam_follow);
                 cam.SetDistance(g_state.cam_dist);
                 cam.SetYaw(g_state.cam_yaw);
                 cam.SetPitch(g_state.cam_pitch);

@@ -1,4 +1,10 @@
+#if defined(_WIN32)
+#define GLFW_EXPOSE_NATIVE_WIN32
+#elif defined(__APPLE__)
 #define GLFW_EXPOSE_NATIVE_COCOA
+#else
+#define GLFW_EXPOSE_NATIVE_X11
+#endif
 #include "RenderDevice.h"
 #include "VFS.h"
 #include <GLFW/glfw3native.h>
@@ -13,7 +19,9 @@ bool RenderDevice::Init(const RenderDeviceConfig& config) {
     }
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+#if defined(__APPLE__)
     glfwWindowHint(GLFW_COCOA_RETINA_FRAMEBUFFER, GLFW_TRUE);
+#endif
     glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
     glfwWindowHint(GLFW_FOCUSED, GLFW_TRUE);
     
@@ -44,10 +52,23 @@ bool RenderDevice::Init(const RenderDeviceConfig& config) {
     logical_height_ = win_h;
 
     bgfx::PlatformData pd{};
+#if defined(_WIN32)
+    pd.nwh = glfwGetWin32Window(window_);
+#elif defined(__APPLE__)
     pd.nwh = glfwGetCocoaWindow(window_);
+#else
+    pd.ndt = glfwGetX11Display();
+    pd.nwh = (void*)(uintptr_t)glfwGetX11Window(window_);
+#endif
 
     bgfx::Init bgfx_init;
-    bgfx_init.type = bgfx::RendererType::Metal; 
+#if defined(_WIN32)
+    bgfx_init.type = bgfx::RendererType::Direct3D11;
+#elif defined(__APPLE__)
+    bgfx_init.type = bgfx::RendererType::Metal;
+#else
+    bgfx_init.type = bgfx::RendererType::Count; // auto-detect (Vulkan/OpenGL)
+#endif
     bgfx_init.resolution.width = (uint32_t)width_;
     bgfx_init.resolution.height = (uint32_t)height_;
     bgfx_init.resolution.reset = (config.vsync ? BGFX_RESET_VSYNC : BGFX_RESET_NONE) | BGFX_RESET_HIDPI | BGFX_RESET_FLUSH_AFTER_RENDER;

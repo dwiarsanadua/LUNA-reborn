@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 #include <cstdint>
 #include <glm/glm.hpp>
 #include <bgfx/bgfx.h>

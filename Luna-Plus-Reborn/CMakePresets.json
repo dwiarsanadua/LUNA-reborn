@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 6,
   "configurePresets": [
     {
       "name": "macos-debug",
@@ -25,33 +25,71 @@
     },
     {
       "name": "windows-debug",
-      "displayName": "Windows Debug (x64, D3D12)",
+      "displayName": "Windows Debug (x64, D3D11)",
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
       "binaryDir": "${sourceDir}/build/win-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "LUNA_GRAPHICS_API": "D3D12",
+        "LUNA_GRAPHICS_API": "D3D11",
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
       }
     },
     {
       "name": "windows-release",
-      "displayName": "Windows Release (x64, D3D12)",
+      "displayName": "Windows Release (x64, D3D11)",
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
       "binaryDir": "${sourceDir}/build/win-release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "LUNA_GRAPHICS_API": "D3D12",
+        "LUNA_GRAPHICS_API": "D3D11",
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+      }
+    },
+    {
+      "name": "linux-debug",
+      "displayName": "Linux Debug (x64)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/linux-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "linux-release",
+      "displayName": "Linux Release (x64)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/linux-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
       }
     }
   ],
   "buildPresets": [
-    { "name": "macos-debug", "configurePreset": "macos-debug" },
-    { "name": "macos-release", "configurePreset": "macos-release" },
-    { "name": "windows-debug", "configurePreset": "windows-debug" },
-    { "name": "windows-release", "configurePreset": "windows-release" }
+    {
+      "name": "macos-debug",
+      "configurePreset": "macos-debug"
+    },
+    {
+      "name": "macos-release",
+      "configurePreset": "macos-release"
+    },
+    {
+      "name": "windows-debug",
+      "configurePreset": "windows-debug"
+    },
+    {
+      "name": "windows-release",
+      "configurePreset": "windows-release"
+    },
+    {
+      "name": "linux-debug",
+      "configurePreset": "linux-debug"
+    },
+    {
+      "name": "linux-release",
+      "configurePreset": "linux-release"
+    }
   ]
 }

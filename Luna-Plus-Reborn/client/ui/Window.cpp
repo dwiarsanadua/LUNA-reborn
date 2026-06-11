@@ -51,31 +51,41 @@ void Window::Render(UIRenderer& ui) {
         custom_bg_cb_(ui, x_, y_, w_, h_);
     } else if (draw_chrome_) {
         float th = GetTitleBarH();
-        // Title bar gradient: top half lighter, bottom half darker
-        ui.DrawRect(x_, y_, w_, th / 2, title_color_);
-        ui.DrawRect(x_, y_ + th / 2, w_, th - th / 2,
-                    {uint8_t(title_color_.r * 2 / 3),
-                     uint8_t(title_color_.g * 2 / 3),
-                     uint8_t(title_color_.b * 2 / 3),
-                     title_color_.a});
+        // Title bar: 4-step vertical gradient like Old's window cap texture
+        float step = th / 4.0f;
+        UIColor tc = title_color_;
+        UIColor steps[4] = {
+            {uint8_t(std::min(255, tc.r * 5 / 3)), uint8_t(std::min(255, tc.g * 5 / 3)),
+             uint8_t(std::min(255, tc.b * 5 / 3)), tc.a},
+            tc,
+            {uint8_t(tc.r * 3 / 4), uint8_t(tc.g * 3 / 4), uint8_t(tc.b * 3 / 4), tc.a},
+            {uint8_t(tc.r / 2), uint8_t(tc.g / 2), uint8_t(tc.b / 2), tc.a},
+        };
+        for (int i = 0; i < 4; ++i)
+            ui.DrawRect(x_, y_ + step * i, w_, step + 1, steps[i]);
+        // Thin gold separator under the title (Old chrome accent)
+        ui.DrawRect(x_, y_ + th - 1, w_, 1, {212, 175, 96, 230});
 
-        // Window body fill
+        // Window body fill with subtle inner panel
         ui.DrawRect(x_, y_ + th, w_, h_ - th, body_color_);
+        ui.DrawBorder(x_ + 3, y_ + th + 3, w_ - 6, h_ - th - 6, {255, 255, 255, 18}, 1);
 
-        // 3D border (raised style)
-        ui.DrawBorder(x_, y_, w_, h_, {150, 200, 255, 200}, 1);
-        ui.DrawBorder(x_, y_, w_, h_, {50, 80, 120, 200}, 2);
+        // Outer border: dark outline + light blue inner bevel
+        ui.DrawBorder(x_ - 1, y_ - 1, w_ + 2, h_ + 2, {10, 12, 24, 220}, 1);
+        ui.DrawBorder(x_, y_, w_, h_, {150, 200, 255, 190}, 1);
 
         // Title text with shadow
         if (!title_.empty()) {
             ui.DrawText(x_ + 6, y_ + 4, 0xFF000000, "%s", title_.c_str());
-            ui.DrawText(x_ + 5, y_ + 3, 0xffffffff, "%s", title_.c_str());
+            ui.DrawText(x_ + 5, y_ + 3, 0xffffe8c0, "%s", title_.c_str());
         }
 
-        // Close button (pojok kanan atas)
+        // Close button (top-right), rounded-look red with bevel
         if (closable_) {
             float cb_x = x_ + w_ - 20, cb_y = y_ + 2, cb_s = 16;
-            ui.DrawRect(cb_x, cb_y, cb_s, cb_s, {180, 20, 20, 220});
+            ui.DrawRect(cb_x, cb_y, cb_s, cb_s, {150, 26, 26, 230});
+            ui.DrawRect(cb_x, cb_y, cb_s, cb_s / 2, {200, 60, 60, 120});
+            ui.DrawBorder(cb_x, cb_y, cb_s, cb_s, {255, 160, 160, 160}, 1);
             ui.DrawText(cb_x + 4, cb_y + 1, 0xFFFFFFFF, "X");
         }
     }

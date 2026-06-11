@@ -112,7 +112,7 @@ void Hero::Move(float dx, float dz, float dt) {
     prev_x_ = x_; prev_z_ = z_;
     x_ += dx; z_ += dz;
     state_ = (state_ == HeroState::Dash) ? HeroState::Dash :
-             (dist > 50.0f * dt) ? HeroState::Run : HeroState::Walk;
+             (dist > 4.5f * dt) ? HeroState::Run : HeroState::Walk;
 }
 
 void Hero::SetState(HeroState s, float duration) {
@@ -346,7 +346,9 @@ void Hero::Update(float dt) {
             has_waypoint_ = false;
             SetState(HeroState::Idle);
         } else {
-            float speed = 80.0f * dt;
+            // Old Luna run speed: a bit above monster chase speed (3.0-3.5),
+            // so mobs can almost keep pace but the player can kite.
+            float speed = 6.5f * dt;
             if (navmesh_) {
                 auto seek = navmesh_->Seek({x_, z_}, {waypoint_x_, waypoint_z_}, speed / dt, dt);
                 dx = seek.x - x_;
@@ -378,8 +380,8 @@ void Hero::Update(float dt) {
 
     ProcessStateTransitions(dt);
     
-    moving_ = (fabs(x_ - prev_x_) > 0.01f || fabs(z_ - prev_z_) > 0.01f) 
-              && state_ == HeroState::Walk;
+    moving_ = (fabs(x_ - prev_x_) > 0.01f || fabs(z_ - prev_z_) > 0.01f)
+              && (state_ == HeroState::Walk || state_ == HeroState::Run);
     prev_x_ = x_; prev_z_ = z_;
 
     // Apply gravity: stick to terrain height

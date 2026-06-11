@@ -7,15 +7,35 @@ function(compile_shaders TARGET_NAME)
         set(BGFX_ROOT "${CMAKE_SOURCE_DIR}/../external/bgfx")
     endif()
 
-    set(SHADERC_EXE "")
-    if(EXISTS "${BGFX_ROOT}/tools/bin/darwin/shaderc")
-        set(SHADERC_EXE "${BGFX_ROOT}/tools/bin/darwin/shaderc")
-    elseif(EXISTS "${BGFX_ROOT}/.build/ci/tools/bin/shaderc")
-        set(SHADERC_EXE "${BGFX_ROOT}/.build/ci/tools/bin/shaderc")
+    if(APPLE)
+        set(SHADERC_PLATFORM_DIRS
+            "${BGFX_ROOT}/tools/bin/darwin"
+            "${BGFX_ROOT}/.build/osx-arm64/bin")
+    elseif(WIN32)
+        set(SHADERC_PLATFORM_DIRS
+            "${BGFX_ROOT}/tools/bin/windows"
+            "${BGFX_ROOT}/.build/win64_vs2022/bin")
     else()
+        set(SHADERC_PLATFORM_DIRS
+            "${BGFX_ROOT}/tools/bin/linux"
+            "${BGFX_ROOT}/.build/linux64_gcc/bin")
+    endif()
+
+    set(SHADERC_EXE "")
+    foreach(DIR ${SHADERC_PLATFORM_DIRS})
+        foreach(NAME shaderc shaderc.exe shadercRelease)
+            if(NOT SHADERC_EXE AND EXISTS "${DIR}/${NAME}")
+                set(SHADERC_EXE "${DIR}/${NAME}")
+            endif()
+        endforeach()
+    endforeach()
+    if(NOT SHADERC_EXE AND EXISTS "${BGFX_ROOT}/.build/ci/tools/bin/shaderc")
+        set(SHADERC_EXE "${BGFX_ROOT}/.build/ci/tools/bin/shaderc")
+    endif()
+    if(NOT SHADERC_EXE)
         find_program(SHADERC_EXE shaderc
             PATHS
-                "${BGFX_ROOT}/tools/bin/darwin"
+                ${SHADERC_PLATFORM_DIRS}
                 "${BGFX_ROOT}/.build/ci/tools/bin"
                 /opt/homebrew/bin
                 /usr/local/bin

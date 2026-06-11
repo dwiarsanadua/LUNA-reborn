@@ -10,7 +10,13 @@
 #include <algorithm>
 #include <cmath>
 
+#if defined(_WIN32)
+#define GLFW_EXPOSE_NATIVE_WIN32
+#elif defined(__APPLE__)
 #define GLFW_EXPOSE_NATIVE_COCOA
+#else
+#define GLFW_EXPOSE_NATIVE_X11
+#endif
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 #include <bgfx/bgfx.h>
@@ -534,6 +540,9 @@ static bool InitBgfx(GLFWwindow* window) {
     pd.nwh = glfwGetWin32Window(window);
 #elif defined(__APPLE__)
     pd.nwh = glfwGetCocoaWindow(window);
+#else
+    pd.ndt = glfwGetX11Display();
+    pd.nwh = (void*)(uintptr_t)glfwGetX11Window(window);
 #endif
 
     bgfx::Init init;

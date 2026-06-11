@@ -115,6 +115,9 @@ struct GameState {
     float player_x = 0, player_z = 0;
     bool has_waypoint = false;
     float waypoint_x = 0, waypoint_z = 0;
+    // Click-to-move ground marker (fades out after click, Old Luna style)
+    float click_marker_x = 0, click_marker_z = 0;
+    float click_marker_time = 0;
     float player_y = 0;
     int hp = 500, max_hp = 500;
     int mp = 100, max_mp = 100;
@@ -132,8 +135,9 @@ struct GameState {
     std::array<float, 10> hotbar_cooldowns{};
     uint32_t pending_skill_id = 0;
     int skill_points = 5;
-    float cam_yaw = -45.0f, cam_pitch = -40.0f;
-    float cam_dist = 80.0f;
+    // Old Luna in-game camera: fairly close behind the hero, ~35° down
+    float cam_yaw = -45.0f, cam_pitch = -35.0f;
+    float cam_dist = 42.0f;
     std::string name = "Hero";
     bool chat_open = false;
     bool inv_open = false;
